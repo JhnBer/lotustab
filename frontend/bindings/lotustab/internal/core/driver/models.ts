@@ -30,6 +30,8 @@ export interface Field {
     "default"?: string;
     "placeholder"?: string;
     "options"?: Option[] | null;
+    "group"?: string;
+    "fetchable"?: boolean;
 }
 
 /**

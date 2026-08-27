@@ -33,11 +33,11 @@ func (d *Driver) DisplayName() string { return "PostgreSQL" }
 
 func (d *Driver) ConnectionSpec() []driver.Field {
 	return []driver.Field{
-		{Key: "host", Label: "Host", Type: driver.FieldText, Required: true, Default: defaultHost, Placeholder: "localhost"},
-		{Key: "port", Label: "Port", Type: driver.FieldNumber, Required: true, Default: defaultPort, Placeholder: defaultPort},
-		{Key: "user", Label: "User", Type: driver.FieldText, Required: true, Placeholder: "postgres"},
-		{Key: "password", Label: "Password", Type: driver.FieldPassword, Secret: true, Placeholder: "stored in keychain"},
-		{Key: "database", Label: "Database", Type: driver.FieldText, Placeholder: "postgres"},
+		{Key: "host", Label: "Host", Type: driver.FieldText, Required: true, Default: defaultHost, Placeholder: "localhost", Group: "host_port"},
+		{Key: "port", Label: "Port", Type: driver.FieldNumber, Required: true, Default: defaultPort, Placeholder: defaultPort, Group: "host_port"},
+		{Key: "user", Label: "User", Type: driver.FieldText, Required: true, Placeholder: "postgres", Group: "auth"},
+		{Key: "password", Label: "Password", Type: driver.FieldPassword, Secret: true, Placeholder: "stored in keychain", Group: "auth"},
+		{Key: "database", Label: "Database", Type: driver.FieldText, Placeholder: "postgres", Fetchable: true},
 		{
 			Key:     "sslmode",
 			Label:   "SSL mode",

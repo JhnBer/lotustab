@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import DynamicField from "@/features/connections/DynamicField.vue";
 import { errorMessage } from "@/lib/errors";
-import type { Profile, SaveProfileInput } from "@/lib/wails";
+import type { Field, Profile, SaveProfileInput } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
 
 const props = defineProps<{
@@ -42,6 +42,28 @@ const testing = ref(false);
 
 const spec = computed(() => connections.specFor(driverId.value));
 const isEdit = computed(() => Boolean(props.profile?.id));
+
+type FieldRow = { id: string; fields: Field[] };
+
+const fieldRows = computed((): FieldRow[] => {
+  const rows: FieldRow[] = [];
+  const groupIndex = new Map<string, number>();
+  for (const field of spec.value) {
+    const group = field.group;
+    if (!group) {
+      rows.push({ id: field.key, fields: [field] });
+      continue;
+    }
+    const existing = groupIndex.get(group);
+    if (existing === undefined) {
+      groupIndex.set(group, rows.length);
+      rows.push({ id: group, fields: [field] });
+    } else {
+      rows[existing].fields.push(field);
+    }
+  }
+  return rows;
+});
 
 function applyDriver(nextDriverId: string, existing?: Record<string, string>) {
   driverId.value = nextDriverId;
@@ -111,6 +133,10 @@ async function onSave() {
     saving.value = false;
   }
 }
+
+async function fetchDatabases() {
+  return connections.fetchDatabases(payload());
+}
 </script>
 
 <template>
@@ -143,13 +169,20 @@ async function onSave() {
           </Select>
         </div>
 
-        <DynamicField
-          v-for="field in spec"
-          :key="field.key"
-          :field="field"
-          :model-value="params[field.key] ?? ''"
-          @update:model-value="params[field.key] = $event"
-        />
+        <div
+          v-for="row in fieldRows"
+          :key="row.id"
+          :class="row.fields.length > 1 ? 'grid grid-cols-2 gap-2' : undefined"
+        >
+          <DynamicField
+            v-for="field in row.fields"
+            :key="`${driverId}:${field.key}`"
+            :field="field"
+            :model-value="params[field.key] ?? ''"
+            :fetch-options="field.fetchable ? fetchDatabases : undefined"
+            @update:model-value="params[field.key] = $event"
+          />
+        </div>
 
         <DialogFooter class="mt-2">
           <Button type="button" variant="outline" :disabled="testing || saving" @click="onTest">

@@ -54,6 +54,13 @@ export function Disconnect(id: string): $CancellablePromise<void> {
 }
 
 /**
+ * FetchDatabases opens a throwaway connection from the form values and lists databases.
+ */
+export function FetchDatabases(input: $models.SaveProfileInput): $CancellablePromise<string[] | null> {
+    return $Call.ByID(3360744951, input);
+}
+
+/**
  * List returns saved profiles (never includes passwords).
  */
 export function List(): $CancellablePromise<connection$0.Profile[] | null> {

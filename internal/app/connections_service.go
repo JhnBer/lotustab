@@ -99,22 +99,22 @@ func (s *ConnectionsService) Delete(id string) error {
 
 // Test opens a throwaway connection using the form values.
 func (s *ConnectionsService) Test(ctx context.Context, input SaveProfileInput) error {
-	d, profile, password, err := s.prepare(input, false)
-	if err != nil {
-		return err
-	}
-	if password == "" && profile.ID != "" {
-		password, err = s.secrets.Get(profile.ID)
-		if err != nil {
-			return err
-		}
-	}
-	conn, err := d.Open(ctx, driver.ConnConfig{Params: profile.Params, Password: password})
+	conn, err := s.openFromInput(ctx, input)
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
 	return conn.Ping(ctx)
+}
+
+// FetchDatabases opens a throwaway connection from the form values and lists databases.
+func (s *ConnectionsService) FetchDatabases(ctx context.Context, input SaveProfileInput) ([]string, error) {
+	conn, err := s.openFromInput(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	return conn.Databases(ctx)
 }
 
 // Connect opens (or replaces) a live session for a saved profile.
@@ -156,6 +156,20 @@ func (s *ConnectionsService) ensureOpen(ctx context.Context, id string) (driver.
 	}
 	s.manager.Put(id, conn)
 	return conn, nil
+}
+
+func (s *ConnectionsService) openFromInput(ctx context.Context, input SaveProfileInput) (driver.Conn, error) {
+	d, profile, password, err := s.prepare(input, false)
+	if err != nil {
+		return nil, err
+	}
+	if password == "" && profile.ID != "" {
+		password, err = s.secrets.Get(profile.ID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return d.Open(ctx, driver.ConnConfig{Params: profile.Params, Password: password})
 }
 
 func (s *ConnectionsService) openSaved(ctx context.Context, id string) (driver.Conn, error) {

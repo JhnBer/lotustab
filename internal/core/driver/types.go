@@ -27,6 +27,8 @@ type Field struct {
 	Default     string    `json:"default,omitempty"`
 	Placeholder string    `json:"placeholder,omitempty"`
 	Options     []Option  `json:"options,omitempty"`
+	Group       string    `json:"group,omitempty"`
+	Fetchable   bool      `json:"fetchable,omitempty"`
 }
 
 // ConnConfig is the runtime configuration used to open a connection.

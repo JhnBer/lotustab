@@ -89,6 +89,15 @@ export const useConnectionsStore = defineStore("connections", () => {
     });
   }
 
+  async function fetchDatabases(input: SaveProfileInput) {
+    return (
+      (await ConnectionsService.FetchDatabases({
+        ...input,
+        params: input.params ?? {},
+      })) ?? []
+    );
+  }
+
   async function remove(id: string) {
     await ConnectionsService.Delete(id);
     await refresh();
@@ -124,6 +133,7 @@ export const useConnectionsStore = defineStore("connections", () => {
     refresh,
     save,
     test,
+    fetchDatabases,
     remove,
     connect,
     disconnect,

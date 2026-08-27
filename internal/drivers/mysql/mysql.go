@@ -34,11 +34,11 @@ func (d *Driver) DisplayName() string { return "MySQL" }
 
 func (d *Driver) ConnectionSpec() []driver.Field {
 	return []driver.Field{
-		{Key: "host", Label: "Host", Type: driver.FieldText, Required: true, Default: defaultHost, Placeholder: "localhost"},
-		{Key: "port", Label: "Port", Type: driver.FieldNumber, Required: true, Default: defaultPort, Placeholder: defaultPort},
-		{Key: "user", Label: "User", Type: driver.FieldText, Required: true, Placeholder: "root"},
-		{Key: "password", Label: "Password", Type: driver.FieldPassword, Secret: true, Placeholder: "stored in keychain"},
-		{Key: "database", Label: "Database", Type: driver.FieldText, Placeholder: "optional"},
+		{Key: "host", Label: "Host", Type: driver.FieldText, Required: true, Default: defaultHost, Placeholder: "localhost", Group: "host_port"},
+		{Key: "port", Label: "Port", Type: driver.FieldNumber, Required: true, Default: defaultPort, Placeholder: defaultPort, Group: "host_port"},
+		{Key: "user", Label: "User", Type: driver.FieldText, Required: true, Placeholder: "root", Group: "auth"},
+		{Key: "password", Label: "Password", Type: driver.FieldPassword, Secret: true, Placeholder: "stored in keychain", Group: "auth"},
+		{Key: "database", Label: "Database", Type: driver.FieldText, Placeholder: "optional", Fetchable: true},
 		{
 			Key:     "tls",
 			Label:   "TLS",
