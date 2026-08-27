@@ -20,6 +20,14 @@ type SaveProfileInput struct {
 	Name     string            `json:"name"`
 	DriverID string            `json:"driverId"`
 	Params   map[string]string `json:"params"`
+	Color    string            `json:"color"`
+}
+
+// ConnectionsState is the saved profile list plus navigation prefs.
+type ConnectionsState struct {
+	Profiles  []connection.Profile `json:"profiles"`
+	PinnedIDs []string             `json:"pinnedIds"`
+	RecentIDs []string             `json:"recentIds"`
 }
 
 // ConnectionsService exposes connection-profile and session APIs to the frontend.
@@ -50,9 +58,22 @@ func (s *ConnectionsService) ServiceShutdown() error {
 	return nil
 }
 
-// List returns saved profiles (never includes passwords).
-func (s *ConnectionsService) List() ([]connection.Profile, error) {
-	return s.store.List()
+// List returns saved profiles and navigation prefs (never includes passwords).
+func (s *ConnectionsService) List() (ConnectionsState, error) {
+	profiles, pinned, recent, err := s.store.ListState()
+	if err != nil {
+		return ConnectionsState{}, err
+	}
+	if profiles == nil {
+		profiles = []connection.Profile{}
+	}
+	if pinned == nil {
+		pinned = []string{}
+	}
+	if recent == nil {
+		recent = []string{}
+	}
+	return ConnectionsState{Profiles: profiles, PinnedIDs: pinned, RecentIDs: recent}, nil
 }
 
 // Save creates or updates a profile. An empty password leaves the keychain value unchanged.
@@ -67,12 +88,35 @@ func (s *ConnectionsService) Save(input SaveProfileInput) (connection.Profile, e
 	if profile.ID == "" {
 		profile.ID = uuid.NewString()
 		profile.CreatedAt = now
+		color, err := resolveColor(input.Color, connection.DefaultColor)
+		if err != nil {
+			return connection.Profile{}, err
+		}
+		profile.Color = color
 	} else {
 		existing, getErr := s.store.Get(profile.ID)
 		if getErr != nil {
 			profile.CreatedAt = now
+			color, err := resolveColor(input.Color, connection.DefaultColor)
+			if err != nil {
+				return connection.Profile{}, err
+			}
+			profile.Color = color
 		} else {
 			profile.CreatedAt = existing.CreatedAt
+			fallback := existing.Color
+			if fallback == "" {
+				fallback = connection.DefaultColor
+			}
+			if strings.TrimSpace(input.Color) == "" {
+				profile.Color = fallback
+			} else {
+				color, err := resolveColor(input.Color, fallback)
+				if err != nil {
+					return connection.Profile{}, err
+				}
+				profile.Color = color
+			}
 		}
 	}
 	profile.UpdatedAt = now
@@ -124,6 +168,7 @@ func (s *ConnectionsService) Connect(ctx context.Context, id string) error {
 		return err
 	}
 	s.manager.Put(id, conn)
+	_ = s.store.TouchRecent(id)
 	return nil
 }
 
@@ -135,6 +180,25 @@ func (s *ConnectionsService) Disconnect(id string) error {
 // ConnectedIDs returns profile IDs with an open session.
 func (s *ConnectionsService) ConnectedIDs() []string {
 	return s.manager.IDs()
+}
+
+// SetPinned pins or unpins a profile in the sidebar rail.
+func (s *ConnectionsService) SetPinned(id string, pinned bool) error {
+	return s.store.SetPinned(id, pinned)
+}
+
+// SetColor updates a profile's palette color.
+func (s *ConnectionsService) SetColor(id, color string) error {
+	color, err := resolveColor(color, "")
+	if err != nil {
+		return err
+	}
+	return s.store.SetColor(id, color)
+}
+
+// TouchRecent records a profile as recently used.
+func (s *ConnectionsService) TouchRecent(id string) error {
+	return s.store.TouchRecent(id)
 }
 
 // Databases lists databases on the server for a connected (or just-opened) profile.
@@ -229,4 +293,18 @@ func (s *ConnectionsService) prepare(input SaveProfileInput, requireName bool) (
 		Params:   params,
 	}
 	return d, profile, password, nil
+}
+
+func resolveColor(color, fallback string) (string, error) {
+	c := strings.TrimSpace(color)
+	if c == "" {
+		if connection.ValidColor(fallback) {
+			return fallback, nil
+		}
+		return connection.DefaultColor, nil
+	}
+	if !connection.ValidColor(c) {
+		return "", fmt.Errorf("invalid color")
+	}
+	return c, nil
 }

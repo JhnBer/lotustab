@@ -51,3 +51,44 @@ func (s *QueryService) Execute(ctx context.Context, profileID, sqlText string) (
 	}
 	return conn.Query(ctx, sqlText)
 }
+
+// ListTables returns tables and views in the given database.
+func (s *QueryService) ListTables(ctx context.Context, profileID, database string) ([]driver.TableInfo, error) {
+	if strings.TrimSpace(profileID) == "" {
+		return nil, fmt.Errorf("profile is required")
+	}
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	conn, err := s.connections.ensureOpen(ctx, profileID)
+	if err != nil {
+		return nil, err
+	}
+	tables, err := conn.ListTables(ctx, strings.TrimSpace(database))
+	if err != nil {
+		return nil, err
+	}
+	if tables == nil {
+		tables = []driver.TableInfo{}
+	}
+	return tables, nil
+}
+
+// BrowseTable returns a page of rows from a table.
+func (s *QueryService) BrowseTable(ctx context.Context, profileID string, req driver.TableBrowseRequest) (*driver.TableBrowseResult, error) {
+	if strings.TrimSpace(profileID) == "" {
+		return nil, fmt.Errorf("profile is required")
+	}
+	req = driver.ClampTableBrowse(req)
+	if req.Name == "" {
+		return nil, fmt.Errorf("table is required")
+	}
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	conn, err := s.connections.ensureOpen(ctx, profileID)
+	if err != nil {
+		return nil, err
+	}
+	return conn.BrowseTable(ctx, req)
+}

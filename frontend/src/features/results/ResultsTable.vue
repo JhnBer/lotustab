@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { ArrowDown, ArrowUp, ArrowUpDown } from "@lucide/vue";
 import {
   Table,
   TableBody,
@@ -10,10 +11,28 @@ import {
 } from "@/components/ui/table";
 import type { QueryResult } from "@/lib/wails";
 
-const props = defineProps<{
-  result: QueryResult | null;
-  error: string;
-  running: boolean;
+const props = withDefaults(
+  defineProps<{
+    result: QueryResult | null;
+    error: string;
+    running: boolean;
+    sortable?: boolean;
+    sortColumn?: string;
+    sortDir?: string;
+    emptyHint?: string;
+    showStatus?: boolean;
+  }>(),
+  {
+    sortable: false,
+    sortColumn: "",
+    sortDir: "",
+    emptyHint: "Run a query to see results.",
+    showStatus: true,
+  },
+);
+
+const emit = defineEmits<{
+  sort: [column: string];
 }>();
 
 const columns = computed(() => props.result?.columns ?? []);
@@ -32,6 +51,12 @@ function cellText(value: unknown): string {
 function isNull(value: unknown) {
   return value === null || value === undefined;
 }
+
+function onHeaderClick(name: string) {
+  if (props.sortable) {
+    emit("sort", name);
+  }
+}
 </script>
 
 <template>
@@ -43,10 +68,10 @@ function isNull(value: unknown) {
       {{ error }}
     </div>
     <div v-else-if="!result" class="text-muted-foreground p-4 text-sm">
-      Run a query to see results.
+      {{ emptyHint }}
     </div>
     <template v-else>
-      <div class="text-muted-foreground flex items-center justify-between border-b px-3 py-2 text-xs">
+      <div v-if="showStatus" class="text-muted-foreground flex items-center justify-between border-b px-3 py-2 text-xs">
         <span>
           {{ rows.length }} row{{ rows.length === 1 ? "" : "s" }}
           <span v-if="result.truncated"> (truncated)</span>
@@ -64,8 +89,24 @@ function isNull(value: unknown) {
                 v-for="column in columns"
                 :key="column.name"
                 class="bg-background sticky top-0 whitespace-nowrap"
+                :class="sortable ? 'cursor-pointer select-none hover:bg-muted/60' : ''"
+                @click="onHeaderClick(column.name)"
               >
-                <div>{{ column.name }}</div>
+                <div class="flex items-center gap-1">
+                  <span>{{ column.name }}</span>
+                  <ArrowUp
+                    v-if="sortable && sortColumn === column.name && sortDir === 'asc'"
+                    class="size-3"
+                  />
+                  <ArrowDown
+                    v-else-if="sortable && sortColumn === column.name && sortDir === 'desc'"
+                    class="size-3"
+                  />
+                  <ArrowUpDown
+                    v-else-if="sortable"
+                    class="text-muted-foreground size-3 opacity-40"
+                  />
+                </div>
                 <div class="text-muted-foreground font-normal">{{ column.type }}</div>
               </TableHead>
             </TableRow>

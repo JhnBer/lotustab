@@ -9,6 +9,7 @@ export interface Profile {
     "name": string;
     "driverId": string;
     "params": { [_ in string]?: string } | null;
+    "color": string;
     "createdAt": string;
     "updatedAt": string;
 }

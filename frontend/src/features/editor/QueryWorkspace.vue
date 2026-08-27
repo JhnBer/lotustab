@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Play, Plus, X } from "@lucide/vue";
+import { FileCode2, Play, Plus, Table2, X } from "@lucide/vue";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
 import { errorMessage } from "@/lib/errors";
@@ -10,8 +10,9 @@ import {
 } from "@/components/ui/resizable";
 import SqlEditor from "@/features/editor/SqlEditor.vue";
 import ResultsTable from "@/features/results/ResultsTable.vue";
+import TableBrowser from "@/features/results/TableBrowser.vue";
 import { useConnectionsStore } from "@/stores/connections";
-import { useQueryStore } from "@/stores/query";
+import { isQueryTab, isTableTab, useQueryStore } from "@/stores/query";
 
 const connections = useConnectionsStore();
 const queries = useQueryStore();
@@ -25,14 +26,15 @@ function addTab() {
 }
 
 async function run() {
-  if (!queries.activeTab) {
+  const tab = queries.activeTab;
+  if (!tab || tab.kind !== "query") {
     return;
   }
   try {
-    if (!connections.isConnected(queries.activeTab.profileId)) {
-      await connections.connect(queries.activeTab.profileId);
+    if (!connections.isConnected(tab.profileId)) {
+      await connections.connect(tab.profileId);
     }
-    await queries.run(queries.activeTab.id);
+    await queries.run(tab.id);
   } catch (err) {
     toast.error(errorMessage(err));
   }
@@ -51,6 +53,8 @@ async function run() {
           :class="tab.id === queries.activeTabId ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/60'"
           @click="queries.activeTabId = tab.id"
         >
+          <Table2 v-if="tab.kind === 'table'" class="size-3 shrink-0" />
+          <FileCode2 v-else class="size-3 shrink-0" />
           <span class="truncate">{{ tab.title }}</span>
           <span
             class="hover:bg-background rounded-sm p-0.5"
@@ -63,8 +67,8 @@ async function run() {
           <Plus class="size-3.5" />
         </Button>
       </div>
-      <div style="--wails-draggable: no-drag">
-        <Button size="sm" :disabled="!queries.activeTab || queries.activeTab.running" @click="run">
+      <div v-if="isQueryTab(queries.activeTab)" style="--wails-draggable: no-drag">
+        <Button size="sm" :disabled="queries.activeTab.running" @click="run">
           <Play class="size-3.5" />
           Run
         </Button>
@@ -78,7 +82,13 @@ async function run() {
       </RouterLink>
     </div>
 
-    <ResizablePanelGroup v-else direction="vertical" class="min-h-0 flex-1">
+    <TableBrowser
+      v-else-if="isTableTab(queries.activeTab)"
+      :key="queries.activeTab.id"
+      :tab="queries.activeTab"
+    />
+
+    <ResizablePanelGroup v-else-if="isQueryTab(queries.activeTab)" direction="vertical" class="min-h-0 flex-1">
       <ResizablePanel :default-size="45" :min-size="20">
         <SqlEditor
           :key="queries.activeTab.id"

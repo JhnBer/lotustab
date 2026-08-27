@@ -68,3 +68,37 @@ export interface QueryResult {
     "durationMs": number;
     "truncated": boolean;
 }
+
+/**
+ * TableBrowseRequest pages and optionally sorts rows from a single table.
+ */
+export interface TableBrowseRequest {
+    "database": string;
+    "schema": string;
+    "name": string;
+    "limit": number;
+    "offset": number;
+    "orderBy": string;
+    "orderDir": string;
+}
+
+/**
+ * TableBrowseResult is a page of table data plus a total row count.
+ */
+export interface TableBrowseResult {
+    "columns": Column[] | null;
+    "rows": (any[] | null)[] | null;
+    "rowsAffected": number;
+    "durationMs": number;
+    "truncated": boolean;
+    "total": number;
+}
+
+/**
+ * TableInfo is a catalog entry for a table or view.
+ */
+export interface TableInfo {
+    "schema": string;
+    "name": string;
+    "type": string;
+}

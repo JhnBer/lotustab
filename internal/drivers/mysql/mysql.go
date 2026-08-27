@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 
 	mysqldriver "github.com/go-sql-driver/mysql"
@@ -111,6 +112,91 @@ func (c *conn) Query(ctx context.Context, sqlText string) (*driver.QueryResult, 
 
 func (c *conn) Databases(ctx context.Context) ([]string, error) {
 	return sqlutil.ListStrings(ctx, c.db, "SHOW DATABASES")
+}
+
+func (c *conn) ListTables(ctx context.Context, database string) ([]driver.TableInfo, error) {
+	database = strings.TrimSpace(database)
+	var (
+		rows *sql.Rows
+		err  error
+	)
+	if database == "" {
+		rows, err = c.db.QueryContext(ctx, `
+			SELECT table_schema, table_name, table_type
+			FROM information_schema.tables
+			WHERE table_schema = DATABASE()
+			ORDER BY table_name`)
+	} else {
+		rows, err = c.db.QueryContext(ctx, `
+			SELECT table_schema, table_name, table_type
+			FROM information_schema.tables
+			WHERE table_schema = ?
+			ORDER BY table_name`, database)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]driver.TableInfo, 0)
+	for rows.Next() {
+		var schema, name, tableType string
+		if err := rows.Scan(&schema, &name, &tableType); err != nil {
+			return nil, err
+		}
+		out = append(out, driver.TableInfo{
+			Schema: schema,
+			Name:   name,
+			Type:   mysqlObjectType(tableType),
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conn) BrowseTable(ctx context.Context, req driver.TableBrowseRequest) (*driver.TableBrowseResult, error) {
+	req = driver.ClampTableBrowse(req)
+	if req.Name == "" {
+		return nil, fmt.Errorf("table name is required")
+	}
+	dbName := req.Database
+	if dbName == "" {
+		dbName = req.Schema
+	}
+	qualified := mysqlQualified(dbName, req.Name)
+
+	start := time.Now()
+	total, err := sqlutil.Count(ctx, c.db, "SELECT COUNT(*) FROM "+qualified)
+	if err != nil {
+		return nil, err
+	}
+
+	selectSQL := "SELECT * FROM " + qualified + sqlutil.OrderClause(sqlutil.QuoteMySQL, req.OrderBy, req.OrderDir) + " LIMIT ? OFFSET ?"
+	result, err := sqlutil.QueryContext(ctx, c.db, req.Limit, selectSQL, req.Limit, req.Offset)
+	if err != nil {
+		return nil, err
+	}
+	out := driver.BrowseFromQuery(result, total)
+	out.DurationMs = time.Since(start).Milliseconds()
+	return out, nil
+}
+
+func mysqlQualified(database, name string) string {
+	if database == "" {
+		return sqlutil.QuoteMySQL(name)
+	}
+	return sqlutil.QuoteMySQL(database) + "." + sqlutil.QuoteMySQL(name)
+}
+
+func mysqlObjectType(tableType string) string {
+	switch strings.ToUpper(strings.TrimSpace(tableType)) {
+	case "VIEW", "SYSTEM VIEW":
+		return driver.ObjectView
+	default:
+		return driver.ObjectTable
+	}
 }
 
 func (c *conn) Close() error {

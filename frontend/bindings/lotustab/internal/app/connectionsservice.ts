@@ -61,9 +61,9 @@ export function FetchDatabases(input: $models.SaveProfileInput): $CancellablePro
 }
 
 /**
- * List returns saved profiles (never includes passwords).
+ * List returns saved profiles and navigation prefs (never includes passwords).
  */
-export function List(): $CancellablePromise<connection$0.Profile[] | null> {
+export function List(): $CancellablePromise<$models.ConnectionsState> {
     return $Call.ByID(448953289);
 }
 
@@ -75,8 +75,29 @@ export function Save(input: $models.SaveProfileInput): $CancellablePromise<conne
 }
 
 /**
+ * SetColor updates a profile's palette color.
+ */
+export function SetColor(id: string, color: string): $CancellablePromise<void> {
+    return $Call.ByID(2671149882, id, color);
+}
+
+/**
+ * SetPinned pins or unpins a profile in the sidebar rail.
+ */
+export function SetPinned(id: string, pinned: boolean): $CancellablePromise<void> {
+    return $Call.ByID(3944675365, id, pinned);
+}
+
+/**
  * Test opens a throwaway connection using the form values.
  */
 export function Test(input: $models.SaveProfileInput): $CancellablePromise<void> {
     return $Call.ByID(2007282221, input);
+}
+
+/**
+ * TouchRecent records a profile as recently used.
+ */
+export function TouchRecent(id: string): $CancellablePromise<void> {
+    return $Call.ByID(1581593595, id);
 }

@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import DynamicField from "@/features/connections/DynamicField.vue";
 import { errorMessage } from "@/lib/errors";
+import { CONNECTION_COLORS, colorBgClass, DEFAULT_CONNECTION_COLOR, connectionColor } from "@/lib/colors";
 import type { Field, Profile, SaveProfileInput } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
 
@@ -36,6 +37,7 @@ const emit = defineEmits<{
 const connections = useConnectionsStore();
 const name = ref("");
 const driverId = ref("");
+const color = ref("blue");
 const params = reactive<Record<string, string>>({});
 const saving = ref(false);
 const testing = ref(false);
@@ -91,6 +93,7 @@ watch(
     }
     const fallbackDriver = connections.drivers[0]?.id ?? "";
     name.value = props.profile?.name ?? "";
+    color.value = connectionColor(props.profile?.color);
     applyDriver(props.profile?.driverId || fallbackDriver, connections.asRecord(props.profile?.params ?? null));
   },
   { immediate: true },
@@ -106,6 +109,7 @@ function payload(): SaveProfileInput {
     name: name.value.trim(),
     driverId: driverId.value,
     params: { ...params },
+    color: color.value || DEFAULT_CONNECTION_COLOR,
   };
 }
 
@@ -153,6 +157,26 @@ async function fetchDatabases() {
         <div class="grid gap-1.5">
           <Label for="connection-name">Name</Label>
           <Input id="connection-name" v-model="name" placeholder="Production" required />
+        </div>
+
+        <div class="grid gap-1.5">
+          <Label>Color</Label>
+          <div class="flex flex-wrap gap-1.5">
+            <button
+              v-for="swatch in CONNECTION_COLORS"
+              :key="swatch"
+              type="button"
+              class="size-6 rounded-full ring-offset-background focus-visible:ring-2 focus-visible:outline-none"
+              :class="[
+                colorBgClass(swatch),
+                color === swatch ? 'ring-2 ring-foreground' : 'opacity-80 hover:opacity-100',
+              ]"
+              :title="swatch"
+              @click="color = swatch"
+            >
+              <span class="sr-only">{{ swatch }}</span>
+            </button>
+          </div>
         </div>
 
         <div class="grid gap-1.5">

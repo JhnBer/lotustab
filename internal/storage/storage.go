@@ -13,10 +13,13 @@ import (
 const (
 	appDirName   = "lotustab"
 	profilesFile = "connections.json"
+	recentCap    = 8
 )
 
 type filePayload struct {
-	Profiles []connection.Profile `json:"profiles"`
+	Profiles  []connection.Profile `json:"profiles"`
+	PinnedIDs []string             `json:"pinnedIds"`
+	RecentIDs []string             `json:"recentIds"`
 }
 
 // Store persists connection profiles as JSON in the user config directory.
@@ -35,7 +38,12 @@ func New() (*Store, error) {
 	if err := os.MkdirAll(appDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create config dir: %w", err)
 	}
-	return &Store{path: filepath.Join(appDir, profilesFile)}, nil
+	return NewAt(filepath.Join(appDir, profilesFile)), nil
+}
+
+// NewAt creates a store that reads and writes the given JSON file.
+func NewAt(path string) *Store {
+	return &Store{path: path}
 }
 
 // List returns all saved profiles.
@@ -46,14 +54,26 @@ func (s *Store) List() ([]connection.Profile, error) {
 	if err != nil {
 		return nil, err
 	}
-	if payload.Profiles == nil {
-		return []connection.Profile{}, nil
-	}
 	out := make([]connection.Profile, 0, len(payload.Profiles))
 	for _, p := range payload.Profiles {
 		out = append(out, p.Clone())
 	}
 	return out, nil
+}
+
+// ListState returns profiles together with pin and recent order.
+func (s *Store) ListState() ([]connection.Profile, []string, []string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	payload, err := s.read()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	profiles := make([]connection.Profile, 0, len(payload.Profiles))
+	for _, p := range payload.Profiles {
+		profiles = append(profiles, p.Clone())
+	}
+	return profiles, cloneIDs(payload.PinnedIDs), cloneIDs(payload.RecentIDs), nil
 }
 
 // Get returns a profile by ID.
@@ -94,7 +114,7 @@ func (s *Store) Upsert(profile connection.Profile) error {
 	return s.write(payload)
 }
 
-// Delete removes a profile by ID.
+// Delete removes a profile by ID and drops it from pin/recent lists.
 func (s *Store) Delete(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -109,14 +129,108 @@ func (s *Store) Delete(id string) error {
 		}
 	}
 	payload.Profiles = next
+	payload.PinnedIDs = removeID(payload.PinnedIDs, id)
+	payload.RecentIDs = removeID(payload.RecentIDs, id)
 	return s.write(payload)
+}
+
+// SetPinned adds or removes a profile from the pin list.
+func (s *Store) SetPinned(id string, pinned bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	payload, err := s.read()
+	if err != nil {
+		return err
+	}
+	if !hasProfile(payload.Profiles, id) {
+		return fmt.Errorf("profile not found: %s", id)
+	}
+	payload.PinnedIDs = removeID(payload.PinnedIDs, id)
+	if pinned {
+		payload.PinnedIDs = append(payload.PinnedIDs, id)
+	}
+	return s.write(payload)
+}
+
+// SetColor updates a profile's palette color.
+func (s *Store) SetColor(id, color string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	payload, err := s.read()
+	if err != nil {
+		return err
+	}
+	for i, p := range payload.Profiles {
+		if p.ID == id {
+			payload.Profiles[i].Color = color
+			return s.write(payload)
+		}
+	}
+	return fmt.Errorf("profile not found: %s", id)
+}
+
+// TouchRecent records a profile as most-recently used.
+func (s *Store) TouchRecent(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	payload, err := s.read()
+	if err != nil {
+		return err
+	}
+	if !hasProfile(payload.Profiles, id) {
+		return fmt.Errorf("profile not found: %s", id)
+	}
+	next := []string{id}
+	for _, existing := range payload.RecentIDs {
+		if existing == id {
+			continue
+		}
+		next = append(next, existing)
+		if len(next) >= recentCap {
+			break
+		}
+	}
+	payload.RecentIDs = next
+	return s.write(payload)
+}
+
+func hasProfile(profiles []connection.Profile, id string) bool {
+	for _, p := range profiles {
+		if p.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+func removeID(ids []string, id string) []string {
+	out := make([]string, 0, len(ids))
+	for _, existing := range ids {
+		if existing != id {
+			out = append(out, existing)
+		}
+	}
+	return out
+}
+
+func cloneIDs(ids []string) []string {
+	if ids == nil {
+		return []string{}
+	}
+	out := make([]string, len(ids))
+	copy(out, ids)
+	return out
 }
 
 func (s *Store) read() (filePayload, error) {
 	data, err := os.ReadFile(s.path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return filePayload{Profiles: []connection.Profile{}}, nil
+			return filePayload{
+				Profiles:  []connection.Profile{},
+				PinnedIDs: []string{},
+				RecentIDs: []string{},
+			}, nil
 		}
 		return filePayload{}, fmt.Errorf("read profiles: %w", err)
 	}
@@ -127,12 +241,24 @@ func (s *Store) read() (filePayload, error) {
 	if payload.Profiles == nil {
 		payload.Profiles = []connection.Profile{}
 	}
+	if payload.PinnedIDs == nil {
+		payload.PinnedIDs = []string{}
+	}
+	if payload.RecentIDs == nil {
+		payload.RecentIDs = []string{}
+	}
 	return payload, nil
 }
 
 func (s *Store) write(payload filePayload) error {
 	if payload.Profiles == nil {
 		payload.Profiles = []connection.Profile{}
+	}
+	if payload.PinnedIDs == nil {
+		payload.PinnedIDs = []string{}
+	}
+	if payload.RecentIDs == nil {
+		payload.RecentIDs = []string{}
 	}
 	data, err := json.MarshalIndent(payload, "", "  ")
 	if err != nil {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { Pencil, Plug, Plus, Trash2, Unplug } from "@lucide/vue";
+import { Pencil, Pin, Plug, Plus, Trash2, Unplug } from "@lucide/vue";
 import { useRouter } from "vue-router";
 import { toast } from "vue-sonner";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/table";
 import ConnectionDialog from "@/features/connections/ConnectionDialog.vue";
 import { errorMessage } from "@/lib/errors";
+import { colorBgClass } from "@/lib/colors";
 import type { Profile } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
 import { useQueryStore } from "@/stores/query";
@@ -62,6 +63,14 @@ async function disconnect(profile: Profile) {
   try {
     await connections.disconnect(profile.id);
     toast.success(`Disconnected ${profile.name}`);
+  } catch (err) {
+    toast.error(errorMessage(err));
+  }
+}
+
+async function togglePin(profile: Profile) {
+  try {
+    await connections.setPinned(profile.id, !connections.isPinned(profile.id));
   } catch (err) {
     toast.error(errorMessage(err));
   }
@@ -118,9 +127,10 @@ async function remove(profile: Profile) {
             <TableCell>
               <button
                 type="button"
-                class="font-medium hover:underline"
+                class="flex items-center gap-2 font-medium hover:underline"
                 @click="openQuery(profile)"
               >
+                <span class="size-2.5 shrink-0 rounded-full" :class="colorBgClass(profile.color)" />
                 {{ profile.name }}
               </button>
             </TableCell>
@@ -139,6 +149,18 @@ async function remove(profile: Profile) {
             </TableCell>
             <TableCell>
               <div class="flex justify-end gap-1">
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  :title="connections.isPinned(profile.id) ? 'Unpin' : 'Pin'"
+                  @click="togglePin(profile)"
+                >
+                  <Pin
+                    class="size-3.5"
+                    :class="connections.isPinned(profile.id) ? 'fill-current' : ''"
+                  />
+                  <span class="sr-only">{{ connections.isPinned(profile.id) ? "Unpin" : "Pin" }}</span>
+                </Button>
                 <Button
                   v-if="!connections.isConnected(profile.id)"
                   size="icon-sm"

@@ -10,5 +10,8 @@ export type {
     DriverInfo,
     Field,
     Option,
-    QueryResult
+    QueryResult,
+    TableBrowseRequest,
+    TableBrowseResult,
+    TableInfo
 } from "./models.js";

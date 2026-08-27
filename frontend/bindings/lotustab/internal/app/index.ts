@@ -11,5 +11,6 @@ export {
 };
 
 export type {
+    ConnectionsState,
     SaveProfileInput
 } from "./models.js";

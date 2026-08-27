@@ -15,8 +15,22 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as driver$0 from "../core/driver/models.js";
 
 /**
+ * BrowseTable returns a page of rows from a table.
+ */
+export function BrowseTable(profileID: string, req: driver$0.TableBrowseRequest): $CancellablePromise<driver$0.TableBrowseResult | null> {
+    return $Call.ByID(3342274770, profileID, req);
+}
+
+/**
  * Execute runs SQL for the given profile. The profile is connected if needed.
  */
 export function Execute(profileID: string, sqlText: string): $CancellablePromise<driver$0.QueryResult | null> {
     return $Call.ByID(2569199963, profileID, sqlText);
+}
+
+/**
+ * ListTables returns tables and views in the given database.
+ */
+export function ListTables(profileID: string, database: string): $CancellablePromise<driver$0.TableInfo[] | null> {
+    return $Call.ByID(3759006545, profileID, database);
 }

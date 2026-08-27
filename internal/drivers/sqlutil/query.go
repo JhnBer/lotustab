@@ -96,6 +96,35 @@ func scanRows(rows *sql.Rows, maxRows int) (*driver.QueryResult, error) {
 	}, nil
 }
 
+// QueryContext runs a parameterized SELECT and maps the result to QueryResult.
+func QueryContext(ctx context.Context, db *sql.DB, maxRows int, query string, args ...any) (*driver.QueryResult, error) {
+	if maxRows <= 0 {
+		maxRows = defaultMaxRows
+	}
+	start := time.Now()
+	rows, err := db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result, err := scanRows(rows, maxRows)
+	if err != nil {
+		return nil, err
+	}
+	result.DurationMs = time.Since(start).Milliseconds()
+	return result, nil
+}
+
+// Count runs a query expected to return a single integer.
+func Count(ctx context.Context, db *sql.DB, query string, args ...any) (int64, error) {
+	var n int64
+	if err := db.QueryRowContext(ctx, query, args...).Scan(&n); err != nil {
+		return 0, err
+	}
+	return n, nil
+}
+
 // ListStrings runs a single-column query and returns string values.
 func ListStrings(ctx context.Context, db *sql.DB, query string) ([]string, error) {
 	rows, err := db.QueryContext(ctx, query)

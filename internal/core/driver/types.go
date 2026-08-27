@@ -53,6 +53,39 @@ type QueryResult struct {
 	Truncated    bool     `json:"truncated"`
 }
 
+const (
+	ObjectTable = "table"
+	ObjectView  = "view"
+)
+
+// TableInfo is a catalog entry for a table or view.
+type TableInfo struct {
+	Schema string `json:"schema"`
+	Name   string `json:"name"`
+	Type   string `json:"type"`
+}
+
+// TableBrowseRequest pages and optionally sorts rows from a single table.
+type TableBrowseRequest struct {
+	Database string `json:"database"`
+	Schema   string `json:"schema"`
+	Name     string `json:"name"`
+	Limit    int    `json:"limit"`
+	Offset   int    `json:"offset"`
+	OrderBy  string `json:"orderBy"`
+	OrderDir string `json:"orderDir"`
+}
+
+// TableBrowseResult is a page of table data plus a total row count.
+type TableBrowseResult struct {
+	Columns      []Column `json:"columns"`
+	Rows         [][]any  `json:"rows"`
+	RowsAffected int64    `json:"rowsAffected"`
+	DurationMs   int64    `json:"durationMs"`
+	Truncated    bool     `json:"truncated"`
+	Total        int64    `json:"total"`
+}
+
 // DriverInfo is the public description of a registered driver.
 type DriverInfo struct {
 	ID             string  `json:"id"`
