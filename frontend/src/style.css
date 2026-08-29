@@ -7,6 +7,7 @@
 
 /* Keep in sync with CONNECTION_COLORS. */
 @source inline("bg-{red,orange,amber,green,teal,sky,blue,indigo,violet,pink,slate}-500{,/20,/60}");
+@source inline("dark:bg-{red,orange,amber,green,teal,sky,blue,indigo,violet,pink,slate}-500/60");
 
 @custom-variant dark (&:is(.dark *));
 

@@ -1,6 +1,7 @@
 import { createRouter, createWebHashHistory } from "vue-router";
 import ConnectionsPage from "@/features/connections/ConnectionsPage.vue";
 import QueryWorkspace from "@/features/editor/QueryWorkspace.vue";
+import SettingsPage from "@/features/settings/SettingsPage.vue";
 
 export const router = createRouter({
   history: createWebHashHistory(),
@@ -17,6 +18,12 @@ export const router = createRouter({
       name: "query",
       component: QueryWorkspace,
       meta: { title: "Query" },
+    },
+    {
+      path: "/settings",
+      name: "settings",
+      component: SettingsPage,
+      meta: { title: "Settings" },
     },
   ],
 });

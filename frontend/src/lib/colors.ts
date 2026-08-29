@@ -25,3 +25,8 @@ export function connColor(color?: string | null): ConnectionColor {
 export function connBg(color?: string | null): string {
   return `bg-${connColor(color)}-500`;
 }
+
+export function connTint(color?: string | null): string {
+  const bg = connBg(color);
+  return `${bg}/20 dark:${bg}/60`;
+}

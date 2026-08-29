@@ -35,13 +35,14 @@ func NewQueryServiceFromConnections(connections *ConnectionsService) *QueryServi
 }
 
 // Execute runs SQL for the given profile. The profile is connected if needed.
-func (s *QueryService) Execute(ctx context.Context, profileID, sqlText string) (*driver.QueryResult, error) {
+func (s *QueryService) Execute(ctx context.Context, profileID, sqlText string, limit, offset int) (*driver.QueryResult, error) {
 	if strings.TrimSpace(profileID) == "" {
 		return nil, fmt.Errorf("profile is required")
 	}
 	if strings.TrimSpace(sqlText) == "" {
 		return nil, fmt.Errorf("query is empty")
 	}
+	limit, offset = driver.ClampLimitOffset(limit, offset)
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
@@ -49,7 +50,7 @@ func (s *QueryService) Execute(ctx context.Context, profileID, sqlText string) (
 	if err != nil {
 		return nil, err
 	}
-	return conn.Query(ctx, sqlText)
+	return conn.Query(ctx, sqlText, limit, offset)
 }
 
 // ListTables returns tables and views in the given database.

@@ -133,8 +133,13 @@ func (c *conn) Ping(ctx context.Context) error {
 	return c.pool.Ping(ctx)
 }
 
-func (c *conn) Query(ctx context.Context, sql string) (*driver.QueryResult, error) {
-	return queryPool(ctx, c.pool, 5000, sql)
+func (c *conn) Query(ctx context.Context, sql string, limit, offset int) (*driver.QueryResult, error) {
+	page := driver.PrepareQueryPage(sql, limit, offset)
+	result, err := queryPool(ctx, c.pool, page.MaxRows, page.SQL)
+	if err != nil {
+		return nil, err
+	}
+	return driver.FinishQueryPage(result, page), nil
 }
 
 func (c *conn) Databases(ctx context.Context) ([]string, error) {

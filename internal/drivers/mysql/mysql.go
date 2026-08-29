@@ -106,8 +106,13 @@ func (c *conn) Ping(ctx context.Context) error {
 	return c.db.PingContext(ctx)
 }
 
-func (c *conn) Query(ctx context.Context, sqlText string) (*driver.QueryResult, error) {
-	return sqlutil.Query(ctx, c.db, sqlText, 5000)
+func (c *conn) Query(ctx context.Context, sqlText string, limit, offset int) (*driver.QueryResult, error) {
+	page := driver.PrepareQueryPage(sqlText, limit, offset)
+	result, err := sqlutil.Query(ctx, c.db, page.SQL, page.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	return driver.FinishQueryPage(result, page), nil
 }
 
 func (c *conn) Databases(ctx context.Context) ([]string, error) {

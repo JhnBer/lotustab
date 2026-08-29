@@ -24,8 +24,8 @@ export function BrowseTable(profileID: string, req: driver$0.TableBrowseRequest)
 /**
  * Execute runs SQL for the given profile. The profile is connected if needed.
  */
-export function Execute(profileID: string, sqlText: string): $CancellablePromise<driver$0.QueryResult | null> {
-    return $Call.ByID(2569199963, profileID, sqlText);
+export function Execute(profileID: string, sqlText: string, limit: number, offset: number): $CancellablePromise<driver$0.QueryResult | null> {
+    return $Call.ByID(2569199963, profileID, sqlText, limit, offset);
 }
 
 /**

@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { Database, Server } from "@lucide/vue";
+import { computed } from "vue";
+import { Database, Server, Settings } from "@lucide/vue";
 import { storeToRefs } from "pinia";
 import { useRoute, useRouter } from "vue-router";
 import { toast } from "vue-sonner";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
@@ -22,21 +24,33 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { connBg } from "@/lib/colors";
+import { connBg, connTint } from "@/lib/colors";
 import { errorMessage } from "@/lib/errors";
 import type { Profile } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
+import { useSettingsStore } from "@/stores/settings";
 
 const route = useRoute();
 const router = useRouter();
 const connections = useConnectionsStore();
+const settings = useSettingsStore();
 const { setOpen } = useSidebar();
 const { pinnedProfiles } = storeToRefs(connections);
+
+const connectionsTint = computed(() =>
+  settings.connectionTint && connections.selected
+    ? connTint(connections.selected.color)
+    : "",
+);
 
 function goConnections() {
   connections.select("");
   router.push("/connections");
   setOpen(true);
+}
+
+function goSettings() {
+  router.push("/settings");
 }
 
 function activateProfile(profile: Profile) {
@@ -88,7 +102,7 @@ async function connect(profile: Profile) {
     class="h-full w-[calc(var(--sidebar-width-icon)+1px)]! shrink-0 border-r"
   >
     <SidebarContent class="relative">
-      <SidebarGroup class="h-12">
+      <SidebarGroup class="h-12" :class="connectionsTint">
         <SidebarGroupContent class="px-1.5 md:px-0">
           <SidebarMenu>
             <SidebarMenuItem>
@@ -152,5 +166,20 @@ async function connect(profile: Profile) {
         </SidebarGroup>
       </template>
     </SidebarContent>
+    <SidebarFooter>
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            tooltip="Settings"
+            :is-active="route.path === '/settings'"
+            class="px-2.5 md:px-2"
+            @click="goSettings"
+          >
+            <Settings />
+            <span>Settings</span>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    </SidebarFooter>
   </Sidebar>
 </template>

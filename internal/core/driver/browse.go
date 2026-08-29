@@ -14,19 +14,7 @@ func ClampTableBrowse(req TableBrowseRequest) TableBrowseRequest {
 	req.Schema = strings.TrimSpace(req.Schema)
 	req.Name = strings.TrimSpace(req.Name)
 	req.OrderBy = strings.TrimSpace(req.OrderBy)
-
-	switch {
-	case req.Limit <= 0:
-		req.Limit = DefaultBrowseLimit
-	case req.Limit < MinBrowseLimit:
-		req.Limit = MinBrowseLimit
-	case req.Limit > MaxBrowseLimit:
-		req.Limit = MaxBrowseLimit
-	}
-
-	if req.Offset < 0 {
-		req.Offset = 0
-	}
+	req.Limit, req.Offset = ClampLimitOffset(req.Limit, req.Offset)
 
 	dir := strings.ToLower(strings.TrimSpace(req.OrderDir))
 	if req.OrderBy == "" {

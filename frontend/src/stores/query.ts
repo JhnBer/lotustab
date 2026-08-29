@@ -6,16 +6,7 @@ import {
   type QueryResult,
   type TableBrowseResult,
 } from "@/lib/wails";
-
-export const PAGE_SIZES = [50, 100, 250, 500, 1000, 5000, 10000] as const;
-
-const DEFAULT_PAGE_SIZE = 100;
-const PAGE_SIZE_KEY = "lotustab.tablePageSize";
-
-function storedPageSize(): number {
-  const n = Number(localStorage.getItem(PAGE_SIZE_KEY));
-  return (PAGE_SIZES as readonly number[]).includes(n) ? n : DEFAULT_PAGE_SIZE;
-}
+import { useSettingsStore } from "@/stores/settings";
 
 export type SortDir = "asc" | "desc" | "";
 
@@ -30,6 +21,8 @@ interface TabBase {
 export interface QueryTab extends TabBase {
   kind: "query";
   sql: string;
+  page: number;
+  pageSize: number;
   result: QueryResult | null;
 }
 
@@ -53,6 +46,10 @@ export interface WorkspaceSnapshot {
   activeTabId: string;
 }
 
+function storedPageSize(): number {
+  return useSettingsStore().defaultPageSize;
+}
+
 function newQueryTab(profileId: string, title: string): QueryTab {
   return {
     kind: "query",
@@ -60,6 +57,8 @@ function newQueryTab(profileId: string, title: string): QueryTab {
     title,
     profileId,
     sql: "SELECT 1;",
+    page: 1,
+    pageSize: storedPageSize(),
     running: false,
     error: "",
     result: null,
@@ -211,7 +210,16 @@ export const useQueryStore = defineStore("query", () => {
     const existing = new Set(tabs.value.map((t) => t.id));
     for (const tab of snapshot.tabs) {
       if (!existing.has(tab.id)) {
-        tabs.value.push({ ...tab, running: false });
+        if (tab.kind === "query") {
+          tabs.value.push({
+            ...tab,
+            running: false,
+            page: tab.page >= 1 ? tab.page : 1,
+            pageSize: tab.pageSize || storedPageSize(),
+          });
+        } else {
+          tabs.value.push({ ...tab, running: false });
+        }
       }
     }
     if (snapshot.activeTabId && tabs.value.some((t) => t.id === snapshot.activeTabId)) {
@@ -242,7 +250,7 @@ export const useQueryStore = defineStore("query", () => {
     }
   }
 
-  async function run(id: string) {
+  async function execute(id: string) {
     const tab = tabs.value.find((t) => t.id === id);
     if (!tab || tab.kind !== "query") {
       return;
@@ -251,16 +259,36 @@ export const useQueryStore = defineStore("query", () => {
       tab.error = "Query is empty";
       return;
     }
+    if (!tab.page || tab.page < 1) {
+      tab.page = 1;
+    }
+    if (!tab.pageSize) {
+      tab.pageSize = storedPageSize();
+    }
     tab.running = true;
     tab.error = "";
     try {
-      tab.result = await QueryService.Execute(tab.profileId, tab.sql);
+      tab.result = await QueryService.Execute(
+        tab.profileId,
+        tab.sql,
+        tab.pageSize,
+        (tab.page - 1) * tab.pageSize,
+      );
     } catch (err) {
       tab.result = null;
       tab.error = errorMessage(err);
     } finally {
       tab.running = false;
     }
+  }
+
+  async function run(id: string) {
+    const tab = tabs.value.find((t) => t.id === id);
+    if (!tab || tab.kind !== "query") {
+      return;
+    }
+    tab.page = 1;
+    await execute(id);
   }
 
   async function loadTable(id: string) {
@@ -293,25 +321,34 @@ export const useQueryStore = defineStore("query", () => {
 
   function setPage(id: string, page: number) {
     const tab = tabs.value.find((t) => t.id === id);
-    if (!tab || tab.kind !== "table") {
+    if (!tab) {
       return;
     }
-    const maxPage = Math.max(1, Math.ceil(tab.total / tab.pageSize) || 1);
-    tab.page = Math.min(Math.max(1, page), maxPage);
-    void loadTable(id);
+    if (tab.kind === "table") {
+      const maxPage = Math.max(1, Math.ceil(tab.total / tab.pageSize) || 1);
+      tab.page = Math.min(Math.max(1, page), maxPage);
+      void loadTable(id);
+      return;
+    }
+    if (tab.kind === "query") {
+      tab.page = Math.max(1, page);
+      void execute(id);
+    }
   }
 
   function setPageSize(id: string, pageSize: number) {
     const tab = tabs.value.find((t) => t.id === id);
-    if (!tab || tab.kind !== "table") {
+    if (!tab || (tab.kind !== "table" && tab.kind !== "query")) {
       return;
     }
     tab.pageSize = pageSize;
     tab.page = 1;
-    if ((PAGE_SIZES as readonly number[]).includes(pageSize)) {
-      localStorage.setItem(PAGE_SIZE_KEY, String(pageSize));
+    useSettingsStore().setDefaultPageSize(pageSize);
+    if (tab.kind === "table") {
+      void loadTable(id);
+      return;
     }
-    void loadTable(id);
+    void execute(id);
   }
 
   function cycleSort(id: string, column: string) {

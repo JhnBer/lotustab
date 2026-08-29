@@ -12,6 +12,7 @@ import {
 import SqlEditor from "@/features/editor/SqlEditor.vue";
 import ResultsTable from "@/features/results/ResultsTable.vue";
 import TableBrowser from "@/features/results/TableBrowser.vue";
+import TablePager from "@/features/results/TablePager.vue";
 import { useConnectionsStore } from "@/stores/connections";
 import { isQueryTab, isTableTab, useQueryStore } from "@/stores/query";
 
@@ -142,11 +143,24 @@ async function run() {
       </ResizablePanel>
       <ResizableHandle />
       <ResizablePanel :default-size="55" :min-size="20">
-        <ResultsTable
-          :result="queries.activeTab.result"
-          :error="queries.activeTab.error"
-          :running="queries.activeTab.running"
-        />
+        <div class="flex h-full min-h-0 flex-col">
+          <ResultsTable
+            class="min-h-0 flex-1"
+            :result="queries.activeTab.result"
+            :error="queries.activeTab.error"
+            :running="queries.activeTab.running"
+            :show-status="false"
+          />
+          <TablePager
+            :page="queries.activeTab.page"
+            :page-size="queries.activeTab.pageSize"
+            :row-count="queries.activeTab.result?.rows?.length ?? 0"
+            :running="queries.activeTab.running"
+            :truncated="queries.activeTab.result?.truncated"
+            @page="queries.setPage(queries.activeTab!.id, $event)"
+            @page-size="queries.setPageSize(queries.activeTab!.id, $event)"
+          />
+        </div>
       </ResizablePanel>
     </ResizablePanelGroup>
   </section>

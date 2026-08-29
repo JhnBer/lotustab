@@ -36,17 +36,22 @@ import {
 import { Button } from "@/components/ui/button";
 import ConnectionDialog from "@/features/connections/ConnectionDialog.vue";
 import { errorMessage } from "@/lib/errors";
-import { connBg } from "@/lib/colors";
+import { connBg, connTint } from "@/lib/colors";
 import type { Profile, TableInfo } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
 import { groupTables, useExplorerStore } from "@/stores/explorer";
 import { useQueryStore } from "@/stores/query";
+import { useSettingsStore } from "@/stores/settings";
 
 const router = useRouter();
 const connections = useConnectionsStore();
 const explorer = useExplorerStore();
 const queries = useQueryStore();
+const settings = useSettingsStore();
 const { selected, recentProfiles } = storeToRefs(connections);
+const headerTint = computed(() =>
+  settings.connectionTint && selected.value ? connTint(selected.value.color) : "",
+);
 const isMainWindow = ref(true);
 const dialogOpen = ref(false);
 const editing = ref<Profile | null>(null);
@@ -188,7 +193,7 @@ function grouped(database: string) {
 
 <template>
   <Sidebar collapsible="none" class="bg-sidebar h-full min-h-0 w-full! overflow-hidden">
-    <SidebarHeader>
+    <SidebarHeader :class="headerTint">
       <div class="h-12 -m-2 flex items-center p-2">
           <div v-if="selected" class="flex items-start gap-2 px-1 py-0.5">
         <span
