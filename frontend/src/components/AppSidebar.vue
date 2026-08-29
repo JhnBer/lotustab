@@ -195,10 +195,6 @@ function grouped(database: string) {
             </Button>
           </div>
           <div class="text-muted-foreground flex items-center gap-1.5 text-xs">
-            <span
-              class="size-1.5 rounded-full"
-              :class="currentConnected ? 'bg-emerald-500' : 'bg-muted-foreground/40'"
-            />
             {{ currentConnected ? "Connected" : "Offline" }}
           </div>
         </div>
