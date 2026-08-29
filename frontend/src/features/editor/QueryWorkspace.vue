@@ -42,8 +42,8 @@ async function run() {
 </script>
 
 <template>
-  <section class="flex h-full min-h-0 flex-1 flex-col overflow-hidden border">
-    <div class="flex items-center gap-1 border-b px-2 py-1">
+  <section class="flex h-full min-h-0 flex-1 flex-col -m-4 overflow-hidden">
+    <div class="flex items-center gap-1 border-b px-2 py-1 min-h-10">
       <div class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto" style="--wails-draggable: no-drag">
         <button
           v-for="tab in queries.tabs"

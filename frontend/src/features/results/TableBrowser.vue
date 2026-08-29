@@ -40,7 +40,7 @@ function onPageSize(value: unknown) {
 
 <template>
   <div class="flex h-full min-h-0 flex-col">
-    <div class="flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2 text-xs">
+    <div class="flex items-center border-b px-3 py-2 text-xs">
       <div class="text-muted-foreground min-w-0 truncate">
         <span class="text-foreground font-medium">{{ tab.title }}</span>
         <span v-if="tab.database" class="ml-1">· {{ tab.database }}</span>
@@ -48,39 +48,6 @@ function onPageSize(value: unknown) {
           · {{ from }}–{{ to }} of {{ tab.total }}
         </span>
         <span v-if="tab.result && !tab.running"> · {{ tab.result.durationMs }} ms</span>
-      </div>
-      <div class="flex items-center gap-2">
-        <Select :model-value="String(tab.pageSize)" @update:model-value="onPageSize">
-          <SelectTrigger size="sm" class="h-7 w-30">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem v-for="size in PAGE_SIZES" :key="size" :value="String(size)">
-              {{ size }} / page
-            </SelectItem>
-          </SelectContent>
-        </Select>
-        <div class="flex items-center gap-1">
-          <Button
-            size="icon-xs"
-            variant="outline"
-            :disabled="tab.running || tab.page <= 1"
-            @click="queries.setPage(tab.id, tab.page - 1)"
-          >
-            <ChevronLeft class="size-3.5" />
-          </Button>
-          <span class="text-muted-foreground min-w-18 text-center">
-            {{ tab.page }} / {{ pageCount }}
-          </span>
-          <Button
-            size="icon-xs"
-            variant="outline"
-            :disabled="tab.running || tab.page >= pageCount"
-            @click="queries.setPage(tab.id, tab.page + 1)"
-          >
-            <ChevronRight class="size-3.5" />
-          </Button>
-        </div>
       </div>
     </div>
     <ResultsTable
@@ -95,5 +62,38 @@ function onPageSize(value: unknown) {
       empty-hint="Loading table…"
       @sort="queries.cycleSort(tab.id, $event)"
     />
+    <div class="flex shrink-0 items-center justify-end gap-2 border-t px-3 py-2">
+      <Select :model-value="String(tab.pageSize)" @update:model-value="onPageSize">
+        <SelectTrigger size="sm" class="h-7 w-30">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem v-for="size in PAGE_SIZES" :key="size" :value="String(size)">
+            {{ size }} / page
+          </SelectItem>
+        </SelectContent>
+      </Select>
+      <div class="flex items-center gap-1">
+        <Button
+          size="icon-xs"
+          variant="outline"
+          :disabled="tab.running || tab.page <= 1"
+          @click="queries.setPage(tab.id, tab.page - 1)"
+        >
+          <ChevronLeft class="size-3.5" />
+        </Button>
+        <span class="text-muted-foreground min-w-18 text-center text-xs">
+          {{ tab.page }} / {{ pageCount }}
+        </span>
+        <Button
+          size="icon-xs"
+          variant="outline"
+          :disabled="tab.running || tab.page >= pageCount"
+          @click="queries.setPage(tab.id, tab.page + 1)"
+        >
+          <ChevronRight class="size-3.5" />
+        </Button>
+      </div>
+    </div>
   </div>
 </template>

@@ -2,7 +2,8 @@
 import { computed, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import { toast } from "vue-sonner";
-import AppSidebar from "@/components/AppSidebar.vue";
+import AppResizableLayout from "@/components/AppResizableLayout.vue";
+import AppSidebarRail from "@/components/AppSidebarRail.vue";
 import ModeToggle from "@/components/ModeToggle.vue";
 import {
   Breadcrumb,
@@ -14,7 +15,6 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
 import {
-  SidebarInset,
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
@@ -46,12 +46,11 @@ onMounted(async () => {
       :style="{ height: 'var(--titlebar-height)' }"
     />
     <SidebarProvider
-      class="h-full min-h-0 flex-1 overflow-hidden"
-      :style="{ '--sidebar-width': '350px' }"
+      class="flex h-full min-h-0 flex-1 overflow-hidden"
     >
-      <AppSidebar />
-      <SidebarInset class="min-h-0 overflow-hidden">
-        <header class="drag-region bg-background sticky top-0 flex h-12 shrink-0 items-center gap-2 border-b px-4 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+      <AppSidebarRail />
+      <AppResizableLayout>
+        <header class="drag-region bg-background sticky top-0 flex h-12 shrink-0 items-center gap-2 border-b px-4 transition-[width,height] ease-linear">
           <div class="flex min-w-0 flex-1 items-center gap-2" style="--wails-draggable: no-drag">
             <SidebarTrigger class="-ml-1" />
             <Separator
@@ -76,12 +75,12 @@ onMounted(async () => {
             <ModeToggle />
           </div>
         </header>
-        <div class="flex min-h-0 flex-1 flex-col overflow-hidden p-4 pt-0">
+        <div class="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
           <RouterView v-slot="{ Component }">
             <component :is="Component" class="h-full min-h-0 flex-1" />
           </RouterView>
         </div>
-      </SidebarInset>
+      </AppResizableLayout>
       <Toaster rich-colors position="bottom-right" />
     </SidebarProvider>
   </div>

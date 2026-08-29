@@ -102,6 +102,20 @@ export const useExplorerStore = defineStore("explorer", () => {
     }
   }
 
+  async function refresh(id: string) {
+    if (!id) {
+      return;
+    }
+    const expandedDbs = Object.keys(expanded.value).filter((db) => expanded.value[db]);
+    await loadDatabases(id);
+    const stillOpen = expandedDbs.filter((db) => databases.value.includes(db));
+    await Promise.all(stillOpen.map((db) => loadTables(id, db)));
+    const keep = new Set(stillOpen);
+    tablesByDb.value = Object.fromEntries(
+      Object.entries(tablesByDb.value).filter(([db]) => keep.has(db)),
+    );
+  }
+
   return {
     profileId,
     databases,
@@ -114,5 +128,6 @@ export const useExplorerStore = defineStore("explorer", () => {
     loadDatabases,
     loadTables,
     toggleDatabase,
+    refresh,
   };
 });

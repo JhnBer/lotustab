@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "@lucide/vue";
 import {
   Table,
@@ -10,6 +10,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { QueryResult } from "@/lib/wails";
+
+const DEFAULT_COL_WIDTH = 160;
+const MIN_COL_WIDTH = 72;
 
 const props = withDefaults(
   defineProps<{
@@ -37,6 +40,63 @@ const emit = defineEmits<{
 
 const columns = computed(() => props.result?.columns ?? []);
 const rows = computed(() => props.result?.rows ?? []);
+const widths = ref<Record<string, number>>({});
+
+watch(
+  columns,
+  (cols) => {
+    const next: Record<string, number> = {};
+    for (const column of cols) {
+      next[column.name] = widths.value[column.name] ?? DEFAULT_COL_WIDTH;
+    }
+    widths.value = next;
+  },
+  { immediate: true },
+);
+
+const tableMinWidth = computed(() =>
+  columns.value.reduce((sum, column) => sum + (widths.value[column.name] ?? DEFAULT_COL_WIDTH), 0),
+);
+
+function colWidth(name: string) {
+  return widths.value[name] ?? DEFAULT_COL_WIDTH;
+}
+
+let drag: { name: string; startX: number; startWidth: number } | null = null;
+
+function onResizeMove(event: PointerEvent) {
+  if (!drag) {
+    return;
+  }
+  const next = Math.max(MIN_COL_WIDTH, drag.startWidth + (event.clientX - drag.startX));
+  widths.value = { ...widths.value, [drag.name]: next };
+}
+
+function onResizeUp() {
+  drag = null;
+  document.body.style.cursor = "";
+  document.body.style.userSelect = "";
+  window.removeEventListener("pointermove", onResizeMove);
+  window.removeEventListener("pointerup", onResizeUp);
+}
+
+function startResize(event: PointerEvent, name: string) {
+  event.preventDefault();
+  event.stopPropagation();
+  drag = {
+    name,
+    startX: event.clientX,
+    startWidth: colWidth(name),
+  };
+  document.body.style.cursor = "col-resize";
+  document.body.style.userSelect = "none";
+  window.addEventListener("pointermove", onResizeMove);
+  window.addEventListener("pointerup", onResizeUp);
+}
+
+onBeforeUnmount(() => {
+  onResizeUp();
+});
 
 function cellText(value: unknown): string {
   if (value === null || value === undefined) {
@@ -81,50 +141,66 @@ function onHeaderClick(name: string) {
       <div v-if="columns.length === 0" class="text-muted-foreground p-4 text-sm">
         Statement completed. {{ result.rowsAffected }} row{{ result.rowsAffected === 1 ? "" : "s" }} affected.
       </div>
-      <div v-else class="min-h-0 flex-1 overflow-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead
+      <div v-else class="relative min-h-0 flex-1">
+        <div class="absolute inset-0 overflow-hidden">
+          <Table class="table-fixed" :style="{ minWidth: `${tableMinWidth}px` }">
+            <colgroup>
+              <col
                 v-for="column in columns"
                 :key="column.name"
-                class="bg-background sticky top-0 whitespace-nowrap"
-                :class="sortable ? 'cursor-pointer select-none hover:bg-muted/60' : ''"
-                @click="onHeaderClick(column.name)"
-              >
-                <div class="flex items-center gap-1">
-                  <span>{{ column.name }}</span>
-                  <ArrowUp
-                    v-if="sortable && sortColumn === column.name && sortDir === 'asc'"
-                    class="size-3"
+                :style="{ width: `${colWidth(column.name)}px` }"
+              />
+            </colgroup>
+            <TableHeader>
+              <TableRow>
+                <TableHead
+                  v-for="column in columns"
+                  :key="column.name"
+                  class="bg-background sticky top-0 whitespace-nowrap"
+                  :class="sortable ? 'cursor-pointer select-none hover:bg-muted/60' : ''"
+                  @click="onHeaderClick(column.name)"
+                >
+                  <div class="flex items-center gap-1 pr-2">
+                    <span>{{ column.name }}</span>
+                    <ArrowUp
+                      v-if="sortable && sortColumn === column.name && sortDir === 'asc'"
+                      class="size-3"
+                    />
+                    <ArrowDown
+                      v-else-if="sortable && sortColumn === column.name && sortDir === 'desc'"
+                      class="size-3"
+                    />
+                    <ArrowUpDown
+                      v-else-if="sortable"
+                      class="text-muted-foreground size-3 opacity-40"
+                    />
+                  </div>
+                  <div class="text-muted-foreground/60 pr-2 text-[10px] leading-none font-normal">
+                    {{ column.type }}
+                  </div>
+                  <span
+                    class="hover:bg-border absolute inset-y-0 right-0 z-10 w-1.5 cursor-col-resize"
+                    @pointerdown="startResize($event, column.name)"
+                    @click.stop
                   />
-                  <ArrowDown
-                    v-else-if="sortable && sortColumn === column.name && sortDir === 'desc'"
-                    class="size-3"
-                  />
-                  <ArrowUpDown
-                    v-else-if="sortable"
-                    class="text-muted-foreground size-3 opacity-40"
-                  />
-                </div>
-                <div class="text-muted-foreground font-normal">{{ column.type }}</div>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <TableRow v-for="(row, rowIndex) in rows" :key="rowIndex">
-              <TableCell
-                v-for="(value, colIndex) in row ?? []"
-                :key="colIndex"
-                class="max-w-[28rem] truncate font-mono text-xs"
-                :class="isNull(value) ? 'text-muted-foreground italic' : ''"
-                :title="cellText(value)"
-              >
-                {{ cellText(value) }}
-              </TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow v-for="(row, rowIndex) in rows" :key="rowIndex">
+                <TableCell
+                  v-for="(value, colIndex) in row ?? []"
+                  :key="colIndex"
+                  class="truncate font-mono text-xs"
+                  :class="isNull(value) ? 'text-muted-foreground italic' : ''"
+                  :title="cellText(value)"
+                >
+                  {{ cellText(value) }}
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
       </div>
     </template>
   </div>

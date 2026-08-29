@@ -40,3 +40,11 @@ export function connectionColor(color?: string | null): ConnectionColor {
 export function colorBgClass(color?: string | null): string {
   return colorBg[connectionColor(color)];
 }
+
+export function colorCssVar(color?: string | null): string {
+  return `var(--color-${connectionColor(color)}-500)`;
+}
+
+export function colorTintClass(active = false): string {
+  return active ? "bg-(--conn-color)/60" : "bg-(--conn-color)/20";
+}
