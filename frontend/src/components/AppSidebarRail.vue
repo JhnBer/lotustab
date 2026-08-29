@@ -33,6 +33,12 @@ const connections = useConnectionsStore();
 const { setOpen } = useSidebar();
 const { pinnedProfiles } = storeToRefs(connections);
 
+function goConnections() {
+  connections.select("");
+  router.push("/connections");
+  setOpen(true);
+}
+
 function activateProfile(profile: Profile) {
   connections.select(profile.id);
   router.push("/query");
@@ -90,7 +96,7 @@ async function connect(profile: Profile) {
                 tooltip="Connections"
                 :is-active="route.path === '/connections'"
                 class="px-2.5 md:px-2"
-                @click="router.push('/connections'); setOpen(true)"
+                @click="goConnections"
               >
                 <Server />
                 <span>Connections</span>

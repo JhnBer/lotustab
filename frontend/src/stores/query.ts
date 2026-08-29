@@ -40,6 +40,11 @@ export interface TableTab extends TabBase {
 
 export type WorkspaceTab = QueryTab | TableTab;
 
+export interface WorkspaceSnapshot {
+  tabs: WorkspaceTab[];
+  activeTabId: string;
+}
+
 function newQueryTab(profileId: string, title: string): QueryTab {
   return {
     kind: "query",
@@ -161,6 +166,53 @@ export const useQueryStore = defineStore("query", () => {
     }
   }
 
+  function snapshotForProfile(profileId: string): WorkspaceSnapshot {
+    const group = tabs.value.filter((t) => t.profileId === profileId);
+    const activeInGroup = group.some((t) => t.id === activeTabId.value);
+    return {
+      tabs: group.map((t) => ({ ...t, running: false })),
+      activeTabId: activeInGroup ? activeTabId.value : (group[0]?.id ?? ""),
+    };
+  }
+
+  function removeForProfile(profileId: string) {
+    const removingActive =
+      tabs.value.find((t) => t.id === activeTabId.value)?.profileId === profileId;
+    tabs.value = tabs.value.filter((t) => t.profileId !== profileId);
+    if (removingActive) {
+      activeTabId.value = tabs.value[0]?.id ?? "";
+    }
+  }
+
+  function restore(snapshot: WorkspaceSnapshot) {
+    if (!snapshot.tabs.length) {
+      return;
+    }
+    const profileId = snapshot.tabs[0]!.profileId;
+    const group = tabs.value.filter((t) => t.profileId === profileId);
+    const placeholder = group[0];
+    if (
+      group.length === 1 &&
+      placeholder &&
+      placeholder.kind === "query" &&
+      placeholder.sql === "SELECT 1;" &&
+      !placeholder.result
+    ) {
+      tabs.value = tabs.value.filter((t) => t.id !== placeholder.id);
+    }
+    const existing = new Set(tabs.value.map((t) => t.id));
+    for (const tab of snapshot.tabs) {
+      if (!existing.has(tab.id)) {
+        tabs.value.push({ ...tab, running: false });
+      }
+    }
+    if (snapshot.activeTabId && tabs.value.some((t) => t.id === snapshot.activeTabId)) {
+      activeTabId.value = snapshot.activeTabId;
+    } else {
+      activeTabId.value = snapshot.tabs[0]!.id;
+    }
+  }
+
   function reorder(profileId: string, fromIndex: number, toIndex: number) {
     if (fromIndex < 0 || fromIndex === toIndex) {
       return;
@@ -277,6 +329,9 @@ export const useQueryStore = defineStore("query", () => {
     add,
     openTable,
     close,
+    snapshotForProfile,
+    removeForProfile,
+    restore,
     reorder,
     setSql,
     run,

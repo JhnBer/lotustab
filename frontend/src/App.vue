@@ -2,7 +2,7 @@
 import { computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { toast } from "vue-sonner";
-import { Window } from "@wailsio/runtime";
+import { Events, Window } from "@wailsio/runtime";
 import AppResizableLayout from "@/components/AppResizableLayout.vue";
 import AppSidebarRail from "@/components/AppSidebarRail.vue";
 import ModeToggle from "@/components/ModeToggle.vue";
@@ -21,8 +21,9 @@ import {
 } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
 import { errorMessage } from "@/lib/errors";
+import { WindowsService } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
-import { useQueryStore } from "@/stores/query";
+import { useQueryStore, type WorkspaceSnapshot } from "@/stores/query";
 
 const route = useRoute();
 const router = useRouter();
@@ -33,6 +34,18 @@ const pageTitle = computed(() => {
   const title = route.meta.title;
   return typeof title === "string" ? title : "LotusTab";
 });
+
+function restoreHandoff(raw: string | null | undefined): boolean {
+  if (!raw) {
+    return false;
+  }
+  try {
+    queries.restore(JSON.parse(raw) as WorkspaceSnapshot);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 onMounted(async () => {
   try {
@@ -49,10 +62,15 @@ onMounted(async () => {
     const id = name.slice("conn-".length);
     const profile = connections.profiles.find((p) => p.id === id);
     connections.select(id);
-    if (profile) {
+    if (!restoreHandoff(await WindowsService.TakeHandoff(id)) && profile) {
       queries.openForProfile(id, profile.name);
     }
     await router.replace("/query");
+    Events.On("workspace:handoff", () => {
+      void WindowsService.TakeHandoff(id).then((next) => {
+        restoreHandoff(next);
+      });
+    });
   } catch {
     // Main window / non-Wails preview.
   }

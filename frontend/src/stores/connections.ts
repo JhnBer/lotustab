@@ -11,6 +11,7 @@ import {
   type Profile,
   type SaveProfileInput,
 } from "@/lib/wails";
+import { useQueryStore } from "@/stores/query";
 
 function asRecord(params: Profile["params"]): Record<string, string> {
   const out: Record<string, string> = {};
@@ -45,7 +46,6 @@ export const useConnectionsStore = defineStore("connections", () => {
 
   const recentProfiles = computed(() =>
     recentIds.value
-      .filter((id) => id !== selectedId.value)
       .map((id) => profiles.value.find((p) => p.id === id))
       .filter((p): p is Profile => Boolean(p)),
   );
@@ -157,7 +157,6 @@ export const useConnectionsStore = defineStore("connections", () => {
 
   async function connect(id: string) {
     await ConnectionsService.Connect(id);
-    selectedId.value = id;
     await refresh();
   }
 
@@ -172,7 +171,14 @@ export const useConnectionsStore = defineStore("connections", () => {
   }
 
   async function openInNewWindow(profile: Profile) {
-    await WindowsService.OpenConnection(profile.id, profile.name);
+    const queries = useQueryStore();
+    const snap = queries.snapshotForProfile(profile.id);
+    await WindowsService.OpenConnection(
+      profile.id,
+      profile.name,
+      snap.tabs.length > 0 ? JSON.stringify(snap) : "",
+    );
+    queries.removeForProfile(profile.id);
     if (selectedId.value === profile.id) {
       selectedId.value = "";
     }

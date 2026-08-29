@@ -4,11 +4,13 @@ import {
   ChevronRight,
   Database,
   Eye,
+  Pencil,
   Pin,
   Plug,
   RefreshCw,
   SquareArrowOutUpRight,
   Table2,
+  Unplug,
 } from "@lucide/vue";
 import { toast } from "vue-sonner";
 import { storeToRefs } from "pinia";
@@ -18,7 +20,6 @@ import { Window } from "@wailsio/runtime";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupAction,
   SidebarGroupContent,
@@ -33,6 +34,7 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import ConnectionDialog from "@/features/connections/ConnectionDialog.vue";
 import { errorMessage } from "@/lib/errors";
 import { connBg } from "@/lib/colors";
 import type { Profile, TableInfo } from "@/lib/wails";
@@ -45,8 +47,9 @@ const connections = useConnectionsStore();
 const explorer = useExplorerStore();
 const queries = useQueryStore();
 const { selected, recentProfiles } = storeToRefs(connections);
-const recentsExpanded = ref(true);
 const isMainWindow = ref(true);
+const dialogOpen = ref(false);
+const editing = ref<Profile | null>(null);
 
 onMounted(async () => {
   try {
@@ -100,6 +103,29 @@ async function togglePin(profile: Profile) {
   } catch (err) {
     toast.error(errorMessage(err));
   }
+}
+
+async function connectRecent(profile: Profile) {
+  try {
+    await connections.connect(profile.id);
+    toast.success(`Connected to ${profile.name}`);
+  } catch (err) {
+    toast.error(errorMessage(err));
+  }
+}
+
+async function disconnectRecent(profile: Profile) {
+  try {
+    await connections.disconnect(profile.id);
+    toast.info(`Disconnected from ${profile.name}`);
+  } catch (err) {
+    toast.error(errorMessage(err));
+  }
+}
+
+function openEdit(profile: Profile) {
+  editing.value = profile;
+  dialogOpen.value = true;
 }
 
 async function openInNewWindow() {
@@ -200,8 +226,8 @@ function grouped(database: string) {
                   <!--          </div>-->
               </div>
           </div>
-          <div v-else class="text-muted-foreground px-2 py-1 text-xs">
-              Select a connection to browse tables.
+          <div v-else class="text-sm font-medium px-2 py-1">
+              Connections
           </div>
       </div>
     </SidebarHeader>
@@ -209,7 +235,70 @@ function grouped(database: string) {
     <SidebarSeparator class="m-0 -translate-y-full" />
 
     <SidebarContent class="overflow-hidden">
-      <SidebarGroup v-if="selected && !currentConnected">
+      <SidebarGroup v-if="!selected" class="min-h-0 flex-1 overflow-hidden">
+        <SidebarGroupLabel class="bg-sidebar shrink-0">Recent</SidebarGroupLabel>
+        <SidebarGroupContent class="min-h-0 flex-1 overflow-auto">
+          <p v-if="recentProfiles.length === 0" class="text-muted-foreground px-2 py-2 text-xs">
+            No recent connections.
+          </p>
+          <SidebarMenu v-else>
+            <SidebarMenuItem v-for="profile in recentProfiles" :key="profile.id">
+              <div class="flex items-center gap-0.5">
+                <SidebarMenuButton class="min-w-0 flex-1" @click="activateProfile(profile)">
+                  <span
+                    class="size-2 shrink-0 rounded-full"
+                    :class="connBg(profile.color)"
+                  />
+                  <span class="truncate">{{ profile.name }}</span>
+                </SidebarMenuButton>
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  class="shrink-0"
+                  :title="connections.isPinned(profile.id) ? 'Unpin' : 'Pin'"
+                  @click.stop="togglePin(profile)"
+                >
+                  <Pin
+                    class="size-3.5"
+                    :class="connections.isPinned(profile.id) ? 'fill-current' : ''"
+                  />
+                </Button>
+                <Button
+                  v-if="!connections.isConnected(profile.id)"
+                  size="icon-xs"
+                  variant="ghost"
+                  class="shrink-0"
+                  title="Connect"
+                  @click.stop="connectRecent(profile)"
+                >
+                  <Plug class="size-3.5" />
+                </Button>
+                <Button
+                  v-else
+                  size="icon-xs"
+                  variant="ghost"
+                  class="shrink-0"
+                  title="Disconnect"
+                  @click.stop="disconnectRecent(profile)"
+                >
+                  <Unplug class="size-3.5" />
+                </Button>
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  class="shrink-0"
+                  title="Edit"
+                  @click.stop="openEdit(profile)"
+                >
+                  <Pencil class="size-3.5" />
+                </Button>
+              </div>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+
+      <SidebarGroup v-else-if="!currentConnected">
         <SidebarGroupContent class="px-2 py-2">
           <Button size="sm" class="w-full" @click="connectSelected">
             <Plug class="size-3.5" />
@@ -218,7 +307,7 @@ function grouped(database: string) {
         </SidebarGroupContent>
       </SidebarGroup>
 
-      <SidebarGroup v-else-if="selected" class="min-h-0 flex-1 overflow-hidden">
+      <SidebarGroup v-else class="min-h-0 flex-1 overflow-hidden">
         <SidebarGroupLabel class="bg-sidebar shrink-0">Databases</SidebarGroupLabel>
         <SidebarGroupAction
           as="button"
@@ -299,37 +388,6 @@ function grouped(database: string) {
       </SidebarGroup>
     </SidebarContent>
 
-    <SidebarFooter v-if="recentProfiles.length > 0" class="gap-0 p-0">
-      <SidebarSeparator class="mx-0" />
-      <button
-        type="button"
-        class="text-muted-foreground hover:text-foreground flex w-full items-center justify-between px-2 py-3 text-xs"
-        @click="recentsExpanded = !recentsExpanded"
-      >
-        <span>Recent</span>
-        <ChevronDown
-          class="size-3.5 transition-transform duration-100 ease-linear"
-          :class="recentsExpanded ? '' : '-rotate-90'"
-        />
-      </button>
-      <div
-        class="grid overflow-hidden transition-[grid-template-rows] duration-100 ease-linear"
-        :class="recentsExpanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
-      >
-        <div class="min-h-0 overflow-hidden" :class="recentsExpanded ? '' : 'pointer-events-none'">
-          <SidebarMenu class="pb-1">
-            <SidebarMenuItem v-for="profile in recentProfiles" :key="profile.id">
-              <SidebarMenuButton :tooltip="profile.name" @click="activateProfile(profile)">
-                <span
-                  class="size-2 shrink-0 rounded-full"
-                  :class="connBg(profile.color)"
-                />
-                <span>{{ profile.name }}</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </div>
-      </div>
-    </SidebarFooter>
+    <ConnectionDialog v-model:open="dialogOpen" :profile="editing" />
   </Sidebar>
 </template>

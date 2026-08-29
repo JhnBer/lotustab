@@ -12,7 +12,15 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 
 /**
  * OpenConnection shows the existing window for a profile, or creates one.
+ * snapshot is opaque JSON from the source window; empty means no tabs to move.
  */
-export function OpenConnection(profileID: string, title: string): $CancellablePromise<void> {
-    return $Call.ByID(1170944441, profileID, title);
+export function OpenConnection(profileID: string, title: string, snapshot: string): $CancellablePromise<void> {
+    return $Call.ByID(1170944441, profileID, title, snapshot);
+}
+
+/**
+ * TakeHandoff returns and clears the parked workspace snapshot for a profile.
+ */
+export function TakeHandoff(profileID: string): $CancellablePromise<string> {
+    return $Call.ByID(2889088988, profileID);
 }

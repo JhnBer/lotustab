@@ -51,6 +51,7 @@ function openQuery(profile: Profile) {
 async function connect(profile: Profile) {
   try {
     await connections.connect(profile.id);
+    connections.select(profile.id);
     queries.openForProfile(profile.id, profile.name);
     toast.success(`Connected to ${profile.name}`);
     router.push("/query");
