@@ -5,7 +5,7 @@ import "strings"
 const (
 	DefaultBrowseLimit = 100
 	MinBrowseLimit     = 50
-	MaxBrowseLimit     = 1000
+	MaxBrowseLimit     = 10000
 )
 
 // ClampTableBrowse normalizes paging and sort fields for a table browse request.

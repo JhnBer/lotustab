@@ -33,9 +33,13 @@ func TestClampTableBrowse(t *testing.T) {
 	if got.Limit != driver.MinBrowseLimit {
 		t.Fatalf("min clamp: %d", got.Limit)
 	}
-	got = driver.ClampTableBrowse(driver.TableBrowseRequest{Limit: 5000})
+	got = driver.ClampTableBrowse(driver.TableBrowseRequest{Limit: 50000})
 	if got.Limit != driver.MaxBrowseLimit {
 		t.Fatalf("max clamp: %d", got.Limit)
+	}
+	got = driver.ClampTableBrowse(driver.TableBrowseRequest{Limit: 5000})
+	if got.Limit != 5000 {
+		t.Fatalf("5000 should be in range: %d", got.Limit)
 	}
 	got = driver.ClampTableBrowse(driver.TableBrowseRequest{Limit: 250, OrderBy: "name", OrderDir: "nope"})
 	if got.Limit != 250 || got.OrderDir != "asc" {

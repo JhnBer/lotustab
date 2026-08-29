@@ -7,7 +7,15 @@ import {
   type TableBrowseResult,
 } from "@/lib/wails";
 
-export const PAGE_SIZES = [50, 100, 250, 500, 1000] as const;
+export const PAGE_SIZES = [50, 100, 250, 500, 1000, 5000, 10000] as const;
+
+const DEFAULT_PAGE_SIZE = 100;
+const PAGE_SIZE_KEY = "lotustab.tablePageSize";
+
+function storedPageSize(): number {
+  const n = Number(localStorage.getItem(PAGE_SIZE_KEY));
+  return (PAGE_SIZES as readonly number[]).includes(n) ? n : DEFAULT_PAGE_SIZE;
+}
 
 export type SortDir = "asc" | "desc" | "";
 
@@ -137,7 +145,7 @@ export const useQueryStore = defineStore("query", () => {
       schema: opts.schema,
       name: opts.name,
       page: 1,
-      pageSize: 100,
+      pageSize: storedPageSize(),
       orderBy: "",
       orderDir: "",
       running: false,
@@ -300,6 +308,9 @@ export const useQueryStore = defineStore("query", () => {
     }
     tab.pageSize = pageSize;
     tab.page = 1;
+    if ((PAGE_SIZES as readonly number[]).includes(pageSize)) {
+      localStorage.setItem(PAGE_SIZE_KEY, String(pageSize));
+    }
     void loadTable(id);
   }
 

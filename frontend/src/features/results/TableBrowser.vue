@@ -64,7 +64,7 @@ function onPageSize(value: unknown) {
     />
     <div class="flex shrink-0 items-center justify-end gap-2 border-t px-3 py-2">
       <Select :model-value="String(tab.pageSize)" @update:model-value="onPageSize">
-        <SelectTrigger size="sm" class="h-7 w-30">
+        <SelectTrigger size="sm" class="h-7 w-36">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
