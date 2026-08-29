@@ -7,12 +7,14 @@ import {
   Pin,
   Plug,
   RefreshCw,
+  SquareArrowOutUpRight,
   Table2,
 } from "@lucide/vue";
 import { toast } from "vue-sonner";
 import { storeToRefs } from "pinia";
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
+import { Window } from "@wailsio/runtime";
 import {
   Sidebar,
   SidebarContent,
@@ -44,6 +46,15 @@ const explorer = useExplorerStore();
 const queries = useQueryStore();
 const { selected, recentProfiles } = storeToRefs(connections);
 const recentsExpanded = ref(true);
+const isMainWindow = ref(true);
+
+onMounted(async () => {
+  try {
+    isMainWindow.value = (await Window.Name()) === "main";
+  } catch {
+    // Preview / non-Wails: keep the pop-out control visible.
+  }
+});
 
 const currentConnected = computed(() =>
   selected.value ? connections.isConnected(selected.value.id) : false,
@@ -86,6 +97,18 @@ async function connectSelected() {
 async function togglePin(profile: Profile) {
   try {
     await connections.setPinned(profile.id, !connections.isPinned(profile.id));
+  } catch (err) {
+    toast.error(errorMessage(err));
+  }
+}
+
+async function openInNewWindow() {
+  if (!selected.value) {
+    return;
+  }
+  try {
+    await connections.openInNewWindow(selected.value);
+    await router.push("/connections");
   } catch (err) {
     toast.error(errorMessage(err));
   }
@@ -159,6 +182,16 @@ function grouped(database: string) {
                 class="size-3.5"
                 :class="connections.isPinned(selected.id) ? 'fill-current' : ''"
               />
+            </Button>
+            <Button
+              v-if="isMainWindow"
+              size="icon-xs"
+              variant="ghost"
+              class="shrink-0"
+              title="Open in new window"
+              @click="openInNewWindow"
+            >
+              <SquareArrowOutUpRight class="size-3.5" />
             </Button>
           </div>
           <div class="text-muted-foreground flex items-center gap-1.5 text-xs">

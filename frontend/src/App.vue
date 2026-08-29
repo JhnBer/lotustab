@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { toast } from "vue-sonner";
+import { Window } from "@wailsio/runtime";
 import AppResizableLayout from "@/components/AppResizableLayout.vue";
 import AppSidebarRail from "@/components/AppSidebarRail.vue";
 import ModeToggle from "@/components/ModeToggle.vue";
@@ -21,9 +22,12 @@ import {
 import { Toaster } from "@/components/ui/sonner";
 import { errorMessage } from "@/lib/errors";
 import { useConnectionsStore } from "@/stores/connections";
+import { useQueryStore } from "@/stores/query";
 
 const route = useRoute();
+const router = useRouter();
 const connections = useConnectionsStore();
+const queries = useQueryStore();
 
 const pageTitle = computed(() => {
   const title = route.meta.title;
@@ -35,6 +39,22 @@ onMounted(async () => {
     await connections.refresh();
   } catch (err) {
     toast.error(errorMessage(err));
+    return;
+  }
+  try {
+    const name = await Window.Name();
+    if (!name.startsWith("conn-")) {
+      return;
+    }
+    const id = name.slice("conn-".length);
+    const profile = connections.profiles.find((p) => p.id === id);
+    connections.select(id);
+    if (profile) {
+      queries.openForProfile(id, profile.name);
+    }
+    await router.replace("/query");
+  } catch {
+    // Main window / non-Wails preview.
   }
 });
 </script>
@@ -42,7 +62,7 @@ onMounted(async () => {
 <template>
   <div class="flex h-full min-h-0 flex-col">
     <div
-      class="drag-region bg-background shrink-0"
+      class="drag-region bg-background border-b shrink-0"
       :style="{ height: 'var(--titlebar-height)' }"
     />
     <SidebarProvider

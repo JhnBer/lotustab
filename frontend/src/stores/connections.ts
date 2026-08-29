@@ -1,9 +1,11 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
+import { Events } from "@wailsio/runtime";
 import { errorMessage } from "@/lib/errors";
 import {
   ConnectionsService,
   DriversService,
+  WindowsService,
   type DriverInfo,
   type Field,
   type Profile,
@@ -105,6 +107,23 @@ export const useConnectionsStore = defineStore("connections", () => {
     applyState(await ConnectionsService.List());
   }
 
+  async function syncFromBackend() {
+    try {
+      const [state, nextConnected] = await Promise.all([
+        ConnectionsService.List(),
+        ConnectionsService.ConnectedIDs(),
+      ]);
+      applyState(state);
+      connectedIds.value = nextConnected ?? [];
+    } catch {
+      // Keep the current window usable if a sync tick fails.
+    }
+  }
+
+  Events.On("connections:changed", () => {
+    void syncFromBackend();
+  });
+
   async function save(input: SaveProfileInput) {
     const saved = await ConnectionsService.Save({
       ...input,
@@ -150,6 +169,13 @@ export const useConnectionsStore = defineStore("connections", () => {
   function select(id: string) {
     selectedId.value = id;
     void touchRecent(id);
+  }
+
+  async function openInNewWindow(profile: Profile) {
+    await WindowsService.OpenConnection(profile.id, profile.name);
+    if (selectedId.value === profile.id) {
+      selectedId.value = "";
+    }
   }
 
   async function setPinned(id: string, pinned: boolean) {
@@ -199,6 +225,7 @@ export const useConnectionsStore = defineStore("connections", () => {
     connect,
     disconnect,
     select,
+    openInNewWindow,
     setPinned,
     setColor,
     touchRecent,

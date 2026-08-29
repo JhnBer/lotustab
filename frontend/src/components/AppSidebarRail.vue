@@ -2,6 +2,7 @@
 import { Database, Server } from "@lucide/vue";
 import { storeToRefs } from "pinia";
 import { useRoute, useRouter } from "vue-router";
+import { toast } from "vue-sonner";
 import {
   Sidebar,
   SidebarContent,
@@ -13,8 +14,16 @@ import {
   SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { connBg } from "@/lib/colors";
+import { errorMessage } from "@/lib/errors";
 import type { Profile } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
 
@@ -27,6 +36,43 @@ const { pinnedProfiles } = storeToRefs(connections);
 function activateProfile(profile: Profile) {
   connections.select(profile.id);
   router.push("/query");
+}
+
+async function openInNewWindow(profile: Profile) {
+  try {
+    await connections.openInNewWindow(profile);
+    if (!connections.selectedId) {
+      await router.push("/connections");
+    }
+  } catch (err) {
+    toast.error(errorMessage(err));
+  }
+}
+
+async function unpin(profile: Profile) {
+  try {
+    await connections.setPinned(profile.id, false);
+  } catch (err) {
+    toast.error(errorMessage(err));
+  }
+}
+
+async function disconnect(profile: Profile) {
+  try {
+    await connections.disconnect(profile.id);
+    toast.info(`Disconnected from ${profile.name}`);
+  } catch (err) {
+    toast.error(errorMessage(err));
+  }
+}
+
+async function connect(profile: Profile) {
+    try {
+        await connections.connect(profile.id);
+        toast.success(`Connected to ${profile.name}`);
+    } catch (err) {
+        toast.error(errorMessage(err));
+    }
 }
 </script>
 
@@ -60,8 +106,8 @@ function activateProfile(profile: Profile) {
           <SidebarGroupContent class="px-1.5 md:px-0">
             <SidebarMenu class="gap-1">
               <SidebarMenuItem v-for="profile in pinnedProfiles" :key="profile.id">
-                <Tooltip>
-                  <TooltipTrigger as-child>
+                <ContextMenu>
+                  <ContextMenuTrigger as-child>
                     <button
                       type="button"
                       class="mx-auto flex size-8 items-center justify-center rounded-md text-foreground ring-offset-background focus-visible:ring-2 focus-visible:outline-none dark:text-white"
@@ -71,11 +117,29 @@ function activateProfile(profile: Profile) {
                       <Database class="size-4" />
                       <span class="sr-only">{{ profile.name }}</span>
                     </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" align="center">
-                    {{ profile.name }}
-                  </TooltipContent>
-                </Tooltip>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent>
+                    <ContextMenuLabel>{{ profile.name }}</ContextMenuLabel>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem @click="openInNewWindow(profile)">
+                      Open in new window
+                    </ContextMenuItem>
+                    <ContextMenuItem @click="unpin(profile)">
+                      Unpin
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <template v-if="connections.isConnected(profile.id)">
+                      <ContextMenuItem @click="disconnect(profile)">
+                        Disconnect
+                      </ContextMenuItem>
+                    </template>
+                    <template v-else>
+                        <ContextMenuItem @click="connect(profile)">
+                            Connect
+                        </ContextMenuItem>
+                    </template>
+                  </ContextMenuContent>
+                </ContextMenu>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>

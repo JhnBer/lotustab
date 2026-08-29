@@ -37,6 +37,7 @@ func main() {
 	connections := app.NewConnectionsService(registry, store, secretStore, manager)
 	queries := app.NewQueryServiceFromConnections(connections)
 	drivers := app.NewDriversService(registry)
+	windows := app.NewWindowsService()
 
 	appl := application.New(application.Options{
 		Name:        "LotusTab",
@@ -45,6 +46,7 @@ func main() {
 			application.NewService(drivers),
 			application.NewService(connections),
 			application.NewService(queries),
+			application.NewService(windows),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
@@ -54,17 +56,7 @@ func main() {
 		},
 	})
 
-	appl.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:  "LotusTab",
-		Width:  1280,
-		Height: 800,
-		Mac: application.MacWindow{
-			Backdrop: application.MacBackdropTranslucent,
-			TitleBar: application.MacTitleBarHiddenInset,
-		},
-		BackgroundColour: application.NewRGB(10, 10, 10),
-		URL:              "/",
-	})
+	appl.Window.NewWithOptions(app.WindowOptions("main", "LotusTab", "/"))
 
 	if err := appl.Run(); err != nil {
 		log.Fatal(err)

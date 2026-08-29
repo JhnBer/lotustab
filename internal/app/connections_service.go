@@ -7,12 +7,15 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"lotustab/internal/core/connection"
 	"lotustab/internal/core/driver"
 	"lotustab/internal/secrets"
 	"lotustab/internal/storage"
 )
+
+const connectionsChangedEvent = "connections:changed"
 
 // SaveProfileInput is the payload used to create, update, or test a profile.
 type SaveProfileInput struct {
@@ -56,6 +59,19 @@ func NewConnectionsService(
 func (s *ConnectionsService) ServiceShutdown() error {
 	s.manager.CloseAll()
 	return nil
+}
+
+func (s *ConnectionsService) notifyChanged() {
+	if appl := application.Get(); appl != nil {
+		appl.Event.Emit(connectionsChangedEvent)
+	}
+}
+
+func (s *ConnectionsService) afterChange(err error) error {
+	if err == nil {
+		s.notifyChanged()
+	}
+	return err
 }
 
 // List returns saved profiles and navigation prefs (never includes passwords).
@@ -127,6 +143,7 @@ func (s *ConnectionsService) Save(input SaveProfileInput) (connection.Profile, e
 	if err := s.secrets.Set(profile.ID, password); err != nil {
 		return connection.Profile{}, err
 	}
+	s.notifyChanged()
 	return profile, nil
 }
 
@@ -138,7 +155,7 @@ func (s *ConnectionsService) Delete(id string) error {
 	if err := s.secrets.Delete(id); err != nil {
 		return err
 	}
-	return s.store.Delete(id)
+	return s.afterChange(s.store.Delete(id))
 }
 
 // Test opens a throwaway connection using the form values.
@@ -169,12 +186,13 @@ func (s *ConnectionsService) Connect(ctx context.Context, id string) error {
 	}
 	s.manager.Put(id, conn)
 	_ = s.store.TouchRecent(id)
+	s.notifyChanged()
 	return nil
 }
 
 // Disconnect closes the live session for a profile.
 func (s *ConnectionsService) Disconnect(id string) error {
-	return s.manager.Remove(id)
+	return s.afterChange(s.manager.Remove(id))
 }
 
 // ConnectedIDs returns profile IDs with an open session.
@@ -184,7 +202,7 @@ func (s *ConnectionsService) ConnectedIDs() []string {
 
 // SetPinned pins or unpins a profile in the sidebar rail.
 func (s *ConnectionsService) SetPinned(id string, pinned bool) error {
-	return s.store.SetPinned(id, pinned)
+	return s.afterChange(s.store.SetPinned(id, pinned))
 }
 
 // SetColor updates a profile's palette color.
@@ -193,12 +211,12 @@ func (s *ConnectionsService) SetColor(id, color string) error {
 	if err != nil {
 		return err
 	}
-	return s.store.SetColor(id, color)
+	return s.afterChange(s.store.SetColor(id, color))
 }
 
 // TouchRecent records a profile as recently used.
 func (s *ConnectionsService) TouchRecent(id string) error {
-	return s.store.TouchRecent(id)
+	return s.afterChange(s.store.TouchRecent(id))
 }
 
 // Databases lists databases on the server for a connected (or just-opened) profile.
@@ -219,6 +237,7 @@ func (s *ConnectionsService) ensureOpen(ctx context.Context, id string) (driver.
 		return nil, err
 	}
 	s.manager.Put(id, conn)
+	s.notifyChanged()
 	return conn, nil
 }
 

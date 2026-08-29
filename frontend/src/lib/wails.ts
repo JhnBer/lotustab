@@ -2,6 +2,7 @@ export {
   ConnectionsService,
   DriversService,
   QueryService,
+  WindowsService,
 } from "../../bindings/lotustab/internal/app";
 export type {
   ConnectionsState,
