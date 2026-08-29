@@ -1,3 +1,4 @@
+// Tailwind hues. If you add one, also add it in style.css `@source inline`.
 export const CONNECTION_COLORS = [
   "red",
   "orange",
@@ -14,23 +15,13 @@ export const CONNECTION_COLORS = [
 
 export type ConnectionColor = (typeof CONNECTION_COLORS)[number];
 
-export const DEFAULT_CONNECTION_COLOR: ConnectionColor = "blue";
-
-export function connectionColor(color?: string | null): ConnectionColor {
+export function connColor(color?: string | null): ConnectionColor {
   if (color && (CONNECTION_COLORS as readonly string[]).includes(color)) {
     return color as ConnectionColor;
   }
-  return DEFAULT_CONNECTION_COLOR;
+  return "blue";
 }
 
-export function colorBgClass(color?: string | null): string {
-  return 'bg-' + connectionColor(color) + '-500';
-}
-
-export function colorCssVar(color?: string | null): string {
-  return `var(--color-${connectionColor(color)}-500)`;
-}
-
-export function colorTintClass(active = false): string {
-  return active ? "bg-(--conn-color)/60" : "bg-(--conn-color)/20";
+export function connBg(color?: string | null): string {
+  return `bg-${connColor(color)}-500`;
 }

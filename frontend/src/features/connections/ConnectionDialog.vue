@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import DynamicField from "@/features/connections/DynamicField.vue";
 import { errorMessage } from "@/lib/errors";
-import { CONNECTION_COLORS, colorBgClass, DEFAULT_CONNECTION_COLOR, connectionColor } from "@/lib/colors";
+import { CONNECTION_COLORS, connBg, connColor } from "@/lib/colors";
 import type { Field, Profile, SaveProfileInput } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
 
@@ -93,7 +93,7 @@ watch(
     }
     const fallbackDriver = connections.drivers[0]?.id ?? "";
     name.value = props.profile?.name ?? "";
-    color.value = connectionColor(props.profile?.color);
+    color.value = connColor(props.profile?.color);
     applyDriver(props.profile?.driverId || fallbackDriver, connections.asRecord(props.profile?.params ?? null));
   },
   { immediate: true },
@@ -109,7 +109,7 @@ function payload(): SaveProfileInput {
     name: name.value.trim(),
     driverId: driverId.value,
     params: { ...params },
-    color: color.value || DEFAULT_CONNECTION_COLOR,
+    color: connColor(color.value),
   };
 }
 
@@ -167,10 +167,7 @@ async function fetchDatabases() {
               :key="swatch"
               type="button"
               class="size-6 rounded-full ring-offset-background focus-visible:ring-2 focus-visible:outline-none"
-              :class="[
-                colorBgClass(swatch),
-                color === swatch ? 'ring-2 ring-foreground' : 'opacity-80 hover:opacity-100',
-              ]"
+              :class="[connBg(swatch), color === swatch ? 'ring-2 ring-foreground' : 'opacity-80 hover:opacity-100']"
               :title="swatch"
               @click="color = swatch"
             >

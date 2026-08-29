@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/table";
 import ConnectionDialog from "@/features/connections/ConnectionDialog.vue";
 import { errorMessage } from "@/lib/errors";
-import { colorBgClass } from "@/lib/colors";
+import { connBg } from "@/lib/colors";
 import type { Profile } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
 import { useQueryStore } from "@/stores/query";
@@ -130,7 +130,7 @@ async function remove(profile: Profile) {
                 class="flex items-center gap-2 font-medium hover:underline"
                 @click="openQuery(profile)"
               >
-                <span class="size-2.5 shrink-0 rounded-full" :class="colorBgClass(profile.color)" />
+                <span class="size-2.5 shrink-0 rounded-full" :class="connBg(profile.color)" />
                 {{ profile.name }}
               </button>
             </TableCell>

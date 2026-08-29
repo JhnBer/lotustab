@@ -14,7 +14,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { colorCssVar, colorTintClass } from "@/lib/colors";
+import { connBg } from "@/lib/colors";
 import type { Profile } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
 
@@ -65,8 +65,7 @@ function activateProfile(profile: Profile) {
                     <button
                       type="button"
                       class="mx-auto flex size-8 items-center justify-center rounded-md text-foreground ring-offset-background focus-visible:ring-2 focus-visible:outline-none dark:text-white"
-                      :style="{ '--conn-color': colorCssVar(profile.color) }"
-                      :class="colorTintClass(connections.selectedId === profile.id)"
+                      :class="connBg(profile.color) + (connections.selectedId === profile.id ? '/60' : '/20')"
                       @click="activateProfile(profile)"
                     >
                       <Database class="size-4" />

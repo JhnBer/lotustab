@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { errorMessage } from "@/lib/errors";
-import { colorBgClass } from "@/lib/colors";
+import { connBg } from "@/lib/colors";
 import type { Profile, TableInfo } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
 import { groupTables, useExplorerStore } from "@/stores/explorer";
@@ -143,7 +143,7 @@ function grouped(database: string) {
       <div v-if="selected" class="flex items-start gap-2 px-1 py-0.5">
         <span
           class="mt-1.5 size-2.5 shrink-0 rounded-full"
-          :class="colorBgClass(selected.color)"
+          :class="connBg(selected.color)"
         />
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-1">
@@ -291,7 +291,7 @@ function grouped(database: string) {
               <SidebarMenuButton :tooltip="profile.name" @click="activateProfile(profile)">
                 <span
                   class="size-2 shrink-0 rounded-full"
-                  :class="colorBgClass(profile.color)"
+                  :class="connBg(profile.color)"
                 />
                 <span>{{ profile.name }}</span>
               </SidebarMenuButton>
