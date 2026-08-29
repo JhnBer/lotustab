@@ -163,48 +163,50 @@ function grouped(database: string) {
 <template>
   <Sidebar collapsible="none" class="bg-sidebar h-full min-h-0 w-full! overflow-hidden">
     <SidebarHeader>
-      <div v-if="selected" class="flex items-start gap-2 px-1 py-0.5">
+      <div class="h-12 -m-2 flex items-center p-2">
+          <div v-if="selected" class="flex items-start gap-2 px-1 py-0.5">
         <span
-          class="mt-1.5 size-2.5 shrink-0 rounded-full"
-          :class="connBg(selected.color)"
+            class="mt-1.5 size-2.5 shrink-0 rounded-full"
+            :class="connBg(selected.color)"
         />
-        <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-1">
-            <span class="truncate text-sm font-medium">{{ selected.name }}</span>
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              class="shrink-0"
-              :title="connections.isPinned(selected.id) ? 'Unpin' : 'Pin'"
-              @click="togglePin(selected)"
-            >
-              <Pin
-                class="size-3.5"
-                :class="connections.isPinned(selected.id) ? 'fill-current' : ''"
-              />
-            </Button>
-            <Button
-              v-if="isMainWindow"
-              size="icon-xs"
-              variant="ghost"
-              class="shrink-0"
-              title="Open in new window"
-              @click="openInNewWindow"
-            >
-              <SquareArrowOutUpRight class="size-3.5" />
-            </Button>
+              <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-1">
+                      <span class="truncate text-sm font-medium">{{ selected.name }}</span>
+                      <Button
+                          size="icon-xs"
+                          variant="ghost"
+                          class="shrink-0"
+                          :title="connections.isPinned(selected.id) ? 'Unpin' : 'Pin'"
+                          @click="togglePin(selected)"
+                      >
+                          <Pin
+                              class="size-3.5"
+                              :class="connections.isPinned(selected.id) ? 'fill-current' : ''"
+                          />
+                      </Button>
+                      <Button
+                          v-if="isMainWindow"
+                          size="icon-xs"
+                          variant="ghost"
+                          class="shrink-0"
+                          title="Open in new window"
+                          @click="openInNewWindow"
+                      >
+                          <SquareArrowOutUpRight class="size-3.5" />
+                      </Button>
+                  </div>
+                  <!--          <div class="text-muted-foreground flex items-center gap-1.5 text-xs">-->
+                  <!--            {{ currentConnected ? "Connected" : "Offline" }}-->
+                  <!--          </div>-->
+              </div>
           </div>
-          <div class="text-muted-foreground flex items-center gap-1.5 text-xs">
-            {{ currentConnected ? "Connected" : "Offline" }}
+          <div v-else class="text-muted-foreground px-2 py-1 text-xs">
+              Select a connection to browse tables.
           </div>
-        </div>
-      </div>
-      <div v-else class="text-muted-foreground px-2 py-1 text-xs">
-        Select a connection to browse tables.
       </div>
     </SidebarHeader>
 
-    <SidebarSeparator />
+    <SidebarSeparator class="m-0 -translate-y-full" />
 
     <SidebarContent class="overflow-hidden">
       <SidebarGroup v-if="selected && !currentConnected">

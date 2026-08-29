@@ -75,7 +75,7 @@ onMounted(async () => {
             <SidebarTrigger class="-ml-1" />
             <Separator
               orientation="vertical"
-              class="mr-2 data-[orientation=vertical]:h-4"
+              class="mr-2 data-[orientation=vertical]:h-12"
             />
             <Breadcrumb>
               <BreadcrumbList>

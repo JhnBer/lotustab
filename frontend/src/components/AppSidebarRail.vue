@@ -81,8 +81,8 @@ async function connect(profile: Profile) {
     collapsible="none"
     class="h-full w-[calc(var(--sidebar-width-icon)+1px)]! shrink-0 border-r"
   >
-    <SidebarContent>
-      <SidebarGroup>
+    <SidebarContent class="relative">
+      <SidebarGroup class="h-12">
         <SidebarGroupContent class="px-1.5 md:px-0">
           <SidebarMenu>
             <SidebarMenuItem>
@@ -101,7 +101,7 @@ async function connect(profile: Profile) {
       </SidebarGroup>
 
       <template v-if="pinnedProfiles.length > 0">
-        <SidebarSeparator />
+        <SidebarSeparator class="m-0 -translate-y-full" />
         <SidebarGroup>
           <SidebarGroupContent class="px-1.5 md:px-0">
             <SidebarMenu class="gap-1">
