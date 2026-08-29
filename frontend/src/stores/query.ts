@@ -151,11 +151,28 @@ export const useQueryStore = defineStore("query", () => {
     if (index < 0) {
       return;
     }
+    const profileId = tabs.value[index]!.profileId;
+    const groupIndex = tabs.value.filter((t) => t.profileId === profileId).findIndex((t) => t.id === id);
     tabs.value.splice(index, 1);
     if (activeTabId.value === id) {
-      const next = tabs.value[index] ?? tabs.value[index - 1];
+      const group = tabs.value.filter((t) => t.profileId === profileId);
+      const next = group[groupIndex] ?? group[groupIndex - 1];
       activeTabId.value = next?.id ?? "";
     }
+  }
+
+  function reorder(profileId: string, fromIndex: number, toIndex: number) {
+    if (fromIndex < 0 || fromIndex === toIndex) {
+      return;
+    }
+    const group = tabs.value.filter((t) => t.profileId === profileId);
+    const [moved] = group.splice(fromIndex, 1);
+    if (!moved) {
+      return;
+    }
+    group.splice(toIndex, 0, moved);
+    let i = 0;
+    tabs.value = tabs.value.map((t) => (t.profileId === profileId ? group[i++]! : t));
   }
 
   function setSql(id: string, sql: string) {
@@ -260,6 +277,7 @@ export const useQueryStore = defineStore("query", () => {
     add,
     openTable,
     close,
+    reorder,
     setSql,
     run,
     loadTable,
