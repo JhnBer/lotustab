@@ -100,7 +100,7 @@ onMounted(async () => {
       <AppSidebarRail />
       <AppResizableLayout>
         <header
-          class="drag-region sticky top-0 flex h-12 shrink-0 items-center gap-2 border-b px-4 transition-[width,height,background-color] ease-linear"
+          class="drag-region sticky top-0 flex h-12 shrink-0 items-center gap-2 border-b px-4 transition-[width,height] ease-linear"
           :class="headerTint || 'bg-background'"
         >
           <div class="flex min-w-0 flex-1 items-center gap-2" style="--wails-draggable: no-drag">
