@@ -7,6 +7,7 @@ import type { QueryResult } from "@/lib/wails";
 const DEFAULT_COL_WIDTH = 160;
 const MIN_COL_WIDTH = 72;
 const ROW_HEIGHT = 36;
+const ROW_NUM_WIDTH = 48;
 
 const props = withDefaults(
   defineProps<{
@@ -18,6 +19,7 @@ const props = withDefaults(
     sortDir?: string;
     emptyHint?: string;
     showStatus?: boolean;
+    rowOffset?: number;
   }>(),
   {
     sortable: false,
@@ -25,6 +27,7 @@ const props = withDefaults(
     sortDir: "",
     emptyHint: "Run a query to see results.",
     showStatus: true,
+    rowOffset: 0,
   },
 );
 
@@ -49,8 +52,10 @@ watch(
   { immediate: true },
 );
 
-const tableMinWidth = computed(() =>
-  columns.value.reduce((sum, column) => sum + (widths.value[column.name] ?? DEFAULT_COL_WIDTH), 0),
+const tableMinWidth = computed(
+  () =>
+    ROW_NUM_WIDTH +
+    columns.value.reduce((sum, column) => sum + (widths.value[column.name] ?? DEFAULT_COL_WIDTH), 0),
 );
 
 const virtualizer = useVirtualizer(
@@ -169,6 +174,13 @@ function onHeaderClick(name: string) {
               class="bg-background sticky top-0 z-10 flex border-b"
             >
               <div
+                role="columnheader"
+                class="text-muted-foreground box-border flex-none px-2 py-2 font-medium"
+                :style="{ width: `${ROW_NUM_WIDTH}px` }"
+              >
+                #
+              </div>
+              <div
                 v-for="column in columns"
                 :key="column.name"
                 role="columnheader"
@@ -216,6 +228,13 @@ function onHeaderClick(name: string) {
                   transform: `translateY(${item.start}px)`,
                 }"
               >
+                <div
+                  role="cell"
+                  class="text-muted-foreground box-border flex-none truncate px-2 font-mono text-xs leading-9"
+                  :style="{ width: `${ROW_NUM_WIDTH}px` }"
+                >
+                  {{ rowOffset + item.index + 1 }}
+                </div>
                 <div
                   v-for="(value, colIndex) in rows[item.index] ?? []"
                   :key="colIndex"

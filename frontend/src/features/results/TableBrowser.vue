@@ -28,6 +28,7 @@ const queries = useQueryStore();
       :sort-column="tab.orderBy"
       :sort-dir="tab.orderDir"
       :show-status="false"
+      :row-offset="(tab.page - 1) * tab.pageSize"
       empty-hint="Loading table…"
       @sort="queries.cycleSort(tab.id, $event)"
     />

@@ -150,6 +150,7 @@ async function run() {
             :error="queries.activeTab.error"
             :running="queries.activeTab.running"
             :show-status="false"
+            :row-offset="(queries.activeTab.page - 1) * queries.activeTab.pageSize"
           />
           <TablePager
             :page="queries.activeTab.page"
