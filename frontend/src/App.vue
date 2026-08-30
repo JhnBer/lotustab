@@ -41,7 +41,7 @@ const pageTitle = computed(() => {
 });
 
 const headerTint = computed(() =>
-  settings.connectionTint && connections.selected
+  settings.connectionTint && connections.selected && !route.path.startsWith("/settings")
     ? connTint(connections.selected.color)
     : "",
 );

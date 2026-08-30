@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from "vue";
+import { useRoute } from "vue-router";
 import AppSidebar from "@/components/AppSidebar.vue";
 import { SidebarInset, useSidebar } from "@/components/ui/sidebar";
+import SettingsSidebar from "@/features/settings/SettingsSidebar.vue";
+
+const route = useRoute();
+const isSettings = computed(() => route.path.startsWith("/settings"));
 
 const DEFAULT_WIDTH = 280;
 const MIN_WIDTH = 220;
@@ -68,7 +73,8 @@ onBeforeUnmount(() => {
       :style="{ width: `${clipWidth}px` }"
     >
       <div class="flex h-full" :style="{ width: `${explorerPx}px` }">
-        <AppSidebar class="min-w-0 flex-1" />
+        <AppSidebar v-if="!isSettings" class="min-w-0 flex-1" />
+        <SettingsSidebar v-else class="min-w-0 flex-1" />
         <div
           class="bg-border relative w-px shrink-0 cursor-col-resize after:absolute after:inset-y-0 after:-left-1 after:w-2.5 after:content-['']"
           @pointerdown="startResize"

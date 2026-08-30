@@ -38,7 +38,7 @@ const { setOpen } = useSidebar();
 const { pinnedProfiles } = storeToRefs(connections);
 
 const connectionsTint = computed(() =>
-  settings.connectionTint && connections.selected
+  settings.connectionTint && connections.selected && !route.path.startsWith("/settings")
     ? connTint(connections.selected.color)
     : "",
 );
@@ -51,6 +51,7 @@ function goConnections() {
 
 function goSettings() {
   router.push("/settings");
+  setOpen(true);
 }
 
 function activateProfile(profile: Profile) {
