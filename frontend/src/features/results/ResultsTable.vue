@@ -85,12 +85,27 @@ watch(
   },
 );
 
+function columnKey(cols: { name: string }[]) {
+  return cols.map((column) => column.name).join("\0");
+}
+
+let prevColumnKey = columnKey(columns.value);
+
 watch(
   () => props.result,
   () => {
+    const nextKey = columnKey(columns.value);
+    const colsChanged = nextKey !== prevColumnKey;
+    prevColumnKey = nextKey;
     rowVirtualizer.value.scrollToOffset(0);
-    columnVirtualizer.value.scrollToOffset(0);
-    scrollRef.value?.scrollTo({ top: 0, left: 0 });
+    const scroller = scrollRef.value;
+    if (scroller) {
+      scroller.scrollTop = 0;
+      if (colsChanged) {
+        scroller.scrollLeft = 0;
+        columnVirtualizer.value.scrollToOffset(0);
+      }
+    }
   },
   { flush: "post" },
 );
