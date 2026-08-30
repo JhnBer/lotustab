@@ -31,6 +31,10 @@ function onPageSize(value: unknown) {
 function onTint(value: unknown) {
   settings.setConnectionTint(Boolean(value));
 }
+
+function onShowAllDatabases(value: unknown) {
+  settings.setShowAllDatabases(Boolean(value));
+}
 </script>
 
 <template>
@@ -57,6 +61,15 @@ function onTint(value: unknown) {
         id="settings-tint"
         :model-value="settings.connectionTint"
         @update:model-value="onTint"
+      />
+    </div>
+
+    <div class="flex items-center justify-between gap-4">
+      <Label for="settings-show-all-dbs">Show all databases</Label>
+      <Switch
+        id="settings-show-all-dbs"
+        :model-value="settings.showAllDatabases"
+        @update:model-value="onShowAllDatabases"
       />
     </div>
 

@@ -7,6 +7,7 @@ export const DEFAULT_PAGE_SIZE = 100;
 
 const PAGE_SIZE_KEY = "lotustab.tablePageSize";
 const TINT_KEY = "lotustab.connectionTint";
+const SHOW_ALL_DBS_KEY = "lotustab.showAllDatabases";
 const SETTINGS_CHANGED = "settings:changed";
 
 export function isPageSize(n: number): boolean {
@@ -22,25 +23,33 @@ function readTint(): boolean {
   return localStorage.getItem(TINT_KEY) === "true";
 }
 
+function readShowAllDatabases(): boolean {
+  return localStorage.getItem(SHOW_ALL_DBS_KEY) !== "false";
+}
+
 type SettingsPayload = {
   connectionTint: boolean;
   defaultPageSize: number;
+  showAllDatabases: boolean;
 };
 
 export const useSettingsStore = defineStore("settings", () => {
   const connectionTint = ref(readTint());
   const defaultPageSize = ref(readPageSize());
+  const showAllDatabases = ref(readShowAllDatabases());
 
   function snapshot(): SettingsPayload {
     return {
       connectionTint: connectionTint.value,
       defaultPageSize: defaultPageSize.value,
+      showAllDatabases: showAllDatabases.value,
     };
   }
 
   function persist() {
     localStorage.setItem(TINT_KEY, String(connectionTint.value));
     localStorage.setItem(PAGE_SIZE_KEY, String(defaultPageSize.value));
+    localStorage.setItem(SHOW_ALL_DBS_KEY, String(showAllDatabases.value));
   }
 
   function commit() {
@@ -52,11 +61,16 @@ export const useSettingsStore = defineStore("settings", () => {
     const size = isPageSize(next.defaultPageSize)
       ? next.defaultPageSize
       : defaultPageSize.value;
-    if (connectionTint.value === next.connectionTint && defaultPageSize.value === size) {
+    if (
+      connectionTint.value === next.connectionTint &&
+      defaultPageSize.value === size &&
+      showAllDatabases.value === next.showAllDatabases
+    ) {
       return;
     }
     connectionTint.value = next.connectionTint;
     defaultPageSize.value = size;
+    showAllDatabases.value = next.showAllDatabases;
     persist();
   }
 
@@ -76,6 +90,14 @@ export const useSettingsStore = defineStore("settings", () => {
     commit();
   }
 
+  function setShowAllDatabases(on: boolean) {
+    if (showAllDatabases.value === on) {
+      return;
+    }
+    showAllDatabases.value = on;
+    commit();
+  }
+
   Events.On(SETTINGS_CHANGED, (ev) => {
     const data = ev.data as SettingsPayload | null;
     if (!data || typeof data !== "object") {
@@ -84,13 +106,16 @@ export const useSettingsStore = defineStore("settings", () => {
     apply({
       connectionTint: Boolean(data.connectionTint),
       defaultPageSize: Number(data.defaultPageSize),
+      showAllDatabases: data.showAllDatabases !== false,
     });
   });
 
   return {
     connectionTint,
     defaultPageSize,
+    showAllDatabases,
     setDefaultPageSize,
     setConnectionTint,
+    setShowAllDatabases,
   };
 });

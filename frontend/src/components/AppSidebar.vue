@@ -25,6 +25,7 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
+  SidebarInput,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -34,12 +35,19 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import ConnectionDialog from "@/features/connections/ConnectionDialog.vue";
 import { errorMessage } from "@/lib/errors";
 import { connBg, connTint } from "@/lib/colors";
 import type { Profile, TableInfo } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
-import { groupTables, useExplorerStore } from "@/stores/explorer";
+import { filterTables, groupTables, useExplorerStore } from "@/stores/explorer";
 import { useQueryStore } from "@/stores/query";
 import { useSettingsStore } from "@/stores/settings";
 
@@ -68,20 +76,127 @@ const currentConnected = computed(() =>
   selected.value ? connections.isConnected(selected.value.id) : false,
 );
 
+const tableQuery = ref("");
+const ensuringTables = ref(false);
+const filtering = computed(() => tableQuery.value.trim().length > 0);
+
+type VisibleDatabase = {
+  name: string;
+  tables: TableInfo[];
+  showHeader: boolean;
+};
+
+const visibleDatabases = computed((): VisibleDatabase[] => {
+  const query = tableQuery.value;
+  if (!settings.showAllDatabases) {
+    const name = explorer.activeDatabase;
+    if (!name) {
+      return [];
+    }
+    return [
+      {
+        name,
+        tables: filterTables(explorer.tablesByDb[name] ?? [], query),
+        showHeader: false,
+      },
+    ];
+  }
+  const q = query.trim();
+  const out: VisibleDatabase[] = [];
+  for (const name of explorer.databases) {
+    if (q && !(name in explorer.tablesByDb)) {
+      continue;
+    }
+    const tables = filterTables(explorer.tablesByDb[name] ?? [], query);
+    if (q && tables.length === 0) {
+      continue;
+    }
+    out.push({ name, tables, showHeader: true });
+  }
+  return out;
+});
+
+const catalogIncomplete = computed(() => {
+  if (!filtering.value || !settings.showAllDatabases) {
+    return ensuringTables.value;
+  }
+  return explorer.databases.some(
+    (name) => !(name in explorer.tablesByDb) || explorer.loadingTables[name],
+  );
+});
+
+function preferredDatabase(): string {
+  const name = selected.value?.params?.database ?? "";
+  return name && explorer.databases.includes(name) ? name : "";
+}
+
+function syncActiveDatabase() {
+  if (settings.showAllDatabases || !selected.value || !currentConnected.value) {
+    return;
+  }
+  const current = explorer.activeDatabase;
+  if (current && explorer.databases.includes(current)) {
+    if (!(current in explorer.tablesByDb)) {
+      void explorer.setActiveDatabase(selected.value.id, current).catch((err) => {
+        toast.error(errorMessage(err));
+      });
+    }
+    return;
+  }
+  void explorer.setActiveDatabase(selected.value.id, preferredDatabase()).catch((err) => {
+    toast.error(errorMessage(err));
+  });
+}
+
 watch(
   () => [selected.value?.id, currentConnected.value] as const,
   async ([id, connected]) => {
+    tableQuery.value = "";
     if (!id || !connected) {
       explorer.reset();
       return;
     }
     try {
       await explorer.loadDatabases(id);
+      syncActiveDatabase();
     } catch (err) {
       toast.error(errorMessage(err));
     }
   },
   { immediate: true },
+);
+
+watch(
+  () => settings.showAllDatabases,
+  (showAll) => {
+    if (!showAll) {
+      syncActiveDatabase();
+    }
+  },
+);
+
+watch(
+  () =>
+    [
+      tableQuery.value.trim(),
+      settings.showAllDatabases,
+      selected.value?.id,
+      currentConnected.value,
+      explorer.databases.length,
+    ] as const,
+  async ([query, showAll, id, connected]) => {
+    if (!id || !connected || !showAll || !query) {
+      return;
+    }
+    ensuringTables.value = true;
+    try {
+      await explorer.ensureTables(id);
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      ensuringTables.value = false;
+    }
+  },
 );
 
 function activateProfile(profile: Profile) {
@@ -156,6 +271,17 @@ async function onToggleDatabase(database: string) {
   }
 }
 
+async function onSelectDatabase(value: unknown) {
+  if (!selected.value || typeof value !== "string") {
+    return;
+  }
+  try {
+    await explorer.setActiveDatabase(selected.value.id, value);
+  } catch (err) {
+    toast.error(errorMessage(err));
+  }
+}
+
 const explorerRefreshing = ref(false);
 
 async function refreshExplorer() {
@@ -165,6 +291,16 @@ async function refreshExplorer() {
   explorerRefreshing.value = true;
   try {
     await explorer.refresh(selected.value.id);
+    if (!settings.showAllDatabases) {
+      syncActiveDatabase();
+    } else if (tableQuery.value.trim()) {
+      ensuringTables.value = true;
+      try {
+        await explorer.ensureTables(selected.value.id);
+      } finally {
+        ensuringTables.value = false;
+      }
+    }
   } catch (err) {
     toast.error(errorMessage(err));
   } finally {
@@ -185,9 +321,15 @@ function openTable(database: string, table: TableInfo) {
   router.push("/query");
 }
 
-function grouped(database: string) {
-  const tables = explorer.tablesByDb[database] ?? [];
+function tableGroups(tables: TableInfo[]) {
   return groupTables(tables);
+}
+
+function isDbOpen(name: string, showHeader: boolean): boolean {
+  if (!showHeader || filtering.value) {
+    return true;
+  }
+  return Boolean(explorer.expanded[name]);
 }
 </script>
 
@@ -312,8 +454,25 @@ function grouped(database: string) {
         </SidebarGroupContent>
       </SidebarGroup>
 
-      <SidebarGroup v-else class="min-h-0 flex-1 overflow-hidden">
-        <SidebarGroupLabel class="bg-sidebar shrink-0">Databases</SidebarGroupLabel>
+      <SidebarGroup v-else class="min-h-0 flex-1 gap-1 overflow-hidden">
+        <SidebarGroupLabel v-if="settings.showAllDatabases" class="bg-sidebar shrink-0">
+          Databases
+        </SidebarGroupLabel>
+        <div v-else class="flex h-8 shrink-0 items-center pr-8">
+          <Select
+            :model-value="explorer.activeDatabase || undefined"
+            @update:model-value="onSelectDatabase"
+          >
+            <SelectTrigger size="sm" class="h-7 w-full min-w-0">
+              <SelectValue placeholder="Select database" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="database in explorer.databases" :key="database" :value="database">
+                {{ database }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <SidebarGroupAction
           as="button"
           title="Reload tables"
@@ -322,6 +481,9 @@ function grouped(database: string) {
         >
           <RefreshCw :class="explorerRefreshing ? 'animate-spin' : undefined" />
         </SidebarGroupAction>
+        <div class="px-0 pb-1">
+          <SidebarInput v-model="tableQuery" placeholder="Filter tables…" />
+        </div>
         <SidebarGroupContent class="min-h-0 flex-1 overflow-auto">
           <p v-if="explorer.loadingDbs && explorer.databases.length === 0" class="text-muted-foreground px-2 py-2 text-xs">
             Loading databases…
@@ -332,24 +494,37 @@ function grouped(database: string) {
           <p v-else-if="explorer.databases.length === 0" class="text-muted-foreground px-2 py-2 text-xs">
             No databases.
           </p>
+          <p v-else-if="!settings.showAllDatabases && !explorer.activeDatabase" class="text-muted-foreground px-2 py-2 text-xs">
+            Select a database.
+          </p>
+          <p v-else-if="filtering && visibleDatabases.length === 0 && catalogIncomplete" class="text-muted-foreground px-2 py-2 text-xs">
+            Loading tables…
+          </p>
+          <p v-else-if="filtering && visibleDatabases.length === 0" class="text-muted-foreground px-2 py-2 text-xs">
+            No matching tables.
+          </p>
           <SidebarMenu v-else>
-            <SidebarMenuItem v-for="database in explorer.databases" :key="database">
+            <SidebarMenuItem v-for="entry in visibleDatabases" :key="entry.name">
               <SidebarMenuButton
-                :is-active="explorer.expanded[database]"
-                @click="onToggleDatabase(database)"
+                v-if="entry.showHeader"
+                :is-active="isDbOpen(entry.name, true)"
+                @click="onToggleDatabase(entry.name)"
               >
-                <ChevronDown v-if="explorer.expanded[database]" class="size-3.5" />
+                <ChevronDown v-if="isDbOpen(entry.name, true)" class="size-3.5" />
                 <ChevronRight v-else class="size-3.5" />
                 <Database class="size-3.5" />
-                <span>{{ database }}</span>
+                <span>{{ entry.name }}</span>
               </SidebarMenuButton>
-              <SidebarMenuSub v-if="explorer.expanded[database]">
-                <SidebarMenuSubItem v-if="explorer.loadingTables[database]">
+              <SidebarMenuSub
+                v-if="isDbOpen(entry.name, entry.showHeader)"
+                :class="entry.showHeader ? undefined : 'mx-0 border-l-0 translate-x-0 px-0'"
+              >
+                <SidebarMenuSubItem v-if="explorer.loadingTables[entry.name] && entry.tables.length === 0">
                   <span class="text-muted-foreground px-2 py-1 text-xs">Loading…</span>
                 </SidebarMenuSubItem>
-                <template v-else-if="grouped(database)">
+                <template v-else-if="tableGroups(entry.tables)">
                   <SidebarMenuSubItem
-                    v-for="group in grouped(database)"
+                    v-for="group in tableGroups(entry.tables)"
                     :key="group.schema"
                   >
                     <div class="text-muted-foreground px-2 py-1 text-[11px] font-medium">
@@ -360,7 +535,7 @@ function grouped(database: string) {
                         v-for="table in group.tables"
                         :key="`${table.schema}.${table.name}`"
                       >
-                        <SidebarMenuSubButton as="button" @click="openTable(database, table)">
+                        <SidebarMenuSubButton as="button" @click="openTable(entry.name, table)">
                           <Eye v-if="table.type === 'view'" class="size-3.5" />
                           <Table2 v-else class="size-3.5" />
                           <span>{{ table.name }}</span>
@@ -371,22 +546,25 @@ function grouped(database: string) {
                 </template>
                 <template v-else>
                   <SidebarMenuSubItem
-                    v-for="table in explorer.tablesByDb[database] ?? []"
+                    v-for="table in entry.tables"
                     :key="`${table.schema}.${table.name}`"
                   >
-                    <SidebarMenuSubButton as="button" @click="openTable(database, table)">
+                    <SidebarMenuSubButton as="button" @click="openTable(entry.name, table)">
                       <Eye v-if="table.type === 'view'" class="size-3.5" />
                       <Table2 v-else class="size-3.5" />
                       <span>{{ table.name }}</span>
                     </SidebarMenuSubButton>
                   </SidebarMenuSubItem>
                   <SidebarMenuSubItem
-                    v-if="(explorer.tablesByDb[database] ?? []).length === 0"
+                    v-if="entry.tables.length === 0"
                   >
                     <span class="text-muted-foreground px-2 py-1 text-xs">No tables</span>
                   </SidebarMenuSubItem>
                 </template>
               </SidebarMenuSub>
+            </SidebarMenuItem>
+            <SidebarMenuItem v-if="catalogIncomplete && filtering">
+              <span class="text-muted-foreground px-2 py-1 text-xs">Loading tables…</span>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroupContent>

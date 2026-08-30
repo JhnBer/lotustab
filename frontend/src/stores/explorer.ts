@@ -38,6 +38,14 @@ export function groupTables(tables: TableInfo[]): { schema: string; tables: Tabl
   }));
 }
 
+export function filterTables(tables: TableInfo[], query: string): TableInfo[] {
+  const q = query.trim().toLowerCase();
+  if (!q) {
+    return tables;
+  }
+  return tables.filter((table) => table.name.toLowerCase().includes(q));
+}
+
 export const useExplorerStore = defineStore("explorer", () => {
   const profileId = ref("");
   const databases = ref<string[]>([]);
@@ -46,6 +54,7 @@ export const useExplorerStore = defineStore("explorer", () => {
   const loadingDbs = ref(false);
   const loadingTables = ref<Record<string, boolean>>({});
   const error = ref("");
+  const activeDatabase = ref("");
 
   function reset() {
     profileId.value = "";
@@ -55,6 +64,7 @@ export const useExplorerStore = defineStore("explorer", () => {
     loadingDbs.value = false;
     loadingTables.value = {};
     error.value = "";
+    activeDatabase.value = "";
   }
 
   async function loadDatabases(id: string) {
@@ -65,6 +75,7 @@ export const useExplorerStore = defineStore("explorer", () => {
     if (profileId.value !== id) {
       tablesByDb.value = {};
       expanded.value = {};
+      activeDatabase.value = "";
     }
     profileId.value = id;
     loadingDbs.value = true;
@@ -102,18 +113,49 @@ export const useExplorerStore = defineStore("explorer", () => {
     }
   }
 
+  async function setActiveDatabase(id: string, database: string) {
+    activeDatabase.value = database;
+    if (database && !(database in tablesByDb.value)) {
+      await loadTables(id, database);
+    }
+  }
+
+  async function ensureTables(id: string) {
+    if (!id) {
+      return;
+    }
+    for (const database of databases.value) {
+      if (database in tablesByDb.value) {
+        continue;
+      }
+      try {
+        await loadTables(id, database);
+      } catch {
+        // Cached as [] in loadTables; keep scanning the rest.
+      }
+    }
+  }
+
   async function refresh(id: string) {
     if (!id) {
       return;
     }
     const expandedDbs = Object.keys(expanded.value).filter((db) => expanded.value[db]);
+    const keepActive = activeDatabase.value;
     await loadDatabases(id);
     const stillOpen = expandedDbs.filter((db) => databases.value.includes(db));
-    await Promise.all(stillOpen.map((db) => loadTables(id, db)));
-    const keep = new Set(stillOpen);
+    const reload = [...stillOpen];
+    if (keepActive && databases.value.includes(keepActive) && !reload.includes(keepActive)) {
+      reload.push(keepActive);
+    }
+    await Promise.all(reload.map((db) => loadTables(id, db)));
+    const keep = new Set(reload);
     tablesByDb.value = Object.fromEntries(
       Object.entries(tablesByDb.value).filter(([db]) => keep.has(db)),
     );
+    if (keepActive && !databases.value.includes(keepActive)) {
+      activeDatabase.value = "";
+    }
   }
 
   return {
@@ -124,10 +166,13 @@ export const useExplorerStore = defineStore("explorer", () => {
     loadingDbs,
     loadingTables,
     error,
+    activeDatabase,
     reset,
     loadDatabases,
     loadTables,
     toggleDatabase,
+    setActiveDatabase,
+    ensureTables,
     refresh,
   };
 });
