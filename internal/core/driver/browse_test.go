@@ -50,3 +50,25 @@ func TestClampTableBrowse(t *testing.T) {
 		t.Fatalf("orderDir without column should clear: %+v", got)
 	}
 }
+
+func TestClampApplyEdits(t *testing.T) {
+	got := driver.ClampApplyEdits(driver.ApplyEditsRequest{
+		Database: " db ",
+		Schema:   " public ",
+		Name:     " users ",
+		Rows:     []driver.RowEdit{{Key: map[string]any{"id": 1}, Cells: map[string]any{"n": "x"}}},
+	})
+	if got.Database != "db" || got.Schema != "public" || got.Name != "users" {
+		t.Fatalf("trimmed identifiers: %+v", got)
+	}
+	if len(got.Rows) != 1 {
+		t.Fatalf("rows should be kept: %d", len(got.Rows))
+	}
+}
+
+func TestBrowseFromQueryEmptyPrimaryKey(t *testing.T) {
+	got := driver.BrowseFromQuery(nil, 0)
+	if got.PrimaryKey == nil {
+		t.Fatal("primaryKey should be empty slice, not nil")
+	}
+}

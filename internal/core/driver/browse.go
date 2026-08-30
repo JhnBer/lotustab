@@ -47,5 +47,14 @@ func BrowseFromQuery(result *QueryResult, total int64) *TableBrowseResult {
 		DurationMs:   result.DurationMs,
 		Truncated:    result.Truncated,
 		Total:        total,
+		PrimaryKey:   []string{},
 	}
+}
+
+// ClampApplyEdits trims table identity fields on an edit batch.
+func ClampApplyEdits(req ApplyEditsRequest) ApplyEditsRequest {
+	req.Database = strings.TrimSpace(req.Database)
+	req.Schema = strings.TrimSpace(req.Schema)
+	req.Name = strings.TrimSpace(req.Name)
+	return req
 }

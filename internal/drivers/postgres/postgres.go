@@ -227,6 +227,81 @@ func (c *conn) BrowseTable(ctx context.Context, req driver.TableBrowseRequest) (
 	}
 	out := driver.BrowseFromQuery(result, total)
 	out.DurationMs = time.Since(start).Milliseconds()
+	pk, err := postgresPrimaryKey(ctx, pool, req.Schema, req.Name)
+	if err != nil {
+		return nil, err
+	}
+	out.PrimaryKey = pk
+	return out, nil
+}
+
+func (c *conn) ApplyEdits(ctx context.Context, req driver.ApplyEditsRequest) error {
+	req = driver.ClampApplyEdits(req)
+	if req.Name == "" {
+		return fmt.Errorf("table name is required")
+	}
+	pool, cleanup, err := c.poolFor(ctx, req.Database)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+
+	pk, err := postgresPrimaryKey(ctx, pool, req.Schema, req.Name)
+	if err != nil {
+		return err
+	}
+	if len(pk) == 0 {
+		return fmt.Errorf("table has no primary key")
+	}
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	qualified := postgresQualified(req.Schema, req.Name)
+	err = sqlutil.ApplyRowEdits(ctx, func(ctx context.Context, q string, args ...any) (int64, error) {
+		tag, execErr := tx.Exec(ctx, q, args...)
+		if execErr != nil {
+			return 0, execErr
+		}
+		return tag.RowsAffected(), nil
+	}, sqlutil.QuotePostgres, sqlutil.Dollar, qualified, pk, req.Rows)
+	if err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+func postgresPrimaryKey(ctx context.Context, pool *pgxpool.Pool, schema, name string) ([]string, error) {
+	const q = `
+		SELECT a.attname
+		FROM pg_namespace n
+		JOIN pg_class c ON c.relnamespace = n.oid
+		JOIN pg_index i ON i.indrelid = c.oid
+		JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum = ANY(i.indkey)
+		WHERE n.nspname = CASE WHEN $1 = '' THEN current_schema() ELSE $1 END
+		  AND c.relname = $2
+		  AND i.indisprimary
+		ORDER BY array_position(i.indkey, a.attnum)`
+	rows, err := pool.Query(ctx, q, schema, name)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]string, 0)
+	for rows.Next() {
+		var col string
+		if err := rows.Scan(&col); err != nil {
+			return nil, err
+		}
+		out = append(out, col)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 

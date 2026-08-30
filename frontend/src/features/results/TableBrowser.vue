@@ -1,13 +1,27 @@
 <script setup lang="ts">
+import { toast } from "vue-sonner";
 import ResultsTable from "@/features/results/ResultsTable.vue";
 import TablePager from "@/features/results/TablePager.vue";
+import { errorMessage } from "@/lib/errors";
 import { type TableTab, useQueryStore } from "@/stores/query";
 
-defineProps<{
+const props = defineProps<{
   tab: TableTab;
 }>();
 
 const queries = useQueryStore();
+
+function onEdit(row: number, column: string, value: unknown) {
+  queries.setCellDraft(props.tab.id, row, column, value);
+}
+
+async function onApply() {
+  try {
+    await queries.applyEdits(props.tab.id);
+  } catch (err) {
+    toast.error(errorMessage(err));
+  }
+}
 </script>
 
 <template>
@@ -29,8 +43,12 @@ const queries = useQueryStore();
       :sort-dir="tab.orderDir"
       :show-status="false"
       :row-offset="(tab.page - 1) * tab.pageSize"
+      :editable="(tab.primaryKey?.length ?? 0) > 0"
+      :edits="tab.edits ?? []"
+      :primary-key="tab.primaryKey ?? []"
       empty-hint="Loading table…"
       @sort="queries.cycleSort(tab.id, $event)"
+      @edit="onEdit"
     />
     <TablePager
       :page="tab.page"
@@ -38,8 +56,11 @@ const queries = useQueryStore();
       :row-count="tab.result?.rows?.length ?? 0"
       :running="tab.running"
       :total="tab.total"
+      :dirty="(tab.edits?.length ?? 0) > 0"
       @page="queries.setPage(tab.id, $event)"
       @page-size="queries.setPageSize(tab.id, $event)"
+      @apply="onApply"
+      @cancel="queries.clearEdits(tab.id)"
     />
   </div>
 </template>

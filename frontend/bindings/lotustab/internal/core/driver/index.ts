@@ -6,11 +6,13 @@ export {
 } from "./models.js";
 
 export type {
+    ApplyEditsRequest,
     Column,
     DriverInfo,
     Field,
     Option,
     QueryResult,
+    RowEdit,
     TableBrowseRequest,
     TableBrowseResult,
     TableInfo

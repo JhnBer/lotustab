@@ -7,6 +7,12 @@ import {
   type TableBrowseResult,
 } from "@/lib/wails";
 import { useSettingsStore } from "@/stores/settings";
+import {
+  draftLookup,
+  rowKey,
+  valuesEqual,
+  type CellDraft,
+} from "@/features/results/edits";
 
 export type SortDir = "asc" | "desc" | "";
 
@@ -37,6 +43,8 @@ export interface TableTab extends TabBase {
   orderDir: SortDir;
   result: QueryResult | null;
   total: number;
+  primaryKey: string[];
+  edits: CellDraft[];
 }
 
 export type WorkspaceTab = QueryTab | TableTab;
@@ -151,6 +159,8 @@ export const useQueryStore = defineStore("query", () => {
       error: "",
       result: null,
       total: 0,
+      primaryKey: [],
+      edits: [],
     };
     tabs.value.push(tab);
     activeTabId.value = tab.id;
@@ -177,7 +187,12 @@ export const useQueryStore = defineStore("query", () => {
     const group = tabs.value.filter((t) => t.profileId === profileId);
     const activeInGroup = group.some((t) => t.id === activeTabId.value);
     return {
-      tabs: group.map((t) => ({ ...t, running: false })),
+      tabs: group.map((t) => {
+        if (t.kind === "table") {
+          return { ...t, running: false, edits: [] };
+        }
+        return { ...t, running: false };
+      }),
       activeTabId: activeInGroup ? activeTabId.value : (group[0]?.id ?? ""),
     };
   }
@@ -218,7 +233,12 @@ export const useQueryStore = defineStore("query", () => {
             pageSize: tab.pageSize || storedPageSize(),
           });
         } else {
-          tabs.value.push({ ...tab, running: false });
+          tabs.value.push({
+            ...tab,
+            running: false,
+            edits: [],
+            primaryKey: tab.primaryKey ?? [],
+          });
         }
       }
     }
@@ -296,6 +316,9 @@ export const useQueryStore = defineStore("query", () => {
     if (!tab || tab.kind !== "table") {
       return;
     }
+    if (!tab.edits) {
+      tab.edits = [];
+    }
     tab.running = true;
     tab.error = "";
     try {
@@ -310,9 +333,11 @@ export const useQueryStore = defineStore("query", () => {
       });
       tab.result = asQueryResult(result);
       tab.total = result?.total ?? 0;
+      tab.primaryKey = result?.primaryKey ?? [];
     } catch (err) {
       tab.result = null;
       tab.total = 0;
+      tab.primaryKey = [];
       tab.error = errorMessage(err);
     } finally {
       tab.running = false;
@@ -369,6 +394,69 @@ export const useQueryStore = defineStore("query", () => {
     void loadTable(id);
   }
 
+  function setCellDraft(id: string, rowIndex: number, column: string, value: unknown) {
+    const tab = tabs.value.find((t) => t.id === id);
+    if (!tab || tab.kind !== "table" || !tab.primaryKey?.length) {
+      return;
+    }
+    if (!tab.edits) {
+      tab.edits = [];
+    }
+    const columns = tab.result?.columns ?? [];
+    const row = tab.result?.rows?.[rowIndex];
+    const key = rowKey(row, columns, tab.primaryKey);
+    if (!key) {
+      return;
+    }
+    const colIndex = columns.findIndex((c) => c.name === column);
+    if (colIndex < 0) {
+      return;
+    }
+    const original = row?.[colIndex];
+    const lookup = draftLookup(key);
+    const edits = tab.edits.slice();
+    const index = edits.findIndex((e) => draftLookup(e.key) === lookup);
+    const cells = { ...(index >= 0 ? edits[index]!.cells : {}) };
+    if (valuesEqual(original, value)) {
+      delete cells[column];
+    } else {
+      cells[column] = value;
+    }
+    if (Object.keys(cells).length === 0) {
+      if (index >= 0) {
+        edits.splice(index, 1);
+      }
+    } else if (index >= 0) {
+      edits[index] = { key, cells };
+    } else {
+      edits.push({ key, cells });
+    }
+    tab.edits = edits;
+  }
+
+  function clearEdits(id: string) {
+    const tab = tabs.value.find((t) => t.id === id);
+    if (!tab || tab.kind !== "table") {
+      return;
+    }
+    tab.edits = [];
+  }
+
+  async function applyEdits(id: string) {
+    const tab = tabs.value.find((t) => t.id === id);
+    if (!tab || tab.kind !== "table" || !tab.edits?.length) {
+      return;
+    }
+    await QueryService.ApplyEdits(tab.profileId, {
+      database: tab.database,
+      schema: tab.schema,
+      name: tab.name,
+      rows: tab.edits,
+    });
+    tab.edits = [];
+    await loadTable(id);
+  }
+
   return {
     tabs,
     activeTabId,
@@ -387,5 +475,8 @@ export const useQueryStore = defineStore("query", () => {
     setPage,
     setPageSize,
     cycleSort,
+    setCellDraft,
+    clearEdits,
+    applyEdits,
   };
 });

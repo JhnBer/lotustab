@@ -15,6 +15,13 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as driver$0 from "../core/driver/models.js";
 
 /**
+ * ApplyEdits writes accumulated cell edits in a single transaction.
+ */
+export function ApplyEdits(profileID: string, req: driver$0.ApplyEditsRequest): $CancellablePromise<void> {
+    return $Call.ByID(1691205989, profileID, req);
+}
+
+/**
  * BrowseTable returns a page of rows from a table.
  */
 export function BrowseTable(profileID: string, req: driver$0.TableBrowseRequest): $CancellablePromise<driver$0.TableBrowseResult | null> {

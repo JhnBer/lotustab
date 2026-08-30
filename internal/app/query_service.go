@@ -93,3 +93,25 @@ func (s *QueryService) BrowseTable(ctx context.Context, profileID string, req dr
 	}
 	return conn.BrowseTable(ctx, req)
 }
+
+// ApplyEdits writes accumulated cell edits in a single transaction.
+func (s *QueryService) ApplyEdits(ctx context.Context, profileID string, req driver.ApplyEditsRequest) error {
+	if strings.TrimSpace(profileID) == "" {
+		return fmt.Errorf("profile is required")
+	}
+	req = driver.ClampApplyEdits(req)
+	if req.Name == "" {
+		return fmt.Errorf("table is required")
+	}
+	if len(req.Rows) == 0 {
+		return fmt.Errorf("no edits")
+	}
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	conn, err := s.connections.ensureOpen(ctx, profileID)
+	if err != nil {
+		return err
+	}
+	return conn.ApplyEdits(ctx, req)
+}

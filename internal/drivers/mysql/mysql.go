@@ -185,6 +185,89 @@ func (c *conn) BrowseTable(ctx context.Context, req driver.TableBrowseRequest) (
 	}
 	out := driver.BrowseFromQuery(result, total)
 	out.DurationMs = time.Since(start).Milliseconds()
+	pk, err := mysqlPrimaryKey(ctx, c.db, dbName, req.Name)
+	if err != nil {
+		return nil, err
+	}
+	out.PrimaryKey = pk
+	return out, nil
+}
+
+func (c *conn) ApplyEdits(ctx context.Context, req driver.ApplyEditsRequest) error {
+	req = driver.ClampApplyEdits(req)
+	if req.Name == "" {
+		return fmt.Errorf("table name is required")
+	}
+	dbName := req.Database
+	if dbName == "" {
+		dbName = req.Schema
+	}
+	pk, err := mysqlPrimaryKey(ctx, c.db, dbName, req.Name)
+	if err != nil {
+		return err
+	}
+	if len(pk) == 0 {
+		return fmt.Errorf("table has no primary key")
+	}
+
+	tx, err := c.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	qualified := mysqlQualified(dbName, req.Name)
+	err = sqlutil.ApplyRowEdits(ctx, func(ctx context.Context, q string, args ...any) (int64, error) {
+		res, execErr := tx.ExecContext(ctx, q, args...)
+		if execErr != nil {
+			return 0, execErr
+		}
+		return res.RowsAffected()
+	}, sqlutil.QuoteMySQL, sqlutil.Question, qualified, pk, req.Rows)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func mysqlPrimaryKey(ctx context.Context, db *sql.DB, database, name string) ([]string, error) {
+	var (
+		rows *sql.Rows
+		err  error
+	)
+	if database == "" {
+		rows, err = db.QueryContext(ctx, `
+			SELECT COLUMN_NAME
+			FROM information_schema.KEY_COLUMN_USAGE
+			WHERE TABLE_SCHEMA = DATABASE()
+			  AND TABLE_NAME = ?
+			  AND CONSTRAINT_NAME = 'PRIMARY'
+			ORDER BY ORDINAL_POSITION`, name)
+	} else {
+		rows, err = db.QueryContext(ctx, `
+			SELECT COLUMN_NAME
+			FROM information_schema.KEY_COLUMN_USAGE
+			WHERE TABLE_SCHEMA = ?
+			  AND TABLE_NAME = ?
+			  AND CONSTRAINT_NAME = 'PRIMARY'
+			ORDER BY ORDINAL_POSITION`, database, name)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]string, 0)
+	for rows.Next() {
+		var col string
+		if err := rows.Scan(&col); err != nil {
+			return nil, err
+		}
+		out = append(out, col)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 

@@ -18,11 +18,14 @@ const props = defineProps<{
   running?: boolean;
   total?: number;
   truncated?: boolean;
+  dirty?: boolean;
 }>();
 
 const emit = defineEmits<{
   page: [page: number];
   pageSize: [size: number];
+  apply: [];
+  cancel: [];
 }>();
 
 const pageCount = computed(() => {
@@ -81,6 +84,10 @@ function onPageSize(value: unknown) {
     <span class="text-muted-foreground mr-auto min-w-0 truncate text-xs">
       {{ rangeLabel }}
     </span>
+    <div v-if="dirty" class="flex items-center gap-1">
+      <Button size="xs" :disabled="running" @click="emit('apply')">Apply</Button>
+      <Button size="xs" variant="outline" :disabled="running" @click="emit('cancel')">Cancel</Button>
+    </div>
     <Select :model-value="String(pageSize)" @update:model-value="onPageSize">
       <SelectTrigger size="sm" class="h-7 w-36">
         <SelectValue />

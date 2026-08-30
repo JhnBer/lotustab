@@ -84,6 +84,21 @@ type TableBrowseResult struct {
 	DurationMs   int64    `json:"durationMs"`
 	Truncated    bool     `json:"truncated"`
 	Total        int64    `json:"total"`
+	PrimaryKey   []string `json:"primaryKey"`
+}
+
+// RowEdit is a set of cell changes for one row, addressed by its original primary key.
+type RowEdit struct {
+	Key   map[string]any `json:"key"`
+	Cells map[string]any `json:"cells"`
+}
+
+// ApplyEditsRequest applies accumulated cell edits to a single table.
+type ApplyEditsRequest struct {
+	Database string    `json:"database"`
+	Schema   string    `json:"schema"`
+	Name     string    `json:"name"`
+	Rows     []RowEdit `json:"rows"`
 }
 
 // DriverInfo is the public description of a registered driver.

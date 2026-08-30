@@ -31,3 +31,20 @@ func TestListTablesRequiresProfile(t *testing.T) {
 		t.Fatalf("expected profile error, got %v", err)
 	}
 }
+
+func TestApplyEditsValidatesInput(t *testing.T) {
+	s := &QueryService{}
+	row := driver.RowEdit{Key: map[string]any{"id": 1}, Cells: map[string]any{"name": "a"}}
+	err := s.ApplyEdits(context.Background(), "", driver.ApplyEditsRequest{Name: "users", Rows: []driver.RowEdit{row}})
+	if err == nil || !strings.Contains(err.Error(), "profile") {
+		t.Fatalf("expected profile error, got %v", err)
+	}
+	err = s.ApplyEdits(context.Background(), "abc", driver.ApplyEditsRequest{Name: "  ", Rows: []driver.RowEdit{row}})
+	if err == nil || !strings.Contains(err.Error(), "table") {
+		t.Fatalf("expected table error, got %v", err)
+	}
+	err = s.ApplyEdits(context.Background(), "abc", driver.ApplyEditsRequest{Name: "users"})
+	if err == nil || !strings.Contains(err.Error(), "no edits") {
+		t.Fatalf("expected no edits error, got %v", err)
+	}
+}
