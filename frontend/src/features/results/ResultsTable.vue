@@ -7,7 +7,7 @@ import type { QueryResult } from "@/lib/wails";
 const DEFAULT_COL_WIDTH = 160;
 const MIN_COL_WIDTH = 72;
 const ROW_HEIGHT = 36;
-const ROW_NUM_WIDTH = 48;
+const ROW_NUM_WIDTH = 56;
 
 const props = withDefaults(
   defineProps<{
@@ -74,6 +74,15 @@ const columnVirtualizer = useVirtualizer(
     paddingStart: ROW_NUM_WIDTH,
     overscan: 3,
   })),
+);
+
+const rowNumOffset = ref(props.rowOffset);
+
+watch(
+  () => props.result,
+  () => {
+    rowNumOffset.value = props.rowOffset;
+  },
 );
 
 watch(
@@ -199,7 +208,7 @@ function cellValue(rowIndex: number, colIndex: number) {
             >
               <div
                 role="columnheader"
-                class="bg-background text-muted-foreground sticky left-0 z-40 box-border flex-none border-r px-2 py-2 font-medium"
+                class="bg-background text-muted-foreground sticky left-0 z-40 box-border flex flex-none items-center justify-center border-r px-1 py-2 font-medium"
                 :style="{ width: `${ROW_NUM_WIDTH}px` }"
               >
                 #
@@ -262,14 +271,14 @@ function cellValue(rowIndex: number, colIndex: number) {
                   v-for="item in virtualRows"
                   :key="item.index"
                   role="cell"
-                  class="text-muted-foreground absolute top-0 left-0 box-border truncate px-2 font-mono text-xs leading-9"
+                  class="text-muted-foreground absolute top-0 left-0 box-border flex items-center justify-center px-1 font-mono text-xs"
                   :style="{
                     width: `${ROW_NUM_WIDTH}px`,
                     height: `${item.size}px`,
                     transform: `translateY(${item.start}px)`,
                   }"
                 >
-                  {{ rowOffset + item.index + 1 }}
+                  {{ rowNumOffset + item.index + 1 }}
                 </div>
               </div>
               <div
