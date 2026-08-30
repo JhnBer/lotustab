@@ -52,13 +52,11 @@ watch(
   { immediate: true },
 );
 
-const tableMinWidth = computed(
-  () =>
-    ROW_NUM_WIDTH +
-    columns.value.reduce((sum, column) => sum + (widths.value[column.name] ?? DEFAULT_COL_WIDTH), 0),
-);
+function colWidth(name: string) {
+  return widths.value[name] ?? DEFAULT_COL_WIDTH;
+}
 
-const virtualizer = useVirtualizer(
+const rowVirtualizer = useVirtualizer(
   computed(() => ({
     count: rows.value.length,
     getScrollElement: () => scrollRef.value,
@@ -67,21 +65,43 @@ const virtualizer = useVirtualizer(
   })),
 );
 
+const columnVirtualizer = useVirtualizer(
+  computed(() => ({
+    count: columns.value.length,
+    getScrollElement: () => scrollRef.value,
+    estimateSize: (index: number) => colWidth(columns.value[index]?.name ?? ""),
+    horizontal: true,
+    paddingStart: ROW_NUM_WIDTH,
+    overscan: 3,
+  })),
+);
+
 watch(
   () => props.result,
   () => {
-    virtualizer.value.scrollToOffset(0);
-    scrollRef.value?.scrollTo({ top: 0 });
+    rowVirtualizer.value.scrollToOffset(0);
+    columnVirtualizer.value.scrollToOffset(0);
+    scrollRef.value?.scrollTo({ top: 0, left: 0 });
   },
   { flush: "post" },
 );
 
-const virtualRows = computed(() => virtualizer.value.getVirtualItems());
-const totalSize = computed(() => virtualizer.value.getTotalSize());
+watch(widths, () => {
+  columnVirtualizer.value.measure();
+});
 
-function colWidth(name: string) {
-  return widths.value[name] ?? DEFAULT_COL_WIDTH;
-}
+const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
+const totalSize = computed(() => rowVirtualizer.value.getTotalSize());
+const virtualColumns = computed(() => columnVirtualizer.value.getVirtualItems());
+const colTotalSize = computed(() => columnVirtualizer.value.getTotalSize());
+const padLeft = computed(() => {
+  const first = virtualColumns.value[0];
+  return first ? Math.max(0, first.start - ROW_NUM_WIDTH) : 0;
+});
+const padRight = computed(() => {
+  const last = virtualColumns.value.at(-1);
+  return last ? colTotalSize.value - last.end : 0;
+});
 
 let drag: { name: string; startX: number; startWidth: number } | null = null;
 
@@ -138,6 +158,10 @@ function onHeaderClick(name: string) {
     emit("sort", name);
   }
 }
+
+function cellValue(rowIndex: number, colIndex: number) {
+  return rows.value[rowIndex]?.[colIndex];
+}
 </script>
 
 <template>
@@ -167,36 +191,42 @@ function onHeaderClick(name: string) {
           <div
             role="table"
             class="text-sm"
-            :style="{ minWidth: `${tableMinWidth}px` }"
+            :style="{ width: `${colTotalSize}px` }"
           >
             <div
               role="row"
-              class="bg-background sticky top-0 z-10 flex border-b"
+              class="bg-background sticky top-0 z-30 flex border-b"
             >
               <div
                 role="columnheader"
-                class="text-muted-foreground box-border flex-none px-2 py-2 font-medium"
+                class="bg-background text-muted-foreground sticky left-0 z-40 box-border flex-none border-r px-2 py-2 font-medium"
                 :style="{ width: `${ROW_NUM_WIDTH}px` }"
               >
                 #
               </div>
               <div
-                v-for="column in columns"
-                :key="column.name"
+                v-if="padLeft"
+                aria-hidden="true"
+                class="flex-none"
+                :style="{ width: `${padLeft}px` }"
+              />
+              <div
+                v-for="col in virtualColumns"
+                :key="col.index"
                 role="columnheader"
                 class="relative box-border flex-none overflow-hidden px-2 py-2"
                 :class="sortable ? 'cursor-pointer select-none hover:bg-muted/60' : ''"
-                :style="{ width: `${colWidth(column.name)}px` }"
-                @click="onHeaderClick(column.name)"
+                :style="{ width: `${col.size}px` }"
+                @click="onHeaderClick(columns[col.index]?.name ?? '')"
               >
                 <div class="flex items-center gap-1 pr-2">
-                  <span class="truncate font-medium">{{ column.name }}</span>
+                  <span class="truncate font-medium">{{ columns[col.index]?.name }}</span>
                   <ArrowUp
-                    v-if="sortable && sortColumn === column.name && sortDir === 'asc'"
+                    v-if="sortable && sortColumn === columns[col.index]?.name && sortDir === 'asc'"
                     class="size-3 shrink-0"
                   />
                   <ArrowDown
-                    v-else-if="sortable && sortColumn === column.name && sortDir === 'desc'"
+                    v-else-if="sortable && sortColumn === columns[col.index]?.name && sortDir === 'desc'"
                     class="size-3 shrink-0"
                   />
                   <ArrowUpDown
@@ -205,19 +235,43 @@ function onHeaderClick(name: string) {
                   />
                 </div>
                 <div class="text-muted-foreground/60 truncate pr-2 text-[10px] leading-none font-normal">
-                  {{ column.type }}
+                  {{ columns[col.index]?.type }}
                 </div>
                 <span
                   class="hover:bg-border absolute inset-y-0 right-0 z-10 w-1.5 cursor-col-resize"
-                  @pointerdown="startResize($event, column.name)"
+                  @pointerdown="startResize($event, columns[col.index]?.name ?? '')"
                   @click.stop
                 />
               </div>
+              <div
+                v-if="padRight"
+                aria-hidden="true"
+                class="flex-none"
+                :style="{ width: `${padRight}px` }"
+              />
             </div>
             <div
               class="relative"
               :style="{ height: `${totalSize}px` }"
             >
+              <div
+                class="bg-background sticky left-0 z-20 border-r"
+                :style="{ width: `${ROW_NUM_WIDTH}px`, height: `${totalSize}px` }"
+              >
+                <div
+                  v-for="item in virtualRows"
+                  :key="item.index"
+                  role="cell"
+                  class="text-muted-foreground absolute top-0 left-0 box-border truncate px-2 font-mono text-xs leading-9"
+                  :style="{
+                    width: `${ROW_NUM_WIDTH}px`,
+                    height: `${item.size}px`,
+                    transform: `translateY(${item.start}px)`,
+                  }"
+                >
+                  {{ rowOffset + item.index + 1 }}
+                </div>
+              </div>
               <div
                 v-for="item in virtualRows"
                 :key="item.index"
@@ -229,23 +283,27 @@ function onHeaderClick(name: string) {
                 }"
               >
                 <div
-                  role="cell"
-                  class="text-muted-foreground box-border flex-none truncate px-2 font-mono text-xs leading-9"
-                  :style="{ width: `${ROW_NUM_WIDTH}px` }"
-                >
-                  {{ rowOffset + item.index + 1 }}
-                </div>
+                  aria-hidden="true"
+                  class="flex-none"
+                  :style="{ width: `${padLeft + ROW_NUM_WIDTH}px` }"
+                />
                 <div
-                  v-for="(value, colIndex) in rows[item.index] ?? []"
-                  :key="colIndex"
+                  v-for="col in virtualColumns"
+                  :key="col.index"
                   role="cell"
                   class="box-border flex-none truncate px-2 font-mono text-xs leading-9"
-                  :class="isNull(value) ? 'text-muted-foreground italic' : ''"
-                  :style="{ width: `${colWidth(columns[colIndex]?.name ?? '')}px` }"
-                  :title="cellText(value)"
+                  :class="isNull(cellValue(item.index, col.index)) ? 'text-muted-foreground italic' : ''"
+                  :style="{ width: `${col.size}px` }"
+                  :title="cellText(cellValue(item.index, col.index))"
                 >
-                  {{ cellText(value) }}
+                  {{ cellText(cellValue(item.index, col.index)) }}
                 </div>
+                <div
+                  v-if="padRight"
+                  aria-hidden="true"
+                  class="flex-none"
+                  :style="{ width: `${padRight}px` }"
+                />
               </div>
             </div>
           </div>
