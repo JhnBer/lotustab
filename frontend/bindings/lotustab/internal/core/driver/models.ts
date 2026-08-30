@@ -98,6 +98,7 @@ export interface TableBrowseRequest {
     "offset": number;
     "orderBy": string;
     "orderDir": string;
+    "filters"?: TableFilter[] | null;
 }
 
 /**
@@ -111,6 +112,16 @@ export interface TableBrowseResult {
     "truncated": boolean;
     "total": number;
     "primaryKey": string[] | null;
+}
+
+/**
+ * TableFilter is one column predicate on a table browse request.
+ */
+export interface TableFilter {
+    "column": string;
+    "op": string;
+    "value": string;
+    "join": string;
 }
 
 /**

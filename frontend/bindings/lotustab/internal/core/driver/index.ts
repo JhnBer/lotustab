@@ -15,5 +15,6 @@ export type {
     RowEdit,
     TableBrowseRequest,
     TableBrowseResult,
+    TableFilter,
     TableInfo
 } from "./models.js";

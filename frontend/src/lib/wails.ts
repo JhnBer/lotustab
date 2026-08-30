@@ -18,6 +18,7 @@ export type {
   RowEdit,
   TableBrowseRequest,
   TableBrowseResult,
+  TableFilter,
   TableInfo,
 } from "../../bindings/lotustab/internal/core/driver/models";
 export { FieldType } from "../../bindings/lotustab/internal/core/driver/models";

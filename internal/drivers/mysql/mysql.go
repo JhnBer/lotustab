@@ -171,15 +171,20 @@ func (c *conn) BrowseTable(ctx context.Context, req driver.TableBrowseRequest) (
 		dbName = req.Schema
 	}
 	qualified := mysqlQualified(dbName, req.Name)
-
-	start := time.Now()
-	total, err := sqlutil.Count(ctx, c.db, "SELECT COUNT(*) FROM "+qualified)
+	where, args, err := sqlutil.WhereClause(sqlutil.QuoteMySQL, sqlutil.Question, req.Filters)
 	if err != nil {
 		return nil, err
 	}
 
-	selectSQL := "SELECT * FROM " + qualified + sqlutil.OrderClause(sqlutil.QuoteMySQL, req.OrderBy, req.OrderDir) + " LIMIT ? OFFSET ?"
-	result, err := sqlutil.QueryContext(ctx, c.db, req.Limit, selectSQL, req.Limit, req.Offset)
+	start := time.Now()
+	total, err := sqlutil.Count(ctx, c.db, "SELECT COUNT(*) FROM "+qualified+where, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	selectSQL := "SELECT * FROM " + qualified + where + sqlutil.OrderClause(sqlutil.QuoteMySQL, req.OrderBy, req.OrderDir) + " LIMIT ? OFFSET ?"
+	selectArgs := append(append([]any{}, args...), req.Limit, req.Offset)
+	result, err := sqlutil.QueryContext(ctx, c.db, req.Limit, selectSQL, selectArgs...)
 	if err != nil {
 		return nil, err
 	}

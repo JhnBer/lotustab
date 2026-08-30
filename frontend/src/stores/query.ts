@@ -13,6 +13,11 @@ import {
   valuesEqual,
   type CellDraft,
 } from "@/features/results/edits";
+import {
+  completeFilters,
+  emptyFilter,
+  type TableFilter,
+} from "@/features/results/filters";
 
 export type SortDir = "asc" | "desc" | "";
 
@@ -45,6 +50,9 @@ export interface TableTab extends TabBase {
   total: number;
   primaryKey: string[];
   edits: CellDraft[];
+  filtersEnabled: boolean;
+  filtersOpen: boolean;
+  filters: TableFilter[];
 }
 
 export type WorkspaceTab = QueryTab | TableTab;
@@ -161,6 +169,9 @@ export const useQueryStore = defineStore("query", () => {
       total: 0,
       primaryKey: [],
       edits: [],
+      filtersEnabled: false,
+      filtersOpen: false,
+      filters: [],
     };
     tabs.value.push(tab);
     activeTabId.value = tab.id;
@@ -238,6 +249,9 @@ export const useQueryStore = defineStore("query", () => {
             running: false,
             edits: [],
             primaryKey: tab.primaryKey ?? [],
+            filtersEnabled: tab.filtersEnabled ?? false,
+            filtersOpen: tab.filtersOpen ?? false,
+            filters: tab.filters ?? [],
           });
         }
       }
@@ -319,6 +333,9 @@ export const useQueryStore = defineStore("query", () => {
     if (!tab.edits) {
       tab.edits = [];
     }
+    if (!tab.filters) {
+      tab.filters = [];
+    }
     tab.running = true;
     tab.error = "";
     try {
@@ -330,6 +347,7 @@ export const useQueryStore = defineStore("query", () => {
         offset: (tab.page - 1) * tab.pageSize,
         orderBy: tab.orderBy,
         orderDir: tab.orderDir,
+        filters: tab.filtersEnabled ? completeFilters(tab.filters) : [],
       });
       tab.result = asQueryResult(result);
       tab.total = result?.total ?? 0;
@@ -389,6 +407,59 @@ export const useQueryStore = defineStore("query", () => {
     } else {
       tab.orderBy = "";
       tab.orderDir = "";
+    }
+    tab.page = 1;
+    void loadTable(id);
+  }
+
+  function setFilters(id: string, filters: TableFilter[]) {
+    const tab = tabs.value.find((t) => t.id === id);
+    if (!tab || tab.kind !== "table") {
+      return;
+    }
+    tab.filters = filters;
+  }
+
+  function addFilter(id: string) {
+    const tab = tabs.value.find((t) => t.id === id);
+    if (!tab || tab.kind !== "table" || !tab.filtersEnabled) {
+      return;
+    }
+    tab.filters = [...(tab.filters ?? []), emptyFilter()];
+    tab.filtersOpen = true;
+  }
+
+  function setFiltersEnabled(id: string, enabled: boolean) {
+    const tab = tabs.value.find((t) => t.id === id);
+    if (!tab || tab.kind !== "table") {
+      return;
+    }
+    tab.filtersEnabled = enabled;
+    if (enabled) {
+      tab.filtersOpen = true;
+      if (!tab.filters?.length) {
+        tab.filters = [emptyFilter()];
+      }
+    }
+    tab.page = 1;
+    void loadTable(id);
+  }
+
+  function toggleFiltersOpen(id: string) {
+    const tab = tabs.value.find((t) => t.id === id);
+    if (!tab || tab.kind !== "table") {
+      return;
+    }
+    tab.filtersOpen = !tab.filtersOpen;
+    if (tab.filtersOpen && !tab.filters?.length) {
+      tab.filters = [emptyFilter()];
+    }
+  }
+
+  function applyFilters(id: string) {
+    const tab = tabs.value.find((t) => t.id === id);
+    if (!tab || tab.kind !== "table" || !tab.filtersEnabled) {
+      return;
     }
     tab.page = 1;
     void loadTable(id);
@@ -475,6 +546,11 @@ export const useQueryStore = defineStore("query", () => {
     setPage,
     setPageSize,
     cycleSort,
+    setFilters,
+    addFilter,
+    setFiltersEnabled,
+    toggleFiltersOpen,
+    applyFilters,
     setCellDraft,
     clearEdits,
     applyEdits,

@@ -213,15 +213,22 @@ func (c *conn) BrowseTable(ctx context.Context, req driver.TableBrowseRequest) (
 	defer cleanup()
 
 	qualified := postgresQualified(req.Schema, req.Name)
+	where, args, err := sqlutil.WhereClause(sqlutil.QuotePostgres, sqlutil.Dollar, req.Filters)
+	if err != nil {
+		return nil, err
+	}
 	start := time.Now()
 
 	var total int64
-	if err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM "+qualified).Scan(&total); err != nil {
+	if err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM "+qualified+where, args...).Scan(&total); err != nil {
 		return nil, err
 	}
 
-	selectSQL := "SELECT * FROM " + qualified + sqlutil.OrderClause(sqlutil.QuotePostgres, req.OrderBy, req.OrderDir) + " LIMIT $1 OFFSET $2"
-	result, err := queryPool(ctx, pool, req.Limit, selectSQL, req.Limit, req.Offset)
+	n := len(args)
+	selectSQL := "SELECT * FROM " + qualified + where + sqlutil.OrderClause(sqlutil.QuotePostgres, req.OrderBy, req.OrderDir) +
+		" LIMIT " + sqlutil.Dollar(n+1) + " OFFSET " + sqlutil.Dollar(n+2)
+	selectArgs := append(append([]any{}, args...), req.Limit, req.Offset)
+	result, err := queryPool(ctx, pool, req.Limit, selectSQL, selectArgs...)
 	if err != nil {
 		return nil, err
 	}

@@ -65,15 +65,24 @@ type TableInfo struct {
 	Type   string `json:"type"`
 }
 
+// TableFilter is one column predicate on a table browse request.
+type TableFilter struct {
+	Column string `json:"column"`
+	Op     string `json:"op"`
+	Value  string `json:"value"`
+	Join   string `json:"join"`
+}
+
 // TableBrowseRequest pages and optionally sorts rows from a single table.
 type TableBrowseRequest struct {
-	Database string `json:"database"`
-	Schema   string `json:"schema"`
-	Name     string `json:"name"`
-	Limit    int    `json:"limit"`
-	Offset   int    `json:"offset"`
-	OrderBy  string `json:"orderBy"`
-	OrderDir string `json:"orderDir"`
+	Database string        `json:"database"`
+	Schema   string        `json:"schema"`
+	Name     string        `json:"name"`
+	Limit    int           `json:"limit"`
+	Offset   int           `json:"offset"`
+	OrderBy  string        `json:"orderBy"`
+	OrderDir string        `json:"orderDir"`
+	Filters  []TableFilter `json:"filters,omitempty"`
 }
 
 // TableBrowseResult is a page of table data plus a total row count.
