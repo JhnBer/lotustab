@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { Database, Server, Settings } from "@lucide/vue";
 import { storeToRefs } from "pinia";
 import { useRoute, useRouter } from "vue-router";
@@ -25,6 +25,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Spinner } from "@/components/ui/spinner";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { connBg, connTint } from "@/lib/colors";
 import { errorMessage } from "@/lib/errors";
 import type { Profile } from "@/lib/wails";
@@ -37,6 +38,7 @@ const connections = useConnectionsStore();
 const settings = useSettingsStore();
 const { setOpen } = useSidebar();
 const { pinnedProfiles } = storeToRefs(connections);
+const menuOpenId = ref("");
 
 const connectionsTint = computed(() =>
   settings.connectionTint && connections.selected && !route.path.startsWith("/settings")
@@ -53,6 +55,10 @@ function goConnections() {
 function goSettings() {
   router.push("/settings");
   setOpen(true);
+}
+
+function onPinMenuOpen(id: string, open: boolean) {
+  menuOpenId.value = open ? id : "";
 }
 
 function activateProfile(profile: Profile) {
@@ -111,15 +117,23 @@ async function connect(profile: Profile) {
         <SidebarGroupContent class="px-1.5 md:px-0">
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton
-                tooltip="Connections"
-                :is-active="route.path === '/connections'"
-                class="px-2.5 md:px-2"
-                @click="goConnections"
-              >
-                <Server />
-                <span>Connections</span>
-              </SidebarMenuButton>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <div class="w-full">
+                    <SidebarMenuButton
+                      :is-active="route.path === '/connections'"
+                      class="px-2.5 md:px-2"
+                      @click="goConnections"
+                    >
+                      <Server />
+                      <span>Connections</span>
+                    </SidebarMenuButton>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="right" align="center">
+                  Connections
+                </TooltipContent>
+              </Tooltip>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroupContent>
@@ -131,17 +145,24 @@ async function connect(profile: Profile) {
           <SidebarGroupContent class="px-1.5 md:px-0">
             <SidebarMenu class="gap-1">
               <SidebarMenuItem v-for="profile in pinnedProfiles" :key="profile.id">
-                <ContextMenu>
-                  <ContextMenuTrigger as-child>
-                    <button
-                      type="button"
-                      class="mx-auto flex size-8 items-center justify-center rounded-md text-foreground ring-offset-background focus-visible:ring-2 focus-visible:outline-none dark:text-white"
-                      :class="connBg(profile.color) + (connections.selectedId === profile.id ? '/60' : '/20')"
-                      @click="activateProfile(profile)"
-                    >
-                      <Database class="size-4" />
-                      <span class="sr-only">{{ profile.name }}</span>
-                    </button>
+                <ContextMenu @update:open="(open) => onPinMenuOpen(profile.id, open)">
+                  <ContextMenuTrigger class="flex w-full justify-center">
+                    <Tooltip :disabled="menuOpenId === profile.id">
+                      <TooltipTrigger as-child>
+                        <button
+                          type="button"
+                          class="flex size-8 items-center justify-center rounded-md text-foreground ring-offset-background focus-visible:ring-2 focus-visible:outline-none dark:text-white"
+                          :class="connBg(profile.color) + (connections.selectedId === profile.id ? '/60' : '/20')"
+                          @click="activateProfile(profile)"
+                        >
+                          <Database class="size-4" />
+                          <span class="sr-only">{{ profile.name }}</span>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" align="center">
+                        {{ profile.name }}
+                      </TooltipContent>
+                    </Tooltip>
                   </ContextMenuTrigger>
                   <ContextMenuContent>
                     <ContextMenuLabel>{{ profile.name }}</ContextMenuLabel>
@@ -178,15 +199,23 @@ async function connect(profile: Profile) {
     <SidebarFooter>
       <SidebarMenu>
         <SidebarMenuItem>
-          <SidebarMenuButton
-            tooltip="Settings"
-            :is-active="route.path === '/settings'"
-            class="px-2.5 md:px-2"
-            @click="goSettings"
-          >
-            <Settings />
-            <span>Settings</span>
-          </SidebarMenuButton>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <div class="w-full">
+                <SidebarMenuButton
+                  :is-active="route.path === '/settings'"
+                  class="px-2.5 md:px-2"
+                  @click="goSettings"
+                >
+                  <Settings />
+                  <span>Settings</span>
+                </SidebarMenuButton>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="right" align="center">
+              Settings
+            </TooltipContent>
+          </Tooltip>
         </SidebarMenuItem>
       </SidebarMenu>
     </SidebarFooter>
