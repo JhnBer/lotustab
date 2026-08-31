@@ -9,6 +9,7 @@ import {
   type TableBrowseResult,
 } from "@/lib/wails";
 import { useSettingsStore } from "@/stores/settings";
+import { useExplorerStore } from "@/stores/explorer";
 import {
   draftLookup,
   rowKey,
@@ -33,6 +34,7 @@ interface TabBase {
 
 export interface QueryTab extends TabBase {
   kind: "query";
+  database: string;
   sql: string;
   page: number;
   pageSize: number;
@@ -66,7 +68,9 @@ export interface WorkspaceSnapshot {
 
 const WORKSPACE_KEY = "lotustab.workspace";
 
-type PersistedQueryTab = Pick<QueryTab, "kind" | "id" | "title" | "profileId" | "sql" | "page" | "pageSize">;
+type PersistedQueryTab = Pick<QueryTab, "kind" | "id" | "title" | "profileId" | "sql" | "page" | "pageSize"> & {
+  database?: string;
+};
 type PersistedTableTab = Pick<
   TableTab,
   | "kind"
@@ -91,12 +95,20 @@ function storedPageSize(): number {
   return useSettingsStore().defaultPageSize;
 }
 
+function defaultQueryDatabase(): string {
+  if (useSettingsStore().showAllDatabases) {
+    return "";
+  }
+  return useExplorerStore().activeDatabase || "";
+}
+
 function newQueryTab(profileId: string, title: string): QueryTab {
   return {
     kind: "query",
     id: crypto.randomUUID(),
     title,
     profileId,
+    database: defaultQueryDatabase(),
     sql: "SELECT 1;",
     page: 1,
     pageSize: storedPageSize(),
@@ -141,6 +153,7 @@ function persistTab(tab: WorkspaceTab): PersistedTab {
       id: tab.id,
       title: tab.title,
       profileId: tab.profileId,
+      database: tab.database ?? "",
       sql: tab.sql,
       page: tab.page,
       pageSize: tab.pageSize,
@@ -170,6 +183,7 @@ function restoreQueryTab(tab: PersistedQueryTab): QueryTab {
     id: tab.id,
     title: tab.title || "Query",
     profileId: tab.profileId,
+    database: tab.database ?? "",
     sql: tab.sql,
     page: tab.page >= 1 ? tab.page : 1,
     pageSize: tab.pageSize || storedPageSize(),
@@ -435,6 +449,13 @@ export const useQueryStore = defineStore("query", () => {
     }
   }
 
+  function setDatabase(id: string, database: string) {
+    const tab = tabs.value.find((t) => t.id === id);
+    if (tab && tab.kind === "query") {
+      tab.database = database;
+    }
+  }
+
   async function execute(id: string) {
     const tab = tabs.value.find((t) => t.id === id);
     if (!tab || tab.kind !== "query") {
@@ -456,6 +477,7 @@ export const useQueryStore = defineStore("query", () => {
       tab.result = await QueryService.Execute(
         tab.profileId,
         tab.sql,
+        tab.database ?? "",
         tab.pageSize,
         (tab.page - 1) * tab.pageSize,
       );
@@ -692,6 +714,7 @@ export const useQueryStore = defineStore("query", () => {
     restore,
     reorder,
     setSql,
+    setDatabase,
     run,
     loadTable,
     setPage,

@@ -73,7 +73,7 @@ func (d *Driver) Open(ctx context.Context, cfg driver.ConnConfig) (driver.Conn, 
 		_ = db.Close()
 		return nil, fmt.Errorf("mysql ping: %w", err)
 	}
-	return &conn{db: db}, nil
+	return &conn{db: db, database: strings.TrimSpace(cfg.Param("database", ""))}, nil
 }
 
 func mysqlConfig(cfg driver.ConnConfig) (*mysqldriver.Config, error) {
@@ -103,20 +103,47 @@ func mysqlConfig(cfg driver.ConnConfig) (*mysqldriver.Config, error) {
 }
 
 type conn struct {
-	db *sql.DB
+	db       *sql.DB
+	database string
 }
 
 func (c *conn) Ping(ctx context.Context) error {
 	return c.db.PingContext(ctx)
 }
 
-func (c *conn) Query(ctx context.Context, sqlText string, limit, offset int) (*driver.QueryResult, error) {
+func (c *conn) Query(ctx context.Context, sqlText, database string, limit, offset int) (*driver.QueryResult, error) {
 	page := driver.PrepareQueryPage(sqlText, limit, offset)
-	result, err := sqlutil.Query(ctx, c.db, page.SQL, page.MaxRows)
+	database = strings.TrimSpace(database)
+	if database == "" || database == c.database {
+		result, err := sqlutil.Query(ctx, c.db, page.SQL, page.MaxRows)
+		if err != nil {
+			return nil, err
+		}
+		return driver.FinishQueryPage(result, page), nil
+	}
+
+	session, err := c.db.Conn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if c.database != "" {
+			_, _ = session.ExecContext(ctx, mysqlUse(c.database))
+		}
+		_ = session.Close()
+	}()
+	if _, err := session.ExecContext(ctx, mysqlUse(database)); err != nil {
+		return nil, err
+	}
+	result, err := sqlutil.Query(ctx, session, page.SQL, page.MaxRows)
 	if err != nil {
 		return nil, err
 	}
 	return driver.FinishQueryPage(result, page), nil
+}
+
+func mysqlUse(database string) string {
+	return "USE " + sqlutil.QuoteMySQL(database)
 }
 
 func (c *conn) Databases(ctx context.Context) ([]string, error) {

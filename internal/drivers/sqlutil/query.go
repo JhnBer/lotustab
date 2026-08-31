@@ -12,8 +12,14 @@ import (
 
 const defaultMaxRows = 5000
 
+// ExecQuerier is *sql.DB or *sql.Conn.
+type ExecQuerier interface {
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
 // Query runs SQL against database/sql and maps the result to QueryResult.
-func Query(ctx context.Context, db *sql.DB, query string, maxRows int) (*driver.QueryResult, error) {
+func Query(ctx context.Context, db ExecQuerier, query string, maxRows int) (*driver.QueryResult, error) {
 	if maxRows <= 0 {
 		maxRows = defaultMaxRows
 	}

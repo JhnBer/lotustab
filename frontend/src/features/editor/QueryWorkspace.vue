@@ -3,6 +3,13 @@ import { computed, ref, watch } from "vue";
 import { FileCode2, Play, Plus, Table2, X } from "@lucide/vue";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { errorMessage } from "@/lib/errors";
 import {
   ResizableHandle,
@@ -14,10 +21,14 @@ import ResultsTable from "@/features/results/ResultsTable.vue";
 import TableBrowser from "@/features/results/TableBrowser.vue";
 import TablePager from "@/features/results/TablePager.vue";
 import { useConnectionsStore } from "@/stores/connections";
+import { useExplorerStore } from "@/stores/explorer";
 import { isQueryTab, isTableTab, useQueryStore } from "@/stores/query";
+
+const NONE = "__none__";
 
 const connections = useConnectionsStore();
 const queries = useQueryStore();
+const explorer = useExplorerStore();
 
 const visibleTabs = computed(() =>
   queries.tabs.filter((t) => t.profileId === connections.selectedId),
@@ -75,6 +86,15 @@ async function run() {
     toast.error(errorMessage(err));
   }
 }
+
+function onDatabase(value: unknown) {
+  const tab = queries.activeTab;
+  if (!isQueryTab(tab)) {
+    return;
+  }
+  const name = String(value ?? "");
+  queries.setDatabase(tab.id, name === NONE ? "" : name);
+}
 </script>
 
 <template>
@@ -111,12 +131,6 @@ async function run() {
           <Plus class="size-3.5" />
         </Button>
       </div>
-      <div v-if="isQueryTab(queries.activeTab)" style="--wails-draggable: no-drag">
-        <Button size="sm" :disabled="queries.activeTab.running" @click="run">
-          <Play class="size-3.5" />
-          Run
-        </Button>
-      </div>
     </div>
 
     <div v-if="!queries.activeTab" class="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-2 p-8 text-sm">
@@ -134,12 +148,38 @@ async function run() {
 
     <ResizablePanelGroup v-else-if="isQueryTab(queries.activeTab)" direction="vertical" class="min-h-0 flex-1">
       <ResizablePanel :default-size="45" :min-size="20">
-        <SqlEditor
-          :key="queries.activeTab.id"
-          :model-value="queries.activeTab.sql"
-          @update:model-value="queries.setSql(queries.activeTab!.id, $event)"
-          @run="run"
-        />
+        <div class="flex h-full min-h-0 flex-col">
+          <div class="flex items-center gap-2 border-b px-3 py-2 text-xs" style="--wails-draggable: no-drag">
+            <Select
+              :model-value="queries.activeTab.database || undefined"
+              @update:model-value="onDatabase"
+            >
+              <SelectTrigger size="sm" class="h-7 w-44">
+                <SelectValue placeholder="Database" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem :value="NONE">None</SelectItem>
+                <SelectItem v-for="database in explorer.databases" :key="database" :value="database">
+                  {{ database }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <span class="text-muted-foreground min-w-0 flex-1 truncate">
+              You can choose a database here or specify it in the query.
+            </span>
+            <Button size="sm" class="shrink-0" :disabled="queries.activeTab.running" @click="run">
+              <Play class="size-3.5" />
+              Run
+            </Button>
+          </div>
+          <SqlEditor
+            :key="queries.activeTab.id"
+            class="min-h-0 flex-1"
+            :model-value="queries.activeTab.sql"
+            @update:model-value="queries.setSql(queries.activeTab!.id, $event)"
+            @run="run"
+          />
+        </div>
       </ResizablePanel>
       <ResizableHandle />
       <ResizablePanel :default-size="55" :min-size="20">

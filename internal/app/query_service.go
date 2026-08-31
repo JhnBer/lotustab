@@ -35,7 +35,8 @@ func NewQueryServiceFromConnections(connections *ConnectionsService) *QueryServi
 }
 
 // Execute runs SQL for the given profile. The profile is connected if needed.
-func (s *QueryService) Execute(ctx context.Context, profileID, sqlText string, limit, offset int) (*driver.QueryResult, error) {
+// database is optional; empty uses the connection default catalog.
+func (s *QueryService) Execute(ctx context.Context, profileID, sqlText, database string, limit, offset int) (*driver.QueryResult, error) {
 	if strings.TrimSpace(profileID) == "" {
 		return nil, fmt.Errorf("profile is required")
 	}
@@ -50,7 +51,7 @@ func (s *QueryService) Execute(ctx context.Context, profileID, sqlText string, l
 	if err != nil {
 		return nil, err
 	}
-	return conn.Query(ctx, sqlText, limit, offset)
+	return conn.Query(ctx, sqlText, strings.TrimSpace(database), limit, offset)
 }
 
 // ListTables returns tables and views in the given database.
