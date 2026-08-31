@@ -1,6 +1,8 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
+import { watchDebounced } from "@vueuse/core";
 import { errorMessage } from "@/lib/errors";
+import { readJson, writeJson } from "@/lib/persist";
 import {
   QueryService,
   type QueryResult,
@@ -62,6 +64,29 @@ export interface WorkspaceSnapshot {
   activeTabId: string;
 }
 
+const WORKSPACE_KEY = "lotustab.workspace";
+
+type PersistedQueryTab = Pick<QueryTab, "kind" | "id" | "title" | "profileId" | "sql" | "page" | "pageSize">;
+type PersistedTableTab = Pick<
+  TableTab,
+  | "kind"
+  | "id"
+  | "title"
+  | "profileId"
+  | "database"
+  | "schema"
+  | "name"
+  | "page"
+  | "pageSize"
+  | "orderBy"
+  | "orderDir"
+  | "filtersEnabled"
+  | "filtersOpen"
+  | "filters"
+>;
+type PersistedTab = PersistedQueryTab | PersistedTableTab;
+type PersistedWorkspace = { tabs: PersistedTab[]; activeTabId: string };
+
 function storedPageSize(): number {
   return useSettingsStore().defaultPageSize;
 }
@@ -109,9 +134,135 @@ export function isTableTab(tab: WorkspaceTab | undefined): tab is TableTab {
   return tab?.kind === "table";
 }
 
+function persistTab(tab: WorkspaceTab): PersistedTab {
+  if (tab.kind === "query") {
+    return {
+      kind: "query",
+      id: tab.id,
+      title: tab.title,
+      profileId: tab.profileId,
+      sql: tab.sql,
+      page: tab.page,
+      pageSize: tab.pageSize,
+    };
+  }
+  return {
+    kind: "table",
+    id: tab.id,
+    title: tab.title,
+    profileId: tab.profileId,
+    database: tab.database,
+    schema: tab.schema,
+    name: tab.name,
+    page: tab.page,
+    pageSize: tab.pageSize,
+    orderBy: tab.orderBy,
+    orderDir: tab.orderDir,
+    filtersEnabled: tab.filtersEnabled,
+    filtersOpen: tab.filtersOpen,
+    filters: tab.filters ?? [],
+  };
+}
+
+function restoreQueryTab(tab: PersistedQueryTab): QueryTab {
+  return {
+    kind: "query",
+    id: tab.id,
+    title: tab.title || "Query",
+    profileId: tab.profileId,
+    sql: tab.sql,
+    page: tab.page >= 1 ? tab.page : 1,
+    pageSize: tab.pageSize || storedPageSize(),
+    running: false,
+    error: "",
+    result: null,
+  };
+}
+
+function restoreTableTab(tab: PersistedTableTab): TableTab {
+  return {
+    kind: "table",
+    id: tab.id,
+    title: tab.title || tab.name,
+    profileId: tab.profileId,
+    database: tab.database,
+    schema: tab.schema ?? "",
+    name: tab.name,
+    page: tab.page >= 1 ? tab.page : 1,
+    pageSize: tab.pageSize || storedPageSize(),
+    orderBy: tab.orderBy ?? "",
+    orderDir: tab.orderDir === "asc" || tab.orderDir === "desc" ? tab.orderDir : "",
+    running: false,
+    error: "",
+    result: null,
+    total: 0,
+    primaryKey: [],
+    edits: [],
+    filtersEnabled: Boolean(tab.filtersEnabled),
+    filtersOpen: Boolean(tab.filtersOpen),
+    filters: tab.filters ?? [],
+  };
+}
+
+function isPersistedQueryTab(tab: unknown): tab is PersistedQueryTab {
+  if (!tab || typeof tab !== "object") {
+    return false;
+  }
+  const row = tab as PersistedQueryTab;
+  return (
+    row.kind === "query" &&
+    typeof row.id === "string" &&
+    typeof row.profileId === "string" &&
+    typeof row.sql === "string"
+  );
+}
+
+function isPersistedTableTab(tab: unknown): tab is PersistedTableTab {
+  if (!tab || typeof tab !== "object") {
+    return false;
+  }
+  const row = tab as PersistedTableTab;
+  return (
+    row.kind === "table" &&
+    typeof row.id === "string" &&
+    typeof row.profileId === "string" &&
+    typeof row.database === "string" &&
+    typeof row.name === "string"
+  );
+}
+
+function parseWorkspace(raw: unknown): PersistedWorkspace {
+  if (!raw || typeof raw !== "object") {
+    return { tabs: [], activeTabId: "" };
+  }
+  const row = raw as PersistedWorkspace;
+  const tabs = Array.isArray(row.tabs)
+    ? row.tabs.filter((tab): tab is PersistedTab => isPersistedQueryTab(tab) || isPersistedTableTab(tab))
+    : [];
+  return {
+    tabs,
+    activeTabId: typeof row.activeTabId === "string" ? row.activeTabId : "",
+  };
+}
+
+function hydrateTabs(stored: PersistedWorkspace): WorkspaceTab[] {
+  return stored.tabs.map((tab) => (tab.kind === "query" ? restoreQueryTab(tab) : restoreTableTab(tab)));
+}
+
 export const useQueryStore = defineStore("query", () => {
-  const tabs = ref<WorkspaceTab[]>([]);
-  const activeTabId = ref("");
+  const stored = parseWorkspace(readJson(WORKSPACE_KEY, {}));
+  const tabs = ref<WorkspaceTab[]>(hydrateTabs(stored));
+  const activeTabId = ref(
+    stored.activeTabId && tabs.value.some((t) => t.id === stored.activeTabId)
+      ? stored.activeTabId
+      : (tabs.value[0]?.id ?? ""),
+  );
+
+  watchDebounced(
+    () => ({ tabs: tabs.value.map(persistTab), activeTabId: activeTabId.value }),
+    (value) => writeJson(WORKSPACE_KEY, value),
+    { debounce: 300, deep: true },
+  );
 
   const activeTab = computed(() => tabs.value.find((t) => t.id === activeTabId.value));
 

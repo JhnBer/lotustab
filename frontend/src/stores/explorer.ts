@@ -1,7 +1,11 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { computed, ref } from "vue";
+import { watchDebounced } from "@vueuse/core";
 import { errorMessage } from "@/lib/errors";
+import { readJson, writeJson } from "@/lib/persist";
 import { ConnectionsService, QueryService, type TableInfo } from "@/lib/wails";
+
+const EXPLORER_KEY = "lotustab.explorer";
 
 const SYSTEM_DBS = new Set([
   "mysql",
@@ -11,6 +15,13 @@ const SYSTEM_DBS = new Set([
   "template0",
   "template1",
 ]);
+
+export type ExplorerSlice = {
+  databases: string[];
+  tablesByDb: Record<string, TableInfo[]>;
+  expanded: Record<string, boolean>;
+  activeDatabase: string;
+};
 
 function sortDatabases(names: string[]): string[] {
   const user: string[] = [];
@@ -46,76 +57,156 @@ export function filterTables(tables: TableInfo[], query: string): TableInfo[] {
   return tables.filter((table) => table.name.toLowerCase().includes(q));
 }
 
-export const useExplorerStore = defineStore("explorer", () => {
-  const profileId = ref("");
-  const databases = ref<string[]>([]);
-  const tablesByDb = ref<Record<string, TableInfo[]>>({});
-  const expanded = ref<Record<string, boolean>>({});
-  const loadingDbs = ref(false);
-  const loadingTables = ref<Record<string, boolean>>({});
-  const error = ref("");
-  const activeDatabase = ref("");
+function emptySlice(): ExplorerSlice {
+  return { databases: [], tablesByDb: {}, expanded: {}, activeDatabase: "" };
+}
 
-  function reset() {
-    profileId.value = "";
-    databases.value = [];
-    tablesByDb.value = {};
-    expanded.value = {};
-    loadingDbs.value = false;
-    loadingTables.value = {};
-    error.value = "";
-    activeDatabase.value = "";
+function isTableInfo(value: unknown): value is TableInfo {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const row = value as TableInfo;
+  return typeof row.name === "string" && typeof row.schema === "string";
+}
+
+function parseSlices(raw: unknown): Record<string, ExplorerSlice> {
+  if (!raw || typeof raw !== "object") {
+    return {};
+  }
+  const out: Record<string, ExplorerSlice> = {};
+  for (const [id, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!id || !value || typeof value !== "object") {
+      continue;
+    }
+    const row = value as Record<string, unknown>;
+    const databases = Array.isArray(row.databases)
+      ? row.databases.filter((name): name is string => typeof name === "string")
+      : [];
+    const tablesByDb: Record<string, TableInfo[]> = {};
+    if (row.tablesByDb && typeof row.tablesByDb === "object") {
+      for (const [db, tables] of Object.entries(row.tablesByDb as Record<string, unknown>)) {
+        if (!Array.isArray(tables)) {
+          continue;
+        }
+        tablesByDb[db] = tables.filter(isTableInfo);
+      }
+    }
+    const expanded: Record<string, boolean> = {};
+    if (row.expanded && typeof row.expanded === "object") {
+      for (const [db, open] of Object.entries(row.expanded as Record<string, unknown>)) {
+        expanded[db] = Boolean(open);
+      }
+    }
+    out[id] = {
+      databases,
+      tablesByDb,
+      expanded,
+      activeDatabase: typeof row.activeDatabase === "string" ? row.activeDatabase : "",
+    };
+  }
+  return out;
+}
+
+export const useExplorerStore = defineStore("explorer", () => {
+  const slices = ref<Record<string, ExplorerSlice>>(parseSlices(readJson(EXPLORER_KEY, {})));
+  const profileId = ref("");
+  const loadingDbsById = ref<Record<string, boolean>>({});
+  const loadingTablesById = ref<Record<string, Record<string, boolean>>>({});
+  const errorById = ref<Record<string, string>>({});
+
+  const current = computed(() => (profileId.value ? slices.value[profileId.value] : undefined));
+  const databases = computed(() => current.value?.databases ?? []);
+  const tablesByDb = computed(() => current.value?.tablesByDb ?? {});
+  const expanded = computed(() => current.value?.expanded ?? {});
+  const activeDatabase = computed(() => current.value?.activeDatabase ?? "");
+  const loadingDbs = computed(() => Boolean(loadingDbsById.value[profileId.value]));
+  const loadingTables = computed(() => loadingTablesById.value[profileId.value] ?? {});
+  const error = computed(() => errorById.value[profileId.value] ?? "");
+
+  watchDebounced(
+    slices,
+    (value) => writeJson(EXPLORER_KEY, value),
+    { debounce: 300, deep: true },
+  );
+
+  function sliceOf(id: string): ExplorerSlice {
+    return slices.value[id] ?? emptySlice();
+  }
+
+  function patch(id: string, next: Partial<ExplorerSlice>) {
+    slices.value = { ...slices.value, [id]: { ...sliceOf(id), ...next } };
+  }
+
+  function hasCatalog(id: string): boolean {
+    return (slices.value[id]?.databases.length ?? 0) > 0;
+  }
+
+  function activate(id: string) {
+    profileId.value = id;
+  }
+
+  function removeProfile(id: string) {
+    if (!slices.value[id]) {
+      return;
+    }
+    const next = { ...slices.value };
+    delete next[id];
+    slices.value = next;
+    if (profileId.value === id) {
+      profileId.value = "";
+    }
+  }
+
+  function setLoadingTables(id: string, database: string, on: boolean) {
+    const currentTables = loadingTablesById.value[id] ?? {};
+    loadingTablesById.value = {
+      ...loadingTablesById.value,
+      [id]: { ...currentTables, [database]: on },
+    };
   }
 
   async function loadDatabases(id: string) {
     if (!id) {
-      reset();
       return;
     }
-    if (profileId.value !== id) {
-      tablesByDb.value = {};
-      expanded.value = {};
-      activeDatabase.value = "";
-    }
     profileId.value = id;
-    loadingDbs.value = true;
-    error.value = "";
+    loadingDbsById.value = { ...loadingDbsById.value, [id]: true };
+    errorById.value = { ...errorById.value, [id]: "" };
     try {
       const list = (await ConnectionsService.Databases(id)) ?? [];
-      databases.value = sortDatabases(list);
+      patch(id, { databases: sortDatabases(list) });
     } catch (err) {
-      error.value = errorMessage(err);
-      databases.value = [];
+      errorById.value = { ...errorById.value, [id]: errorMessage(err) };
       throw err;
     } finally {
-      loadingDbs.value = false;
+      loadingDbsById.value = { ...loadingDbsById.value, [id]: false };
     }
   }
 
   async function loadTables(id: string, database: string) {
-    loadingTables.value = { ...loadingTables.value, [database]: true };
+    setLoadingTables(id, database, true);
     try {
       const tables = (await QueryService.ListTables(id, database)) ?? [];
-      tablesByDb.value = { ...tablesByDb.value, [database]: tables };
+      patch(id, { tablesByDb: { ...sliceOf(id).tablesByDb, [database]: tables } });
     } catch (err) {
-      tablesByDb.value = { ...tablesByDb.value, [database]: [] };
+      patch(id, { tablesByDb: { ...sliceOf(id).tablesByDb, [database]: [] } });
       throw err;
     } finally {
-      loadingTables.value = { ...loadingTables.value, [database]: false };
+      setLoadingTables(id, database, false);
     }
   }
 
   async function toggleDatabase(id: string, database: string) {
-    const next = !expanded.value[database];
-    expanded.value = { ...expanded.value, [database]: next };
-    if (next && !tablesByDb.value[database]) {
+    const next = !sliceOf(id).expanded[database];
+    patch(id, { expanded: { ...sliceOf(id).expanded, [database]: next } });
+    if (next && !sliceOf(id).tablesByDb[database]) {
       await loadTables(id, database);
     }
   }
 
   async function setActiveDatabase(id: string, database: string) {
-    activeDatabase.value = database;
-    if (database && !(database in tablesByDb.value)) {
+    patch(id, { activeDatabase: database });
+    if (database && !(database in sliceOf(id).tablesByDb)) {
       await loadTables(id, database);
     }
   }
@@ -124,8 +215,8 @@ export const useExplorerStore = defineStore("explorer", () => {
     if (!id) {
       return;
     }
-    for (const database of databases.value) {
-      if (database in tablesByDb.value) {
+    for (const database of sliceOf(id).databases) {
+      if (database in sliceOf(id).tablesByDb) {
         continue;
       }
       try {
@@ -140,22 +231,24 @@ export const useExplorerStore = defineStore("explorer", () => {
     if (!id) {
       return;
     }
-    const expandedDbs = Object.keys(expanded.value).filter((db) => expanded.value[db]);
-    const keepActive = activeDatabase.value;
+    const currentSlice = sliceOf(id);
+    const expandedDbs = Object.keys(currentSlice.expanded).filter((db) => currentSlice.expanded[db]);
+    const keepActive = currentSlice.activeDatabase;
     await loadDatabases(id);
-    const stillOpen = expandedDbs.filter((db) => databases.value.includes(db));
+    const names = sliceOf(id).databases;
+    const stillOpen = expandedDbs.filter((db) => names.includes(db));
     const reload = [...stillOpen];
-    if (keepActive && databases.value.includes(keepActive) && !reload.includes(keepActive)) {
+    if (keepActive && names.includes(keepActive) && !reload.includes(keepActive)) {
       reload.push(keepActive);
     }
     await Promise.all(reload.map((db) => loadTables(id, db)));
     const keep = new Set(reload);
-    tablesByDb.value = Object.fromEntries(
-      Object.entries(tablesByDb.value).filter(([db]) => keep.has(db)),
-    );
-    if (keepActive && !databases.value.includes(keepActive)) {
-      activeDatabase.value = "";
-    }
+    patch(id, {
+      tablesByDb: Object.fromEntries(
+        Object.entries(sliceOf(id).tablesByDb).filter(([db]) => keep.has(db)),
+      ),
+      activeDatabase: keepActive && names.includes(keepActive) ? keepActive : "",
+    });
   }
 
   return {
@@ -167,7 +260,9 @@ export const useExplorerStore = defineStore("explorer", () => {
     loadingTables,
     error,
     activeDatabase,
-    reset,
+    hasCatalog,
+    activate,
+    removeProfile,
     loadDatabases,
     loadTables,
     toggleDatabase,

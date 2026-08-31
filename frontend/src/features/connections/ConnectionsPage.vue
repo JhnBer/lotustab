@@ -5,6 +5,7 @@ import { useRouter } from "vue-router";
 import { toast } from "vue-sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Table,
   TableBody,
@@ -49,6 +50,9 @@ function openQuery(profile: Profile) {
 }
 
 async function connect(profile: Profile) {
+  if (connections.isConnecting(profile.id)) {
+    return;
+  }
   try {
     await connections.connect(profile.id);
     connections.select(profile.id);
@@ -166,9 +170,11 @@ async function remove(profile: Profile) {
                   v-if="!connections.isConnected(profile.id)"
                   size="icon-sm"
                   variant="ghost"
+                  :disabled="connections.isConnecting(profile.id)"
                   @click="connect(profile)"
                 >
-                  <Plug class="size-3.5" />
+                  <Spinner v-if="connections.isConnecting(profile.id)" class="size-3.5" />
+                  <Plug v-else class="size-3.5" />
                   <span class="sr-only">Connect</span>
                 </Button>
                 <Button

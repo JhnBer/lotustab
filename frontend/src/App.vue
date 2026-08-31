@@ -67,23 +67,26 @@ onMounted(async () => {
   }
   try {
     const name = await Window.Name();
-    if (!name.startsWith("conn-")) {
+    if (name.startsWith("conn-")) {
+      const id = name.slice("conn-".length);
+      const profile = connections.profiles.find((p) => p.id === id);
+      connections.select(id);
+      if (!restoreHandoff(await WindowsService.TakeHandoff(id)) && profile) {
+        queries.openForProfile(id, profile.name);
+      }
+      await router.replace("/query");
+      Events.On("workspace:handoff", () => {
+        void WindowsService.TakeHandoff(id).then((next) => {
+          restoreHandoff(next);
+        });
+      });
       return;
     }
-    const id = name.slice("conn-".length);
-    const profile = connections.profiles.find((p) => p.id === id);
-    connections.select(id);
-    if (!restoreHandoff(await WindowsService.TakeHandoff(id)) && profile) {
-      queries.openForProfile(id, profile.name);
-    }
-    await router.replace("/query");
-    Events.On("workspace:handoff", () => {
-      void WindowsService.TakeHandoff(id).then((next) => {
-        restoreHandoff(next);
-      });
-    });
   } catch {
     // Main window / non-Wails preview.
+  }
+  if (connections.selectedId) {
+    await router.replace("/query");
   }
 });
 </script>

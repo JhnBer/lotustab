@@ -35,6 +35,7 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Select,
   SelectContent,
@@ -152,8 +153,15 @@ watch(
   () => [selected.value?.id, currentConnected.value] as const,
   async ([id, connected]) => {
     tableQuery.value = "";
-    if (!id || !connected) {
-      explorer.reset();
+    if (!id) {
+      return;
+    }
+    explorer.activate(id);
+    if (!connected) {
+      return;
+    }
+    if (explorer.hasCatalog(id)) {
+      syncActiveDatabase();
       return;
     }
     try {
@@ -205,7 +213,7 @@ function activateProfile(profile: Profile) {
 }
 
 async function connectSelected() {
-  if (!selected.value) {
+  if (!selected.value || connections.isConnecting(selected.value.id)) {
     return;
   }
   try {
@@ -226,6 +234,9 @@ async function togglePin(profile: Profile) {
 }
 
 async function connectRecent(profile: Profile) {
+  if (connections.isConnecting(profile.id)) {
+    return;
+  }
   try {
     await connections.connect(profile.id);
     toast.success(`Connected to ${profile.name}`);
@@ -416,9 +427,11 @@ function isDbOpen(name: string, showHeader: boolean): boolean {
                   variant="ghost"
                   class="shrink-0"
                   title="Connect"
+                  :disabled="connections.isConnecting(profile.id)"
                   @click.stop="connectRecent(profile)"
                 >
-                  <Plug class="size-3.5" />
+                  <Spinner v-if="connections.isConnecting(profile.id)" class="size-3.5" />
+                  <Plug v-else class="size-3.5" />
                 </Button>
                 <Button
                   v-else
@@ -447,8 +460,14 @@ function isDbOpen(name: string, showHeader: boolean): boolean {
 
       <SidebarGroup v-else-if="!currentConnected">
         <SidebarGroupContent class="px-2 py-2">
-          <Button size="sm" class="w-full" @click="connectSelected">
-            <Plug class="size-3.5" />
+          <Button
+            size="sm"
+            class="w-full"
+            :disabled="connections.isConnecting(selected.id)"
+            @click="connectSelected"
+          >
+            <Spinner v-if="connections.isConnecting(selected.id)" />
+            <Plug v-else class="size-3.5" />
             Connect
           </Button>
         </SidebarGroupContent>

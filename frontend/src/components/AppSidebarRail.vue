@@ -24,6 +24,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { Spinner } from "@/components/ui/spinner";
 import { connBg, connTint } from "@/lib/colors";
 import { errorMessage } from "@/lib/errors";
 import type { Profile } from "@/lib/wails";
@@ -88,12 +89,15 @@ async function disconnect(profile: Profile) {
 }
 
 async function connect(profile: Profile) {
-    try {
-        await connections.connect(profile.id);
-        toast.success(`Connected to ${profile.name}`);
-    } catch (err) {
-        toast.error(errorMessage(err));
-    }
+  if (connections.isConnecting(profile.id)) {
+    return;
+  }
+  try {
+    await connections.connect(profile.id);
+    toast.success(`Connected to ${profile.name}`);
+  } catch (err) {
+    toast.error(errorMessage(err));
+  }
 }
 </script>
 
@@ -155,9 +159,13 @@ async function connect(profile: Profile) {
                       </ContextMenuItem>
                     </template>
                     <template v-else>
-                        <ContextMenuItem @click="connect(profile)">
-                            Connect
-                        </ContextMenuItem>
+                      <ContextMenuItem
+                        :disabled="connections.isConnecting(profile.id)"
+                        @click="connect(profile)"
+                      >
+                        <Spinner v-if="connections.isConnecting(profile.id)" />
+                        Connect
+                      </ContextMenuItem>
                     </template>
                   </ContextMenuContent>
                 </ContextMenu>

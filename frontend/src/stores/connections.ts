@@ -1,7 +1,8 @@
 import { defineStore } from "pinia";
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { Events } from "@wailsio/runtime";
 import { errorMessage } from "@/lib/errors";
+import { readJson, writeJson } from "@/lib/persist";
 import {
   ConnectionsService,
   DriversService,
@@ -11,7 +12,10 @@ import {
   type Profile,
   type SaveProfileInput,
 } from "@/lib/wails";
+import { useExplorerStore } from "@/stores/explorer";
 import { useQueryStore } from "@/stores/query";
+
+const SELECTED_KEY = "lotustab.selectedId";
 
 function asRecord(params: Profile["params"]): Record<string, string> {
   const out: Record<string, string> = {};
@@ -32,9 +36,13 @@ export const useConnectionsStore = defineStore("connections", () => {
   const connectedIds = ref<string[]>([]);
   const pinnedIds = ref<string[]>([]);
   const recentIds = ref<string[]>([]);
-  const selectedId = ref("");
+  const storedSelected = readJson<unknown>(SELECTED_KEY, "");
+  const selectedId = ref(typeof storedSelected === "string" ? storedSelected : "");
+  const connectingIds = ref<string[]>([]);
   const loading = ref(false);
   const error = ref("");
+
+  watch(selectedId, (id) => writeJson(SELECTED_KEY, id));
 
   const selected = computed(() => profiles.value.find((p) => p.id === selectedId.value));
 
@@ -52,6 +60,10 @@ export const useConnectionsStore = defineStore("connections", () => {
 
   function isConnected(id: string) {
     return connectedIds.value.includes(id);
+  }
+
+  function isConnecting(id: string) {
+    return connectingIds.value.includes(id);
   }
 
   function isPinned(id: string) {
@@ -75,7 +87,7 @@ export const useConnectionsStore = defineStore("connections", () => {
     pinnedIds.value = state.pinnedIds ?? [];
     recentIds.value = state.recentIds ?? [];
     if (selectedId.value && !profiles.value.some((p) => p.id === selectedId.value)) {
-      selectedId.value = profiles.value[0]?.id ?? "";
+      selectedId.value = "";
     }
   }
 
@@ -130,7 +142,6 @@ export const useConnectionsStore = defineStore("connections", () => {
       params: input.params ?? {},
     });
     await refresh();
-    selectedId.value = saved.id;
     return saved;
   }
 
@@ -152,12 +163,22 @@ export const useConnectionsStore = defineStore("connections", () => {
 
   async function remove(id: string) {
     await ConnectionsService.Delete(id);
+    useQueryStore().removeForProfile(id);
+    useExplorerStore().removeProfile(id);
     await refresh();
   }
 
   async function connect(id: string) {
-    await ConnectionsService.Connect(id);
-    await refresh();
+    if (connectingIds.value.includes(id)) {
+      return;
+    }
+    connectingIds.value = [...connectingIds.value, id];
+    try {
+      await ConnectionsService.Connect(id);
+      await refresh();
+    } finally {
+      connectingIds.value = connectingIds.value.filter((item) => item !== id);
+    }
   }
 
   async function disconnect(id: string) {
@@ -213,12 +234,14 @@ export const useConnectionsStore = defineStore("connections", () => {
     pinnedIds,
     recentIds,
     selectedId,
+    connectingIds,
     loading,
     error,
     selected,
     pinnedProfiles,
     recentProfiles,
     isConnected,
+    isConnecting,
     isPinned,
     driverById,
     specFor,
