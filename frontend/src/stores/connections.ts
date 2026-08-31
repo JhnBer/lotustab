@@ -39,6 +39,7 @@ export const useConnectionsStore = defineStore("connections", () => {
   const storedSelected = readJson<unknown>(SELECTED_KEY, "");
   const selectedId = ref(typeof storedSelected === "string" ? storedSelected : "");
   const connectingIds = ref<string[]>([]);
+  const pendingConnect = new Map<string, Promise<void>>();
   const loading = ref(false);
   const error = ref("");
 
@@ -169,16 +170,22 @@ export const useConnectionsStore = defineStore("connections", () => {
   }
 
   async function connect(id: string) {
-    if (connectingIds.value.includes(id)) {
-      return;
+    const pending = pendingConnect.get(id);
+    if (pending) {
+      return pending;
     }
     connectingIds.value = [...connectingIds.value, id];
-    try {
-      await ConnectionsService.Connect(id);
-      await refresh();
-    } finally {
-      connectingIds.value = connectingIds.value.filter((item) => item !== id);
-    }
+    const work = (async () => {
+      try {
+        await ConnectionsService.Connect(id);
+        await refresh();
+      } finally {
+        connectingIds.value = connectingIds.value.filter((item) => item !== id);
+        pendingConnect.delete(id);
+      }
+    })();
+    pendingConnect.set(id, work);
+    return work;
   }
 
   async function disconnect(id: string) {

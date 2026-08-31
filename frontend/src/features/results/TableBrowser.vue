@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed, ref, watch } from "vue";
 import { ChevronDown, ChevronRight, Filter, Plus } from "@lucide/vue";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
@@ -7,13 +8,41 @@ import ResultsTable from "@/features/results/ResultsTable.vue";
 import TableFilters from "@/features/results/TableFilters.vue";
 import TablePager from "@/features/results/TablePager.vue";
 import { errorMessage } from "@/lib/errors";
+import { useConnectionsStore } from "@/stores/connections";
 import { type TableTab, useQueryStore } from "@/stores/query";
 
 const props = defineProps<{
   tab: TableTab;
 }>();
 
+const connections = useConnectionsStore();
 const queries = useQueryStore();
+const opening = ref(false);
+const connected = computed(() => connections.connectedIds.includes(props.tab.profileId));
+const loading = computed(() => opening.value || props.tab.running);
+
+watch(
+  [() => props.tab.id, connected],
+  async () => {
+    if (opening.value || props.tab.result || props.tab.running) {
+      return;
+    }
+    opening.value = true;
+    try {
+      if (!connections.isConnected(props.tab.profileId)) {
+        await connections.connect(props.tab.profileId);
+      }
+      if (!props.tab.result) {
+        await queries.loadTable(props.tab.id);
+      }
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      opening.value = false;
+    }
+  },
+  { immediate: true },
+);
 
 function onEdit(row: number, column: string, value: unknown) {
   queries.setCellDraft(props.tab.id, row, column, value);
@@ -68,7 +97,7 @@ async function onApply() {
         </Button>
         <Button
           size="xs"
-          :disabled="!tab.filtersEnabled || tab.running"
+          :disabled="!tab.filtersEnabled || loading"
           @click="queries.applyFilters(tab.id)"
         >
           Apply
@@ -87,7 +116,7 @@ async function onApply() {
       class="min-h-0 flex-1"
       :result="tab.result"
       :error="tab.error"
-      :running="tab.running"
+      :running="loading"
       sortable
       :sort-column="tab.orderBy"
       :sort-dir="tab.orderDir"
@@ -104,7 +133,7 @@ async function onApply() {
       :page="tab.page"
       :page-size="tab.pageSize"
       :row-count="tab.result?.rows?.length ?? 0"
-      :running="tab.running"
+      :running="loading"
       :total="tab.total"
       :dirty="(tab.edits?.length ?? 0) > 0"
       @page="queries.setPage(tab.id, $event)"
