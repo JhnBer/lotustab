@@ -20,6 +20,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import DynamicField from "@/features/connections/DynamicField.vue";
+import SshTunnelFields from "@/features/connections/SshTunnelFields.vue";
+import { copySshParams } from "@/features/connections/ssh";
 import { errorMessage } from "@/lib/errors";
 import { CONNECTION_COLORS, connBg, connColor } from "@/lib/colors";
 import type { Field, Profile, SaveProfileInput } from "@/lib/wails";
@@ -71,6 +73,7 @@ function applyDriver(nextDriverId: string, existing?: Record<string, string>) {
   driverId.value = nextDriverId;
   const nextSpec = connections.specFor(nextDriverId);
   const keys = new Set(nextSpec.map((field) => field.key));
+  const ssh = copySshParams(existing ?? params);
   for (const key of Object.keys(params)) {
     if (!keys.has(key)) {
       delete params[key];
@@ -83,6 +86,7 @@ function applyDriver(nextDriverId: string, existing?: Record<string, string>) {
     }
     params[field.key] = existing?.[field.key] ?? field.default ?? "";
   }
+  Object.assign(params, ssh);
 }
 
 watch(
@@ -145,7 +149,7 @@ async function fetchDatabases() {
 
 <template>
   <Dialog :open="open" @update:open="emit('update:open', $event)">
-    <DialogContent v-if="open" class="sm:max-w-md">
+    <DialogContent v-if="open" class="max-h-[min(90vh,40rem)] overflow-y-auto sm:max-w-md">
       <DialogHeader>
         <DialogTitle>{{ isEdit ? "Edit connection" : "New connection" }}</DialogTitle>
         <DialogDescription>
@@ -204,6 +208,8 @@ async function fetchDatabases() {
             @update:model-value="params[field.key] = $event"
           />
         </div>
+
+        <SshTunnelFields :params="params" :is-edit="isEdit" />
 
         <DialogFooter class="mt-2">
           <Button type="button" variant="outline" :disabled="testing || saving" @click="onTest">

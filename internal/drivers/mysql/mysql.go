@@ -55,14 +55,15 @@ func (d *Driver) ConnectionSpec() []driver.Field {
 }
 
 func (d *Driver) Open(ctx context.Context, cfg driver.ConnConfig) (driver.Conn, error) {
-	dsn, err := dsnFrom(cfg)
+	mc, err := mysqlConfig(cfg)
 	if err != nil {
 		return nil, err
 	}
-	db, err := sql.Open("mysql", dsn)
+	connector, err := mysqldriver.NewConnector(mc)
 	if err != nil {
 		return nil, fmt.Errorf("mysql open: %w", err)
 	}
+	db := sql.OpenDB(connector)
 	db.SetMaxOpenConns(4)
 	db.SetConnMaxLifetime(30 * time.Minute)
 
@@ -75,10 +76,10 @@ func (d *Driver) Open(ctx context.Context, cfg driver.ConnConfig) (driver.Conn, 
 	return &conn{db: db}, nil
 }
 
-func dsnFrom(cfg driver.ConnConfig) (string, error) {
+func mysqlConfig(cfg driver.ConnConfig) (*mysqldriver.Config, error) {
 	port := cfg.Param("port", defaultPort)
 	if _, err := strconv.ParseUint(port, 10, 16); err != nil {
-		return "", fmt.Errorf("invalid port: %s", port)
+		return nil, fmt.Errorf("invalid port: %s", port)
 	}
 	mc := mysqldriver.NewConfig()
 	mc.User = cfg.Param("user", "")
@@ -95,7 +96,10 @@ func dsnFrom(cfg driver.ConnConfig) (string, error) {
 	mc.Timeout = 15 * time.Second
 	mc.ReadTimeout = 60 * time.Second
 	mc.WriteTimeout = 30 * time.Second
-	return mc.FormatDSN(), nil
+	if cfg.Dial != nil {
+		mc.DialFunc = cfg.Dial
+	}
+	return mc, nil
 }
 
 type conn struct {

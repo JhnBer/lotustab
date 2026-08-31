@@ -72,7 +72,7 @@ func (d *Driver) Open(ctx context.Context, cfg driver.ConnConfig) (driver.Conn, 
 	}
 	return &conn{
 		pool:     pool,
-		cfg:      driver.ConnConfig{Params: params, Password: cfg.Password},
+		cfg:      driver.ConnConfig{Params: params, Password: cfg.Password, Dial: cfg.Dial},
 		database: database,
 	}, nil
 }
@@ -87,6 +87,9 @@ func openPool(ctx context.Context, cfg driver.ConnConfig) (*pgxpool.Pool, error)
 		return nil, fmt.Errorf("postgres config: %w", err)
 	}
 	poolCfg.MaxConns = 4
+	if cfg.Dial != nil {
+		poolCfg.ConnConfig.DialFunc = cfg.Dial
+	}
 
 	connectCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
@@ -327,7 +330,7 @@ func (c *conn) poolFor(ctx context.Context, database string) (*pgxpool.Pool, fun
 		params = map[string]string{}
 	}
 	params["database"] = database
-	pool, err := openPool(ctx, driver.ConnConfig{Params: params, Password: c.cfg.Password})
+	pool, err := openPool(ctx, driver.ConnConfig{Params: params, Password: c.cfg.Password, Dial: c.cfg.Dial})
 	if err != nil {
 		return nil, nil, err
 	}

@@ -1,5 +1,10 @@
 package driver
 
+import (
+	"context"
+	"net"
+)
+
 // FieldType describes how the frontend should render a connection form field.
 type FieldType string
 
@@ -33,9 +38,11 @@ type Field struct {
 
 // ConnConfig is the runtime configuration used to open a connection.
 // Password is supplied separately so it is never persisted with profiles.
+// Dial, when set, is used instead of the default TCP dialer (SSH tunnel).
 type ConnConfig struct {
-	Params   map[string]string `json:"params"`
-	Password string            `json:"-"`
+	Params   map[string]string                                                 `json:"params"`
+	Password string                                                            `json:"-"`
+	Dial     func(ctx context.Context, network, addr string) (net.Conn, error) `json:"-"`
 }
 
 // Column describes a single result-set column.

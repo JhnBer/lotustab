@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"lotustab/internal/core/driver"
 	"lotustab/internal/secrets"
 	"lotustab/internal/storage"
+	"lotustab/internal/tunnel"
 )
 
 const connectionsChangedEvent = "connections:changed"
@@ -94,7 +96,7 @@ func (s *ConnectionsService) List() (ConnectionsState, error) {
 
 // Save creates or updates a profile. An empty password leaves the keychain value unchanged.
 func (s *ConnectionsService) Save(input SaveProfileInput) (connection.Profile, error) {
-	d, profile, password, err := s.prepare(input, true)
+	d, profile, secretVals, err := s.prepare(input, true)
 	if err != nil {
 		return connection.Profile{}, err
 	}
@@ -140,8 +142,10 @@ func (s *ConnectionsService) Save(input SaveProfileInput) (connection.Profile, e
 	if err := s.store.Upsert(profile); err != nil {
 		return connection.Profile{}, err
 	}
-	if err := s.secrets.Set(profile.ID, password); err != nil {
-		return connection.Profile{}, err
+	for _, kind := range secrets.Kinds {
+		if err := s.secrets.Set(profile.ID, kind, secretVals[kind]); err != nil {
+			return connection.Profile{}, err
+		}
 	}
 	s.notifyChanged()
 	return profile, nil
@@ -242,17 +246,15 @@ func (s *ConnectionsService) ensureOpen(ctx context.Context, id string) (driver.
 }
 
 func (s *ConnectionsService) openFromInput(ctx context.Context, input SaveProfileInput) (driver.Conn, error) {
-	d, profile, password, err := s.prepare(input, false)
+	d, profile, secretVals, err := s.prepare(input, false)
 	if err != nil {
 		return nil, err
 	}
-	if password == "" && profile.ID != "" {
-		password, err = s.secrets.Get(profile.ID)
-		if err != nil {
-			return nil, err
-		}
+	secretVals, err = s.fillSecrets(profile.ID, secretVals)
+	if err != nil {
+		return nil, err
 	}
-	return d.Open(ctx, driver.ConnConfig{Params: profile.Params, Password: password})
+	return s.open(ctx, d, profile, secretVals)
 }
 
 func (s *ConnectionsService) openSaved(ctx context.Context, id string) (driver.Conn, error) {
@@ -264,32 +266,95 @@ func (s *ConnectionsService) openSaved(ctx context.Context, id string) (driver.C
 	if err != nil {
 		return nil, err
 	}
-	password, err := s.secrets.Get(id)
+	secretVals, err := s.fillSecrets(id, nil)
 	if err != nil {
 		return nil, err
 	}
-	return d.Open(ctx, driver.ConnConfig{Params: profile.Params, Password: password})
+	return s.open(ctx, d, profile, secretVals)
 }
 
-func (s *ConnectionsService) prepare(input SaveProfileInput, requireName bool) (driver.Driver, connection.Profile, string, error) {
+func (s *ConnectionsService) fillSecrets(profileID string, got map[string]string) (map[string]string, error) {
+	if got == nil {
+		got = map[string]string{}
+	}
+	if profileID == "" {
+		return got, nil
+	}
+	for _, kind := range secrets.Kinds {
+		if strings.TrimSpace(got[kind]) != "" {
+			continue
+		}
+		v, err := s.secrets.Get(profileID, kind)
+		if err != nil {
+			return nil, err
+		}
+		got[kind] = v
+	}
+	return got, nil
+}
+
+func (s *ConnectionsService) open(ctx context.Context, d driver.Driver, profile connection.Profile, secretVals map[string]string) (driver.Conn, error) {
+	cfg := driver.ConnConfig{
+		Params:   profile.Params,
+		Password: secretVals[secrets.KindPassword],
+	}
+	sshCfg, enabled, err := tunnel.ConfigFromParams(profile.Params, secretVals[secrets.KindSSHPassword], secretVals[secrets.KindSSHPassphrase])
+	if err != nil {
+		return nil, err
+	}
+	if !enabled {
+		return d.Open(ctx, cfg)
+	}
+	client, err := tunnel.Open(sshCfg)
+	if err != nil {
+		return nil, err
+	}
+	cfg.Dial = client.Dial
+	conn, err := d.Open(ctx, cfg)
+	if err != nil {
+		_ = client.Close()
+		return nil, err
+	}
+	return &chainedConn{Conn: conn, extra: client}, nil
+}
+
+type chainedConn struct {
+	driver.Conn
+	extra io.Closer
+}
+
+func (c *chainedConn) Close() error {
+	err := c.Conn.Close()
+	if c.extra != nil {
+		if e := c.extra.Close(); err == nil {
+			err = e
+		}
+	}
+	return err
+}
+
+func (s *ConnectionsService) prepare(input SaveProfileInput, requireName bool) (driver.Driver, connection.Profile, map[string]string, error) {
 	name := strings.TrimSpace(input.Name)
 	if requireName && name == "" {
-		return nil, connection.Profile{}, "", fmt.Errorf("name is required")
+		return nil, connection.Profile{}, nil, fmt.Errorf("name is required")
 	}
 	if strings.TrimSpace(input.DriverID) == "" {
-		return nil, connection.Profile{}, "", fmt.Errorf("driver is required")
+		return nil, connection.Profile{}, nil, fmt.Errorf("driver is required")
 	}
 	d, err := s.registry.Get(input.DriverID)
 	if err != nil {
-		return nil, connection.Profile{}, "", err
+		return nil, connection.Profile{}, nil, err
 	}
 
 	params := map[string]string{}
 	for k, v := range input.Params {
 		params[k] = v
 	}
-	password := params["password"]
-	delete(params, "password")
+	secretVals := map[string]string{}
+	for _, kind := range secrets.Kinds {
+		secretVals[kind] = params[kind]
+		delete(params, kind)
+	}
 
 	spec := d.ConnectionSpec()
 	for _, field := range spec {
@@ -301,8 +366,16 @@ func (s *ConnectionsService) prepare(input SaveProfileInput, requireName bool) (
 			params[field.Key] = field.Default
 		}
 		if field.Required && strings.TrimSpace(params[field.Key]) == "" {
-			return nil, connection.Profile{}, "", fmt.Errorf("%s is required", field.Label)
+			return nil, connection.Profile{}, nil, fmt.Errorf("%s is required", field.Label)
 		}
+	}
+
+	sshCfg, sshOn, err := tunnel.ConfigFromParams(params, secretVals[secrets.KindSSHPassword], secretVals[secrets.KindSSHPassphrase])
+	if err != nil {
+		return nil, connection.Profile{}, nil, err
+	}
+	if sshOn && sshCfg.Auth == tunnel.AuthPassword && strings.TrimSpace(input.ID) == "" && strings.TrimSpace(secretVals[secrets.KindSSHPassword]) == "" {
+		return nil, connection.Profile{}, nil, fmt.Errorf("SSH password is required")
 	}
 
 	profile := connection.Profile{
@@ -311,7 +384,7 @@ func (s *ConnectionsService) prepare(input SaveProfileInput, requireName bool) (
 		DriverID: d.ID(),
 		Params:   params,
 	}
-	return d, profile, password, nil
+	return d, profile, secretVals, nil
 }
 
 func resolveColor(color, fallback string) (string, error) {
