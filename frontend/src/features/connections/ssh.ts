@@ -11,6 +11,14 @@ export const SSH_DEFAULTS: Record<string, string> = {
   sshKeyPath: "",
   sshPassword: "",
   sshPassphrase: "",
+  sshJumpEnabled: "false",
+  sshJumpHost: "",
+  sshJumpPort: "22",
+  sshJumpUser: "",
+  sshJumpAuth: SSH_AUTH_KEY,
+  sshJumpKeyPath: "",
+  sshJumpPassword: "",
+  sshJumpPassphrase: "",
 };
 
 export const SSH_PARAM_KEYS = Object.keys(SSH_DEFAULTS);

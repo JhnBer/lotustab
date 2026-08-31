@@ -97,3 +97,113 @@ func TestExpandPathHome(t *testing.T) {
 		t.Fatalf("plain path = %q err=%v", plain, err)
 	}
 }
+
+func TestJumpConfigFromParamsDisabled(t *testing.T) {
+	_, ok, err := JumpConfigFromParams(nil, "", "")
+	if err != nil || ok {
+		t.Fatalf("nil params: ok=%v err=%v", ok, err)
+	}
+	_, ok, err = JumpConfigFromParams(map[string]string{
+		ParamEnabled:     "true",
+		ParamJumpEnabled: "false",
+	}, "", "")
+	if err != nil || ok {
+		t.Fatalf("jump off: ok=%v err=%v", ok, err)
+	}
+	_, ok, err = JumpConfigFromParams(map[string]string{
+		ParamEnabled:     "false",
+		ParamJumpEnabled: "true",
+		ParamJumpHost:    "jump",
+		ParamJumpUser:    "ubuntu",
+		ParamJumpKeyPath: "~/.ssh/id_ed25519",
+	}, "", "")
+	if err != nil || ok {
+		t.Fatalf("ssh off: ok=%v err=%v", ok, err)
+	}
+}
+
+func TestJumpConfigFromParamsRequiresHostUserKey(t *testing.T) {
+	base := map[string]string{
+		ParamEnabled:     "true",
+		ParamJumpEnabled: "true",
+		ParamJumpAuth:    AuthKey,
+	}
+	_, ok, err := JumpConfigFromParams(base, "", "")
+	if !ok || err == nil || !strings.Contains(err.Error(), "hostname") {
+		t.Fatalf("expected hostname error, ok=%v err=%v", ok, err)
+	}
+
+	base[ParamJumpHost] = "jump"
+	_, _, err = JumpConfigFromParams(base, "", "")
+	if err == nil || !strings.Contains(err.Error(), "username") {
+		t.Fatalf("expected username error, got %v", err)
+	}
+
+	base[ParamJumpUser] = "ubuntu"
+	_, _, err = JumpConfigFromParams(base, "", "")
+	if err == nil || !strings.Contains(err.Error(), "private key") {
+		t.Fatalf("expected key path error, got %v", err)
+	}
+}
+
+func TestJumpConfigFromParamsDefaults(t *testing.T) {
+	cfg, ok, err := JumpConfigFromParams(map[string]string{
+		ParamEnabled:     "true",
+		ParamJumpEnabled: "true",
+		ParamJumpHost:    "jump",
+		ParamJumpUser:    "ubuntu",
+		ParamJumpKeyPath: "~/.ssh/id_ed25519",
+	}, "pw", "ph")
+	if err != nil || !ok {
+		t.Fatalf("ok=%v err=%v", ok, err)
+	}
+	if cfg.Port != DefaultPort {
+		t.Fatalf("port = %q, want %s", cfg.Port, DefaultPort)
+	}
+	if cfg.Host != "jump" || cfg.Password != "pw" || cfg.Passphrase != "ph" {
+		t.Fatalf("config = %+v", cfg)
+	}
+}
+
+type trackClose struct{ closed bool }
+
+func (t *trackClose) Close() error {
+	t.closed = true
+	return nil
+}
+
+func TestClientCloseClosesVia(t *testing.T) {
+	via := &trackClose{}
+	extra := &trackClose{}
+	c := &Client{extra: extra, via: via}
+	if err := c.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if !via.closed || !extra.closed {
+		t.Fatalf("via=%v extra=%v", via.closed, extra.closed)
+	}
+}
+
+func TestOpenViaClosesHopOnError(t *testing.T) {
+	hopExtra := &trackClose{}
+	hop := &Client{extra: hopExtra}
+	_, err := OpenVia(hop, Config{
+		Host: "db.internal",
+		Port: DefaultPort,
+		User: "ubuntu",
+		Auth: AuthPassword,
+	})
+	if err == nil || !strings.Contains(err.Error(), "password") {
+		t.Fatalf("expected password error, got %v", err)
+	}
+	if !hopExtra.closed {
+		t.Fatal("hop was not closed after OpenVia failure")
+	}
+}
+
+func TestOpenViaNilHop(t *testing.T) {
+	_, err := OpenVia(nil, Config{Host: "x", Port: DefaultPort, User: "u", Auth: AuthPassword, Password: "p"})
+	if err == nil || !strings.Contains(err.Error(), "missing hop") {
+		t.Fatalf("expected missing hop error, got %v", err)
+	}
+}

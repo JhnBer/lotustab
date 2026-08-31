@@ -23,6 +23,13 @@ const (
 	ParamAuth    = "sshAuth"
 	ParamKeyPath = "sshKeyPath"
 
+	ParamJumpEnabled = "sshJumpEnabled"
+	ParamJumpHost    = "sshJumpHost"
+	ParamJumpPort    = "sshJumpPort"
+	ParamJumpUser    = "sshJumpUser"
+	ParamJumpAuth    = "sshJumpAuth"
+	ParamJumpKeyPath = "sshJumpKeyPath"
+
 	AuthKey      = "key"
 	AuthPassword = "password"
 	AuthAgent    = "agent"
@@ -47,39 +54,52 @@ func ConfigFromParams(params map[string]string, sshPassword, sshPassphrase strin
 	if params == nil || params[ParamEnabled] != "true" {
 		return Config{}, false, nil
 	}
-	auth := strings.TrimSpace(params[ParamAuth])
+	return parseConfig(params, ParamHost, ParamPort, ParamUser, ParamAuth, ParamKeyPath, sshPassword, sshPassphrase, "SSH")
+}
+
+// JumpConfigFromParams reads the optional jump-host hop.
+// ok is false when the main tunnel or the jump is disabled.
+func JumpConfigFromParams(params map[string]string, jumpPassword, jumpPassphrase string) (Config, bool, error) {
+	if params == nil || params[ParamEnabled] != "true" || params[ParamJumpEnabled] != "true" {
+		return Config{}, false, nil
+	}
+	return parseConfig(params, ParamJumpHost, ParamJumpPort, ParamJumpUser, ParamJumpAuth, ParamJumpKeyPath, jumpPassword, jumpPassphrase, "SSH jump")
+}
+
+func parseConfig(params map[string]string, hostKey, portKey, userKey, authKey, keyPathKey, password, passphrase, label string) (Config, bool, error) {
+	auth := strings.TrimSpace(params[authKey])
 	if auth == "" {
 		auth = AuthKey
 	}
 	cfg := Config{
-		Host:       strings.TrimSpace(params[ParamHost]),
-		Port:       strings.TrimSpace(params[ParamPort]),
-		User:       strings.TrimSpace(params[ParamUser]),
+		Host:       strings.TrimSpace(params[hostKey]),
+		Port:       strings.TrimSpace(params[portKey]),
+		User:       strings.TrimSpace(params[userKey]),
 		Auth:       auth,
-		KeyPath:    strings.TrimSpace(params[ParamKeyPath]),
-		Passphrase: sshPassphrase,
-		Password:   sshPassword,
+		KeyPath:    strings.TrimSpace(params[keyPathKey]),
+		Passphrase: passphrase,
+		Password:   password,
 	}
 	if cfg.Port == "" {
 		cfg.Port = DefaultPort
 	}
 	if cfg.Host == "" {
-		return Config{}, true, fmt.Errorf("SSH hostname is required")
+		return Config{}, true, fmt.Errorf("%s hostname is required", label)
 	}
 	if _, err := strconv.ParseUint(cfg.Port, 10, 16); err != nil {
-		return Config{}, true, fmt.Errorf("invalid SSH port")
+		return Config{}, true, fmt.Errorf("invalid %s port", label)
 	}
 	if cfg.User == "" {
-		return Config{}, true, fmt.Errorf("SSH username is required")
+		return Config{}, true, fmt.Errorf("%s username is required", label)
 	}
 	switch cfg.Auth {
 	case AuthKey:
 		if cfg.KeyPath == "" {
-			return Config{}, true, fmt.Errorf("SSH private key file is required")
+			return Config{}, true, fmt.Errorf("%s private key file is required", label)
 		}
 	case AuthPassword, AuthAgent:
 	default:
-		return Config{}, true, fmt.Errorf("unknown SSH auth method")
+		return Config{}, true, fmt.Errorf("unknown %s auth method", label)
 	}
 	return cfg, true, nil
 }
@@ -88,6 +108,7 @@ func ConfigFromParams(params map[string]string, sshPassword, sshPassphrase strin
 type Client struct {
 	ssh   *ssh.Client
 	extra io.Closer
+	via   io.Closer
 }
 
 // Open dials the SSH server. The caller must Close the client.
@@ -96,13 +117,7 @@ func Open(cfg Config) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	sshCfg := &ssh.ClientConfig{
-		User: cfg.User,
-		Auth: auth,
-		// TODO(hostkey): v1 skips SSH host-key verification. Add known_hosts / TOFU.
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		Timeout:         15 * time.Second,
-	}
+	sshCfg := clientConfig(cfg.User, auth)
 	conn, err := ssh.Dial("tcp", net.JoinHostPort(cfg.Host, cfg.Port), sshCfg)
 	if err != nil {
 		if extra != nil {
@@ -113,8 +128,63 @@ func Open(cfg Config) (*Client, error) {
 	return &Client{ssh: conn, extra: extra}, nil
 }
 
+// OpenVia dials cfg through an already-open hop. It takes ownership of hop:
+// on success hop is closed by Client.Close; on failure hop is closed immediately.
+func OpenVia(hop *Client, cfg Config) (*Client, error) {
+	if hop == nil {
+		return nil, fmt.Errorf("ssh jump: missing hop")
+	}
+	auth, extra, err := authMethods(cfg)
+	if err != nil {
+		_ = hop.Close()
+		return nil, err
+	}
+	if hop.ssh == nil {
+		if extra != nil {
+			_ = extra.Close()
+		}
+		_ = hop.Close()
+		return nil, fmt.Errorf("ssh jump: missing hop")
+	}
+	sshCfg := clientConfig(cfg.User, auth)
+	addr := net.JoinHostPort(cfg.Host, cfg.Port)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	netConn, err := hop.ssh.DialContext(ctx, "tcp", addr)
+	if err != nil {
+		if extra != nil {
+			_ = extra.Close()
+		}
+		_ = hop.Close()
+		return nil, fmt.Errorf("ssh jump: %w", err)
+	}
+	sshConn, chans, reqs, err := ssh.NewClientConn(netConn, addr, sshCfg)
+	if err != nil {
+		_ = netConn.Close()
+		if extra != nil {
+			_ = extra.Close()
+		}
+		_ = hop.Close()
+		return nil, fmt.Errorf("ssh: %w", err)
+	}
+	return &Client{ssh: ssh.NewClient(sshConn, chans, reqs), extra: extra, via: hop}, nil
+}
+
+func clientConfig(user string, auth []ssh.AuthMethod) *ssh.ClientConfig {
+	return &ssh.ClientConfig{
+		User: user,
+		Auth: auth,
+		// TODO(hostkey): v1 skips SSH host-key verification. Add known_hosts / TOFU.
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Timeout:         15 * time.Second,
+	}
+}
+
 // Dial opens a connection to addr through the SSH server.
 func (c *Client) Dial(ctx context.Context, network, addr string) (net.Conn, error) {
+	if c == nil || c.ssh == nil {
+		return nil, fmt.Errorf("ssh: client is closed")
+	}
 	conn, err := c.ssh.DialContext(ctx, network, addr)
 	if err != nil {
 		return nil, err
@@ -130,11 +200,22 @@ func (noDeadlineConn) SetDeadline(time.Time) error      { return nil }
 func (noDeadlineConn) SetReadDeadline(time.Time) error  { return nil }
 func (noDeadlineConn) SetWriteDeadline(time.Time) error { return nil }
 
-// Close ends the SSH session.
+// Close ends the SSH session, then any parent jump hop.
 func (c *Client) Close() error {
-	err := c.ssh.Close()
+	if c == nil {
+		return nil
+	}
+	var err error
+	if c.ssh != nil {
+		err = c.ssh.Close()
+	}
 	if c.extra != nil {
 		_ = c.extra.Close()
+	}
+	if c.via != nil {
+		if e := c.via.Close(); err == nil {
+			err = e
+		}
 	}
 	return err
 }

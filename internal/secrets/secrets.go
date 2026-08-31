@@ -9,13 +9,15 @@ import (
 const service = "lotustab"
 
 const (
-	KindPassword      = "password"
-	KindSSHPassword   = "sshPassword"
-	KindSSHPassphrase = "sshPassphrase"
+	KindPassword          = "password"
+	KindSSHPassword       = "sshPassword"
+	KindSSHPassphrase     = "sshPassphrase"
+	KindSSHJumpPassword   = "sshJumpPassword"
+	KindSSHJumpPassphrase = "sshJumpPassphrase"
 )
 
 // Kinds is every secret slot stored per profile. Delete removes all of them.
-var Kinds = []string{KindPassword, KindSSHPassword, KindSSHPassphrase}
+var Kinds = []string{KindPassword, KindSSHPassword, KindSSHPassphrase, KindSSHJumpPassword, KindSSHJumpPassphrase}
 
 // Store reads and writes connection secrets in the OS keychain.
 type Store struct{}

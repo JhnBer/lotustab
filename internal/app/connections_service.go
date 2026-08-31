@@ -305,9 +305,25 @@ func (s *ConnectionsService) open(ctx context.Context, d driver.Driver, profile 
 	if !enabled {
 		return d.Open(ctx, cfg)
 	}
-	client, err := tunnel.Open(sshCfg)
+	jumpCfg, jumpOn, err := tunnel.JumpConfigFromParams(profile.Params, secretVals[secrets.KindSSHJumpPassword], secretVals[secrets.KindSSHJumpPassphrase])
 	if err != nil {
 		return nil, err
+	}
+	var client *tunnel.Client
+	if jumpOn {
+		jump, err := tunnel.Open(jumpCfg)
+		if err != nil {
+			return nil, err
+		}
+		client, err = tunnel.OpenVia(jump, sshCfg)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		client, err = tunnel.Open(sshCfg)
+		if err != nil {
+			return nil, err
+		}
 	}
 	cfg.Dial = client.Dial
 	conn, err := d.Open(ctx, cfg)
@@ -376,6 +392,13 @@ func (s *ConnectionsService) prepare(input SaveProfileInput, requireName bool) (
 	}
 	if sshOn && sshCfg.Auth == tunnel.AuthPassword && strings.TrimSpace(input.ID) == "" && strings.TrimSpace(secretVals[secrets.KindSSHPassword]) == "" {
 		return nil, connection.Profile{}, nil, fmt.Errorf("SSH password is required")
+	}
+	jumpCfg, jumpOn, err := tunnel.JumpConfigFromParams(params, secretVals[secrets.KindSSHJumpPassword], secretVals[secrets.KindSSHJumpPassphrase])
+	if err != nil {
+		return nil, connection.Profile{}, nil, err
+	}
+	if jumpOn && jumpCfg.Auth == tunnel.AuthPassword && strings.TrimSpace(input.ID) == "" && strings.TrimSpace(secretVals[secrets.KindSSHJumpPassword]) == "" {
+		return nil, connection.Profile{}, nil, fmt.Errorf("SSH jump password is required")
 	}
 
 	profile := connection.Profile{

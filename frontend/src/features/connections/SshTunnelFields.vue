@@ -1,16 +1,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { SSH_AUTH_AGENT, SSH_AUTH_KEY, SSH_AUTH_PASSWORD } from "@/features/connections/ssh";
+import SshHopFields from "@/features/connections/SshHopFields.vue";
 
 const props = defineProps<{
   params: Record<string, string>;
@@ -24,11 +16,12 @@ const enabled = computed({
   },
 });
 
-const auth = computed(() => props.params.sshAuth || SSH_AUTH_KEY);
-
-function onAuth(value: unknown) {
-  props.params.sshAuth = String(value ?? SSH_AUTH_KEY);
-}
+const jumpEnabled = computed({
+  get: () => props.params.sshJumpEnabled === "true",
+  set: (value: boolean) => {
+    props.params.sshJumpEnabled = value ? "true" : "false";
+  },
+});
 </script>
 
 <template>
@@ -39,95 +32,24 @@ function onAuth(value: unknown) {
     </div>
 
     <template v-if="enabled">
-      <div class="grid grid-cols-2 gap-2">
-        <div class="grid min-w-0 gap-1.5">
-          <Label for="ssh-host">Hostname</Label>
-          <Input
-            id="ssh-host"
-            v-model="params.sshHost"
-            placeholder="bastion.example.com"
-            required
-            autocomplete="off"
-          />
-        </div>
-        <div class="grid min-w-0 gap-1.5">
-          <Label for="ssh-port">Port</Label>
-          <Input
-            id="ssh-port"
-            v-model="params.sshPort"
-            type="number"
-            placeholder="22"
-            required
-            autocomplete="off"
-          />
-        </div>
+      <div class="flex items-center justify-between gap-4">
+        <Label for="ssh-jump-enabled">Jump host</Label>
+        <Switch
+          id="ssh-jump-enabled"
+          :model-value="jumpEnabled"
+          @update:model-value="jumpEnabled = Boolean($event)"
+        />
       </div>
 
-      <div class="grid min-w-0 gap-1.5">
-        <Label for="ssh-auth">SSH auth method</Label>
-        <Select :model-value="auth" @update:model-value="onAuth">
-          <SelectTrigger id="ssh-auth" class="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem :value="SSH_AUTH_KEY">Key file</SelectItem>
-            <SelectItem :value="SSH_AUTH_PASSWORD">Username & password</SelectItem>
-            <SelectItem :value="SSH_AUTH_AGENT">SSH agent</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <SshHopFields
+        v-if="jumpEnabled"
+        :params="params"
+        :is-edit="isEdit"
+        prefix="sshJump"
+        host-placeholder="jump.example.com"
+      />
 
-      <template v-if="auth === SSH_AUTH_KEY">
-        <div class="grid min-w-0 gap-1.5">
-          <Label for="ssh-user">SSH username</Label>
-          <Input id="ssh-user" v-model="params.sshUser" placeholder="ubuntu" required autocomplete="off" />
-        </div>
-        <div class="grid grid-cols-2 gap-2">
-          <div class="grid min-w-0 gap-1.5">
-            <Label for="ssh-key">Private key file</Label>
-            <Input
-              id="ssh-key"
-              v-model="params.sshKeyPath"
-              placeholder="~/.ssh/id_ed25519"
-              required
-              autocomplete="off"
-            />
-          </div>
-          <div class="grid min-w-0 gap-1.5">
-            <Label for="ssh-passphrase">Passphrase</Label>
-            <Input
-              id="ssh-passphrase"
-              v-model="params.sshPassphrase"
-              type="password"
-              placeholder="optional"
-              autocomplete="off"
-            />
-          </div>
-        </div>
-      </template>
-
-      <div v-else-if="auth === SSH_AUTH_PASSWORD" class="grid grid-cols-2 gap-2">
-        <div class="grid min-w-0 gap-1.5">
-          <Label for="ssh-user">SSH username</Label>
-          <Input id="ssh-user" v-model="params.sshUser" placeholder="ubuntu" required autocomplete="off" />
-        </div>
-        <div class="grid min-w-0 gap-1.5">
-          <Label for="ssh-password">Password</Label>
-          <Input
-            id="ssh-password"
-            v-model="params.sshPassword"
-            type="password"
-            :placeholder="isEdit ? 'stored in keychain' : ''"
-            :required="!isEdit"
-            autocomplete="off"
-          />
-        </div>
-      </div>
-
-      <div v-else class="grid min-w-0 gap-1.5">
-        <Label for="ssh-user">SSH username</Label>
-        <Input id="ssh-user" v-model="params.sshUser" placeholder="ubuntu" required autocomplete="off" />
-      </div>
+      <SshHopFields :params="params" :is-edit="isEdit" prefix="ssh" host-placeholder="db.internal" />
     </template>
   </div>
 </template>

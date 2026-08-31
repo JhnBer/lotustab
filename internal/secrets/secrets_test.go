@@ -15,4 +15,10 @@ func TestAccountKeepsPasswordCompatible(t *testing.T) {
 	if got := account("abc", KindSSHPassphrase); got != "abc:sshPassphrase" {
 		t.Fatalf("ssh passphrase account = %q", got)
 	}
+	if got := account("abc", KindSSHJumpPassword); got != "abc:sshJumpPassword" {
+		t.Fatalf("jump password account = %q", got)
+	}
+	if got := account("abc", KindSSHJumpPassphrase); got != "abc:sshJumpPassphrase" {
+		t.Fatalf("jump passphrase account = %q", got)
+	}
 }

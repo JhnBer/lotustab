@@ -25,18 +25,25 @@ func TestPrepareStripsSecrets(t *testing.T) {
 		Name:     "prod",
 		DriverID: "postgres",
 		Params: map[string]string{
-			"host":          "db.internal",
-			"port":          "5432",
-			"user":          "app",
-			"password":      "db-secret",
-			"sshEnabled":    "true",
-			"sshHost":       "bastion",
-			"sshPort":       "22",
-			"sshUser":       "ubuntu",
-			"sshAuth":       tunnel.AuthKey,
-			"sshKeyPath":    "~/.ssh/id_ed25519",
-			"sshPassword":   "ssh-secret",
-			"sshPassphrase": "key-ph",
+			"host":              "db.internal",
+			"port":              "5432",
+			"user":              "app",
+			"password":          "db-secret",
+			"sshEnabled":        "true",
+			"sshHost":           "bastion",
+			"sshPort":           "22",
+			"sshUser":           "ubuntu",
+			"sshAuth":           tunnel.AuthKey,
+			"sshKeyPath":        "~/.ssh/id_ed25519",
+			"sshPassword":       "ssh-secret",
+			"sshPassphrase":     "key-ph",
+			"sshJumpEnabled":    "true",
+			"sshJumpHost":       "jump",
+			"sshJumpPort":       "22",
+			"sshJumpUser":       "jumpuser",
+			"sshJumpAuth":       tunnel.AuthPassword,
+			"sshJumpPassword":   "jump-secret",
+			"sshJumpPassphrase": "jump-ph",
 		},
 	}, true)
 	if err != nil {
@@ -56,8 +63,17 @@ func TestPrepareStripsSecrets(t *testing.T) {
 	if secretVals[secrets.KindSSHPassphrase] != "key-ph" {
 		t.Fatalf("passphrase = %q", secretVals[secrets.KindSSHPassphrase])
 	}
+	if secretVals[secrets.KindSSHJumpPassword] != "jump-secret" {
+		t.Fatalf("jump password = %q", secretVals[secrets.KindSSHJumpPassword])
+	}
+	if secretVals[secrets.KindSSHJumpPassphrase] != "jump-ph" {
+		t.Fatalf("jump passphrase = %q", secretVals[secrets.KindSSHJumpPassphrase])
+	}
 	if profile.Params[tunnel.ParamHost] != "bastion" {
 		t.Fatalf("ssh host not persisted: %v", profile.Params)
+	}
+	if profile.Params[tunnel.ParamJumpHost] != "jump" {
+		t.Fatalf("jump host not persisted: %v", profile.Params)
 	}
 }
 
@@ -95,6 +111,57 @@ func TestPrepareAllowsEmptySSHPasswordOnEdit(t *testing.T) {
 			"sshHost":    "bastion",
 			"sshUser":    "ubuntu",
 			"sshAuth":    tunnel.AuthPassword,
+		},
+	}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPrepareRequiresJumpPasswordOnCreate(t *testing.T) {
+	s := testConnectionsService(t)
+	_, _, _, err := s.prepare(SaveProfileInput{
+		Name:     "prod",
+		DriverID: "postgres",
+		Params: map[string]string{
+			"host":           "db.internal",
+			"port":           "5432",
+			"user":           "app",
+			"sshEnabled":     "true",
+			"sshHost":        "db.internal",
+			"sshUser":        "ubuntu",
+			"sshAuth":        tunnel.AuthKey,
+			"sshKeyPath":     "~/.ssh/id_ed25519",
+			"sshJumpEnabled": "true",
+			"sshJumpHost":    "jump",
+			"sshJumpUser":    "jumpuser",
+			"sshJumpAuth":    tunnel.AuthPassword,
+		},
+	}, true)
+	if err == nil || !strings.Contains(err.Error(), "SSH jump password") {
+		t.Fatalf("expected SSH jump password error, got %v", err)
+	}
+}
+
+func TestPrepareAllowsEmptyJumpPasswordOnEdit(t *testing.T) {
+	s := testConnectionsService(t)
+	_, _, _, err := s.prepare(SaveProfileInput{
+		ID:       "existing-id",
+		Name:     "prod",
+		DriverID: "postgres",
+		Params: map[string]string{
+			"host":           "db.internal",
+			"port":           "5432",
+			"user":           "app",
+			"sshEnabled":     "true",
+			"sshHost":        "db.internal",
+			"sshUser":        "ubuntu",
+			"sshAuth":        tunnel.AuthKey,
+			"sshKeyPath":     "~/.ssh/id_ed25519",
+			"sshJumpEnabled": "true",
+			"sshJumpHost":    "jump",
+			"sshJumpUser":    "jumpuser",
+			"sshJumpAuth":    tunnel.AuthPassword,
 		},
 	}, true)
 	if err != nil {
