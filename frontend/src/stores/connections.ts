@@ -92,6 +92,18 @@ export const useConnectionsStore = defineStore("connections", () => {
     }
   }
 
+  function setConnectedIds(next: string[] | null | undefined) {
+    const ids = next ?? [];
+    const prev = connectedIds.value;
+    connectedIds.value = ids;
+    const still = new Set(ids);
+    for (const id of prev) {
+      if (!still.has(id)) {
+        useQueryStore().dropTableData(id);
+      }
+    }
+  }
+
   async function refresh() {
     loading.value = true;
     error.value = "";
@@ -103,7 +115,7 @@ export const useConnectionsStore = defineStore("connections", () => {
       ]);
       applyState(state);
       drivers.value = nextDrivers ?? [];
-      connectedIds.value = nextConnected ?? [];
+      setConnectedIds(nextConnected);
     } catch (err) {
       error.value = errorMessage(err);
       throw err;
@@ -113,7 +125,7 @@ export const useConnectionsStore = defineStore("connections", () => {
   }
 
   async function refreshConnected() {
-    connectedIds.value = (await ConnectionsService.ConnectedIDs()) ?? [];
+    setConnectedIds(await ConnectionsService.ConnectedIDs());
   }
 
   async function refreshNav() {
@@ -127,7 +139,7 @@ export const useConnectionsStore = defineStore("connections", () => {
         ConnectionsService.ConnectedIDs(),
       ]);
       applyState(state);
-      connectedIds.value = nextConnected ?? [];
+      setConnectedIds(nextConnected);
     } catch {
       // Keep the current window usable if a sync tick fails.
     }
@@ -170,6 +182,9 @@ export const useConnectionsStore = defineStore("connections", () => {
   }
 
   async function connect(id: string) {
+    if (connectedIds.value.includes(id)) {
+      return;
+    }
     const pending = pendingConnect.get(id);
     if (pending) {
       return pending;

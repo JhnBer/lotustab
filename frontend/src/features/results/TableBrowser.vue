@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, watch } from "vue";
 import { ChevronDown, ChevronRight, Filter, Plus } from "@lucide/vue";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
@@ -17,29 +17,16 @@ const props = defineProps<{
 
 const connections = useConnectionsStore();
 const queries = useQueryStore();
-const opening = ref(false);
-const connected = computed(() => connections.connectedIds.includes(props.tab.profileId));
-const loading = computed(() => opening.value || props.tab.running);
+const connected = computed(() => connections.isConnected(props.tab.profileId));
+const loading = computed(() => props.tab.running || connections.isConnecting(props.tab.profileId));
 
 watch(
-  [() => props.tab.id, connected],
-  async () => {
-    if (opening.value || props.tab.result || props.tab.running) {
+  connected,
+  (isConnected) => {
+    if (!isConnected || props.tab.result || props.tab.running) {
       return;
     }
-    opening.value = true;
-    try {
-      if (!connections.isConnected(props.tab.profileId)) {
-        await connections.connect(props.tab.profileId);
-      }
-      if (!props.tab.result) {
-        await queries.loadTable(props.tab.id);
-      }
-    } catch (err) {
-      toast.error(errorMessage(err));
-    } finally {
-      opening.value = false;
-    }
+    void queries.loadTable(props.tab.id);
   },
   { immediate: true },
 );
@@ -125,7 +112,7 @@ async function onApply() {
       :editable="(tab.primaryKey?.length ?? 0) > 0"
       :edits="tab.edits ?? []"
       :primary-key="tab.primaryKey ?? []"
-      empty-hint="Loading table…"
+      :empty-hint="connected ? 'Loading table…' : 'Connect to view this table.'"
       @sort="queries.cycleSort(tab.id, $event)"
       @edit="onEdit"
     />

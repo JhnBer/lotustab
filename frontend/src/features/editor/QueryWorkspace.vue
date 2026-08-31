@@ -36,12 +36,7 @@ const visibleTabs = computed(() =>
 
 watch(
   () => connections.selectedId,
-  (id) => {
-    if (queries.activeTab?.profileId === id) {
-      return;
-    }
-    queries.activeTabId = queries.tabs.find((t) => t.profileId === id)?.id ?? "";
-  },
+  (id) => queries.activateProfile(id),
   { immediate: true },
 );
 
@@ -110,7 +105,7 @@ function onDatabase(value: unknown) {
             tab.id === queries.activeTabId ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/60',
             fromIndex === index ? 'opacity-50' : '',
           ]"
-          @click="queries.activeTabId = tab.id"
+          @click="queries.selectTab(tab.id)"
           @dragstart="onDragStart($event, index)"
           @dragover="onDragOver"
           @drop="onDrop(index)"

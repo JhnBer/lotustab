@@ -8,6 +8,7 @@ import {
   type QueryResult,
   type TableBrowseResult,
 } from "@/lib/wails";
+import { useConnectionsStore } from "@/stores/connections";
 import { useSettingsStore } from "@/stores/settings";
 import { useExplorerStore } from "@/stores/explorer";
 import {
@@ -89,7 +90,11 @@ type PersistedTableTab = Pick<
   | "filters"
 >;
 type PersistedTab = PersistedQueryTab | PersistedTableTab;
-type PersistedWorkspace = { tabs: PersistedTab[]; activeTabId: string };
+type PersistedWorkspace = {
+  tabs: PersistedTab[];
+  activeTabId: string;
+  activeByProfile: Record<string, string>;
+};
 
 function storedPageSize(): number {
   return useSettingsStore().defaultPageSize;
@@ -245,9 +250,34 @@ function isPersistedTableTab(tab: unknown): tab is PersistedTableTab {
   );
 }
 
+function parseActiveByProfile(
+  raw: unknown,
+  tabs: WorkspaceTab[],
+  activeTabId: string,
+): Record<string, string> {
+  const byId = new Map(tabs.map((tab) => [tab.id, tab]));
+  const out: Record<string, string> = {};
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    for (const [profileId, tabId] of Object.entries(raw as Record<string, unknown>)) {
+      if (typeof tabId !== "string" || !profileId) {
+        continue;
+      }
+      const tab = byId.get(tabId);
+      if (tab && tab.profileId === profileId) {
+        out[profileId] = tabId;
+      }
+    }
+  }
+  const active = byId.get(activeTabId);
+  if (active && !out[active.profileId]) {
+    out[active.profileId] = active.id;
+  }
+  return out;
+}
+
 function parseWorkspace(raw: unknown): PersistedWorkspace {
   if (!raw || typeof raw !== "object") {
-    return { tabs: [], activeTabId: "" };
+    return { tabs: [], activeTabId: "", activeByProfile: {} };
   }
   const row = raw as PersistedWorkspace;
   const tabs = Array.isArray(row.tabs)
@@ -256,6 +286,7 @@ function parseWorkspace(raw: unknown): PersistedWorkspace {
   return {
     tabs,
     activeTabId: typeof row.activeTabId === "string" ? row.activeTabId : "",
+    activeByProfile: row.activeByProfile && typeof row.activeByProfile === "object" ? row.activeByProfile : {},
   };
 }
 
@@ -271,19 +302,64 @@ export const useQueryStore = defineStore("query", () => {
       ? stored.activeTabId
       : (tabs.value[0]?.id ?? ""),
   );
+  const activeByProfile = ref<Record<string, string>>(
+    parseActiveByProfile(stored.activeByProfile, tabs.value, activeTabId.value),
+  );
 
   watchDebounced(
-    () => ({ tabs: tabs.value.map(persistTab), activeTabId: activeTabId.value }),
+    () => ({
+      tabs: tabs.value.map(persistTab),
+      activeTabId: activeTabId.value,
+      activeByProfile: activeByProfile.value,
+    }),
     (value) => writeJson(WORKSPACE_KEY, value),
     { debounce: 300, deep: true },
   );
 
   const activeTab = computed(() => tabs.value.find((t) => t.id === activeTabId.value));
 
+  function selectTab(id: string) {
+    if (!id) {
+      activeTabId.value = "";
+      return;
+    }
+    const tab = tabs.value.find((t) => t.id === id);
+    if (!tab) {
+      activeTabId.value = "";
+      return;
+    }
+    activeTabId.value = id;
+    if (activeByProfile.value[tab.profileId] === id) {
+      return;
+    }
+    activeByProfile.value = { ...activeByProfile.value, [tab.profileId]: id };
+  }
+
+  function activateProfile(profileId: string) {
+    if (!profileId) {
+      activeTabId.value = "";
+      return;
+    }
+    const remembered = activeByProfile.value[profileId];
+    const stillThere =
+      Boolean(remembered) &&
+      tabs.value.some((t) => t.id === remembered && t.profileId === profileId);
+    selectTab(stillThere ? remembered! : (tabs.value.find((t) => t.profileId === profileId)?.id ?? ""));
+  }
+
+  function forgetProfile(profileId: string) {
+    if (!(profileId in activeByProfile.value)) {
+      return;
+    }
+    const next = { ...activeByProfile.value };
+    delete next[profileId];
+    activeByProfile.value = next;
+  }
+
   function openForProfile(profileId: string, name: string) {
     const existing = tabs.value.find((t) => t.kind === "query" && t.profileId === profileId);
     if (existing) {
-      activeTabId.value = existing.id;
+      selectTab(existing.id);
       return existing;
     }
     return add(profileId, name);
@@ -293,7 +369,7 @@ export const useQueryStore = defineStore("query", () => {
     const count = tabs.value.filter((t) => t.kind === "query" && t.profileId === profileId).length;
     const tab = newQueryTab(profileId, count === 0 ? name : `${name} ${count + 1}`);
     tabs.value.push(tab);
-    activeTabId.value = tab.id;
+    selectTab(tab.id);
     return tab;
   }
 
@@ -312,7 +388,7 @@ export const useQueryStore = defineStore("query", () => {
         t.name === opts.name,
     );
     if (existing) {
-      activeTabId.value = existing.id;
+      selectTab(existing.id);
       void loadTable(existing.id);
       return existing;
     }
@@ -339,7 +415,7 @@ export const useQueryStore = defineStore("query", () => {
       filters: [],
     };
     tabs.value.push(tab);
-    activeTabId.value = tab.id;
+    selectTab(tab.id);
     void loadTable(tab.id);
     return tab;
   }
@@ -352,16 +428,22 @@ export const useQueryStore = defineStore("query", () => {
     const profileId = tabs.value[index]!.profileId;
     const groupIndex = tabs.value.filter((t) => t.profileId === profileId).findIndex((t) => t.id === id);
     tabs.value.splice(index, 1);
-    if (activeTabId.value === id) {
-      const group = tabs.value.filter((t) => t.profileId === profileId);
-      const next = group[groupIndex] ?? group[groupIndex - 1];
-      activeTabId.value = next?.id ?? "";
+    if (activeTabId.value !== id) {
+      return;
     }
+    const group = tabs.value.filter((t) => t.profileId === profileId);
+    const next = group[groupIndex] ?? group[groupIndex - 1];
+    if (next) {
+      selectTab(next.id);
+      return;
+    }
+    activeTabId.value = "";
+    forgetProfile(profileId);
   }
 
   function snapshotForProfile(profileId: string): WorkspaceSnapshot {
     const group = tabs.value.filter((t) => t.profileId === profileId);
-    const activeInGroup = group.some((t) => t.id === activeTabId.value);
+    const remembered = activeByProfile.value[profileId];
     return {
       tabs: group.map((t) => {
         if (t.kind === "table") {
@@ -369,7 +451,7 @@ export const useQueryStore = defineStore("query", () => {
         }
         return { ...t, running: false };
       }),
-      activeTabId: activeInGroup ? activeTabId.value : (group[0]?.id ?? ""),
+      activeTabId: group.some((t) => t.id === remembered) ? remembered : (group[0]?.id ?? ""),
     };
   }
 
@@ -377,8 +459,9 @@ export const useQueryStore = defineStore("query", () => {
     const removingActive =
       tabs.value.find((t) => t.id === activeTabId.value)?.profileId === profileId;
     tabs.value = tabs.value.filter((t) => t.profileId !== profileId);
+    forgetProfile(profileId);
     if (removingActive) {
-      activeTabId.value = tabs.value[0]?.id ?? "";
+      selectTab(tabs.value[0]?.id ?? "");
     }
   }
 
@@ -421,11 +504,11 @@ export const useQueryStore = defineStore("query", () => {
         }
       }
     }
-    if (snapshot.activeTabId && tabs.value.some((t) => t.id === snapshot.activeTabId)) {
-      activeTabId.value = snapshot.activeTabId;
-    } else {
-      activeTabId.value = snapshot.tabs[0]!.id;
-    }
+    selectTab(
+      snapshot.activeTabId && tabs.value.some((t) => t.id === snapshot.activeTabId)
+        ? snapshot.activeTabId
+        : snapshot.tabs[0]!.id,
+    );
   }
 
   function reorder(profileId: string, fromIndex: number, toIndex: number) {
@@ -456,9 +539,26 @@ export const useQueryStore = defineStore("query", () => {
     }
   }
 
+  function dropTableData(profileId: string) {
+    for (const tab of tabs.value) {
+      if (tab.profileId !== profileId || tab.kind !== "table") {
+        continue;
+      }
+      tab.result = null;
+      tab.total = 0;
+      tab.primaryKey = [];
+      tab.edits = [];
+      tab.error = "";
+      tab.running = false;
+    }
+  }
+
   async function execute(id: string) {
     const tab = tabs.value.find((t) => t.id === id);
     if (!tab || tab.kind !== "query") {
+      return;
+    }
+    if (!useConnectionsStore().isConnected(tab.profileId)) {
       return;
     }
     if (!tab.sql.trim()) {
@@ -501,6 +601,9 @@ export const useQueryStore = defineStore("query", () => {
   async function loadTable(id: string) {
     const tab = tabs.value.find((t) => t.id === id);
     if (!tab || tab.kind !== "table") {
+      return;
+    }
+    if (!useConnectionsStore().isConnected(tab.profileId)) {
       return;
     }
     if (!tab.edits) {
@@ -705,6 +808,8 @@ export const useQueryStore = defineStore("query", () => {
     tabs,
     activeTabId,
     activeTab,
+    selectTab,
+    activateProfile,
     openForProfile,
     add,
     openTable,
@@ -712,6 +817,7 @@ export const useQueryStore = defineStore("query", () => {
     snapshotForProfile,
     removeForProfile,
     restore,
+    dropTableData,
     reorder,
     setSql,
     setDatabase,
