@@ -18,6 +18,7 @@ const props = defineProps<{
   running?: boolean;
   total?: number;
   truncated?: boolean;
+  durationMs?: number;
   dirty?: boolean;
 }>();
 
@@ -83,6 +84,7 @@ function onPageSize(value: unknown) {
   <div class="flex shrink-0 items-center justify-end gap-2 border-t px-3 py-2">
     <span class="text-muted-foreground mr-auto min-w-0 truncate text-xs">
       {{ rangeLabel }}
+      <template v-if="durationMs != null"> · {{ durationMs }} ms</template>
     </span>
     <div v-if="dirty" class="flex items-center gap-1">
       <Button size="xs" :disabled="running" @click="emit('apply')">Apply</Button>

@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { FileCode2, Play, Plus, Table2, X } from "@lucide/vue";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Select,
   SelectContent,
@@ -162,8 +163,18 @@ function onDatabase(value: unknown) {
             <span class="text-muted-foreground min-w-0 flex-1 truncate">
               You can choose a database here or specify it in the query.
             </span>
+            <Button
+              v-if="queries.activeTab.running"
+              size="sm"
+              variant="outline"
+              class="shrink-0"
+              @click="queries.cancel(queries.activeTab.id)"
+            >
+              Cancel
+            </Button>
             <Button size="sm" class="shrink-0" :disabled="queries.activeTab.running" @click="run">
-              <Play class="size-3.5" />
+              <Spinner v-if="queries.activeTab.running" class="size-3.5" />
+              <Play v-else class="size-3.5" />
               Run
             </Button>
           </div>
@@ -193,6 +204,7 @@ function onDatabase(value: unknown) {
             :row-count="queries.activeTab.result?.rows?.length ?? 0"
             :running="queries.activeTab.running"
             :truncated="queries.activeTab.result?.truncated"
+            :duration-ms="queries.activeTab.result?.durationMs"
             @page="queries.setPage(queries.activeTab!.id, $event)"
             @page-size="queries.setPageSize(queries.activeTab!.id, $event)"
           />

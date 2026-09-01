@@ -44,9 +44,6 @@ func (s *QueryService) Execute(ctx context.Context, profileID, sqlText, database
 		return nil, fmt.Errorf("query is empty")
 	}
 	limit, offset = driver.ClampLimitOffset(limit, offset)
-	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
-	defer cancel()
-
 	database = strings.TrimSpace(database)
 	return withLiveConn(s, ctx, profileID, func(conn driver.Conn) (*driver.QueryResult, error) {
 		return conn.Query(ctx, sqlText, database, limit, offset)
@@ -119,7 +116,7 @@ func withLiveConn[T any](s *QueryService, ctx context.Context, profileID string,
 		return zero, err
 	}
 	out, err := fn(conn)
-	if err == nil || !isStaleConn(err) {
+	if err == nil || ctx.Err() != nil || !isStaleConn(err) {
 		return out, err
 	}
 	conn, err = s.connections.reconnect(ctx, profileID)

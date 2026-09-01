@@ -95,7 +95,6 @@ func mysqlConfig(cfg driver.ConnConfig) (*mysqldriver.Config, error) {
 	}
 	mc.ParseTime = true
 	mc.Timeout = 15 * time.Second
-	mc.ReadTimeout = 60 * time.Second
 	mc.WriteTimeout = 30 * time.Second
 	if cfg.Dial != nil {
 		mc.DialFunc = cfg.Dial

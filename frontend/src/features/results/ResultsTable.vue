@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "@lucide/vue";
+import { Spinner } from "@/components/ui/spinner";
 import type { QueryResult } from "@/lib/wails";
 import {
   ContextMenu,
@@ -347,8 +348,8 @@ async function pasteCell() {
 
 <template>
   <div class="flex h-full min-h-0 flex-col">
-    <div v-if="running && !result" class="text-muted-foreground p-4 text-sm">
-      Running…
+    <div v-if="running && !result" class="text-muted-foreground flex flex-1 items-center justify-center p-4">
+      <Spinner />
     </div>
     <div v-else-if="error" class="text-destructive overflow-auto p-4 font-mono text-sm whitespace-pre-wrap">
       {{ error }}

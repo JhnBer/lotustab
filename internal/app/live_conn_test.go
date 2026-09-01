@@ -109,6 +109,25 @@ func TestEnsureOpenKeepsHealthySession(t *testing.T) {
 	}
 }
 
+func TestExecuteDoesNotRetryAfterCancel(t *testing.T) {
+	d := &stubDriver{}
+	s := stubService(t, d)
+	stale := &stubConn{query: fmt.Errorf("read: unexpected EOF")}
+	s.manager.Put("p1", stale)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	qs := NewQueryServiceFromConnections(s)
+	_, err := qs.Execute(ctx, "p1", "SELECT 1", "", 10, 0)
+	if err == nil {
+		t.Fatal("expected canceled query to fail")
+	}
+	if d.opens != 0 {
+		t.Fatalf("opens = %d, want 0", d.opens)
+	}
+}
+
 func TestExecuteRetriesStaleQuery(t *testing.T) {
 	d := &stubDriver{}
 	s := stubService(t, d)

@@ -420,7 +420,21 @@ export const useQueryStore = defineStore("query", () => {
     return tab;
   }
 
+  const inflight = new Map<string, { cancel: () => void }>();
+
+  function isCanceled(err: unknown): boolean {
+    if (typeof err === "object" && err !== null && "name" in err && (err as { name: string }).name === "CancelError") {
+      return true;
+    }
+    return errorMessage(err).toLowerCase().includes("context canceled");
+  }
+
+  function cancel(id: string) {
+    inflight.get(id)?.cancel();
+  }
+
   function close(id: string) {
+    cancel(id);
     const index = tabs.value.findIndex((t) => t.id === id);
     if (index < 0) {
       return;
@@ -571,21 +585,30 @@ export const useQueryStore = defineStore("query", () => {
     if (!tab.pageSize) {
       tab.pageSize = storedPageSize();
     }
+    cancel(id);
     tab.running = true;
     tab.error = "";
+    const pending = QueryService.Execute(
+      tab.profileId,
+      tab.sql,
+      tab.database ?? "",
+      tab.pageSize,
+      (tab.page - 1) * tab.pageSize,
+    );
+    inflight.set(id, pending);
     try {
-      tab.result = await QueryService.Execute(
-        tab.profileId,
-        tab.sql,
-        tab.database ?? "",
-        tab.pageSize,
-        (tab.page - 1) * tab.pageSize,
-      );
+      tab.result = await pending;
     } catch (err) {
+      if (isCanceled(err)) {
+        return;
+      }
       tab.result = null;
       tab.error = errorMessage(err);
     } finally {
-      tab.running = false;
+      if (inflight.get(id) === pending) {
+        inflight.delete(id);
+        tab.running = false;
+      }
     }
   }
 
@@ -822,6 +845,7 @@ export const useQueryStore = defineStore("query", () => {
     setSql,
     setDatabase,
     run,
+    cancel,
     loadTable,
     setPage,
     setPageSize,
