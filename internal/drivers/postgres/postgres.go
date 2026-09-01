@@ -87,6 +87,9 @@ func openPool(ctx context.Context, cfg driver.ConnConfig) (*pgxpool.Pool, error)
 		return nil, fmt.Errorf("postgres config: %w", err)
 	}
 	poolCfg.MaxConns = 4
+	poolCfg.MaxConnLifetime = 30 * time.Minute
+	poolCfg.MaxConnIdleTime = 4 * time.Minute
+	poolCfg.HealthCheckPeriod = 30 * time.Second
 	if cfg.Dial != nil {
 		poolCfg.ConnConfig.DialFunc = cfg.Dial
 	}

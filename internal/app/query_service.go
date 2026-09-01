@@ -47,11 +47,10 @@ func (s *QueryService) Execute(ctx context.Context, profileID, sqlText, database
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
-	conn, err := s.connections.ensureOpen(ctx, profileID)
-	if err != nil {
-		return nil, err
-	}
-	return conn.Query(ctx, sqlText, strings.TrimSpace(database), limit, offset)
+	database = strings.TrimSpace(database)
+	return withLiveConn(s, ctx, profileID, func(conn driver.Conn) (*driver.QueryResult, error) {
+		return conn.Query(ctx, sqlText, database, limit, offset)
+	})
 }
 
 // ListTables returns tables and views in the given database.
@@ -62,11 +61,9 @@ func (s *QueryService) ListTables(ctx context.Context, profileID, database strin
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
-	conn, err := s.connections.ensureOpen(ctx, profileID)
-	if err != nil {
-		return nil, err
-	}
-	tables, err := conn.ListTables(ctx, strings.TrimSpace(database))
+	tables, err := withLiveConn(s, ctx, profileID, func(conn driver.Conn) ([]driver.TableInfo, error) {
+		return conn.ListTables(ctx, strings.TrimSpace(database))
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -88,11 +85,9 @@ func (s *QueryService) BrowseTable(ctx context.Context, profileID string, req dr
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
-	conn, err := s.connections.ensureOpen(ctx, profileID)
-	if err != nil {
-		return nil, err
-	}
-	return conn.BrowseTable(ctx, req)
+	return withLiveConn(s, ctx, profileID, func(conn driver.Conn) (*driver.TableBrowseResult, error) {
+		return conn.BrowseTable(ctx, req)
+	})
 }
 
 // ApplyEdits writes accumulated cell edits in a single transaction.
@@ -115,4 +110,21 @@ func (s *QueryService) ApplyEdits(ctx context.Context, profileID string, req dri
 		return err
 	}
 	return conn.ApplyEdits(ctx, req)
+}
+
+func withLiveConn[T any](s *QueryService, ctx context.Context, profileID string, fn func(driver.Conn) (T, error)) (T, error) {
+	var zero T
+	conn, err := s.connections.ensureOpen(ctx, profileID)
+	if err != nil {
+		return zero, err
+	}
+	out, err := fn(conn)
+	if err == nil || !isStaleConn(err) {
+		return out, err
+	}
+	conn, err = s.connections.reconnect(ctx, profileID)
+	if err != nil {
+		return zero, err
+	}
+	return fn(conn)
 }

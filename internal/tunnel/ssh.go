@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -35,6 +36,9 @@ const (
 	AuthAgent    = "agent"
 
 	DefaultPort = "22"
+
+	keepAliveInterval = 30 * time.Second
+	dialKeepAlive     = 30 * time.Second
 )
 
 // Config is the SSH hop used to reach a database host.
@@ -106,9 +110,17 @@ func parseConfig(params map[string]string, hostKey, portKey, userKey, authKey, k
 
 // Client is an open SSH session that can dial through to a destination.
 type Client struct {
-	ssh   *ssh.Client
-	extra io.Closer
-	via   io.Closer
+	ssh    *ssh.Client
+	extra  io.Closer
+	via    io.Closer
+	stop   chan struct{}
+	closed sync.Once
+}
+
+func newClient(sshClient *ssh.Client, extra, via io.Closer) *Client {
+	c := &Client{ssh: sshClient, extra: extra, via: via, stop: make(chan struct{})}
+	go c.keepAlive()
+	return c
 }
 
 // Open dials the SSH server. The caller must Close the client.
@@ -118,14 +130,24 @@ func Open(cfg Config) (*Client, error) {
 		return nil, err
 	}
 	sshCfg := clientConfig(cfg.User, auth)
-	conn, err := ssh.Dial("tcp", net.JoinHostPort(cfg.Host, cfg.Port), sshCfg)
+	addr := net.JoinHostPort(cfg.Host, cfg.Port)
+	dialer := net.Dialer{Timeout: sshCfg.Timeout, KeepAlive: dialKeepAlive}
+	netConn, err := dialer.Dial("tcp", addr)
 	if err != nil {
 		if extra != nil {
 			_ = extra.Close()
 		}
 		return nil, fmt.Errorf("ssh: %w", err)
 	}
-	return &Client{ssh: conn, extra: extra}, nil
+	sshConn, chans, reqs, err := ssh.NewClientConn(netConn, addr, sshCfg)
+	if err != nil {
+		_ = netConn.Close()
+		if extra != nil {
+			_ = extra.Close()
+		}
+		return nil, fmt.Errorf("ssh: %w", err)
+	}
+	return newClient(ssh.NewClient(sshConn, chans, reqs), extra, nil), nil
 }
 
 // OpenVia dials cfg through an already-open hop. It takes ownership of hop:
@@ -167,7 +189,7 @@ func OpenVia(hop *Client, cfg Config) (*Client, error) {
 		_ = hop.Close()
 		return nil, fmt.Errorf("ssh: %w", err)
 	}
-	return &Client{ssh: ssh.NewClient(sshConn, chans, reqs), extra: extra, via: hop}, nil
+	return newClient(ssh.NewClient(sshConn, chans, reqs), extra, hop), nil
 }
 
 func clientConfig(user string, auth []ssh.AuthMethod) *ssh.ClientConfig {
@@ -200,23 +222,47 @@ func (noDeadlineConn) SetDeadline(time.Time) error      { return nil }
 func (noDeadlineConn) SetReadDeadline(time.Time) error  { return nil }
 func (noDeadlineConn) SetWriteDeadline(time.Time) error { return nil }
 
+func (c *Client) keepAlive() {
+	if c == nil || c.ssh == nil || c.stop == nil {
+		return
+	}
+	ticker := time.NewTicker(keepAliveInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-c.stop:
+			return
+		case <-ticker.C:
+			_, _, err := c.ssh.SendRequest("keepalive@openssh.com", true, nil)
+			if err != nil {
+				return
+			}
+		}
+	}
+}
+
 // Close ends the SSH session, then any parent jump hop.
 func (c *Client) Close() error {
 	if c == nil {
 		return nil
 	}
 	var err error
-	if c.ssh != nil {
-		err = c.ssh.Close()
-	}
-	if c.extra != nil {
-		_ = c.extra.Close()
-	}
-	if c.via != nil {
-		if e := c.via.Close(); err == nil {
-			err = e
+	c.closed.Do(func() {
+		if c.stop != nil {
+			close(c.stop)
 		}
-	}
+		if c.ssh != nil {
+			err = c.ssh.Close()
+		}
+		if c.extra != nil {
+			_ = c.extra.Close()
+		}
+		if c.via != nil {
+			if e := c.via.Close(); err == nil {
+				err = e
+			}
+		}
+	})
 	return err
 }
 

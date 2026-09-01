@@ -234,15 +234,30 @@ func (s *ConnectionsService) Databases(ctx context.Context, id string) ([]string
 
 func (s *ConnectionsService) ensureOpen(ctx context.Context, id string) (driver.Conn, error) {
 	if conn, ok := s.manager.Get(id); ok {
-		return conn, nil
+		if err := pingConn(ctx, conn); err == nil {
+			return conn, nil
+		}
+		_ = s.manager.Remove(id)
 	}
 	conn, err := s.openSaved(ctx, id)
 	if err != nil {
+		s.notifyChanged()
 		return nil, err
 	}
 	s.manager.Put(id, conn)
 	s.notifyChanged()
 	return conn, nil
+}
+
+func (s *ConnectionsService) reconnect(ctx context.Context, id string) (driver.Conn, error) {
+	_ = s.manager.Remove(id)
+	return s.ensureOpen(ctx, id)
+}
+
+func pingConn(ctx context.Context, conn driver.Conn) error {
+	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	return conn.Ping(pingCtx)
 }
 
 func (s *ConnectionsService) openFromInput(ctx context.Context, input SaveProfileInput) (driver.Conn, error) {
@@ -277,7 +292,7 @@ func (s *ConnectionsService) fillSecrets(profileID string, got map[string]string
 	if got == nil {
 		got = map[string]string{}
 	}
-	if profileID == "" {
+	if profileID == "" || s.secrets == nil {
 		return got, nil
 	}
 	for _, kind := range secrets.Kinds {

@@ -66,6 +66,7 @@ func (d *Driver) Open(ctx context.Context, cfg driver.ConnConfig) (driver.Conn, 
 	db := sql.OpenDB(connector)
 	db.SetMaxOpenConns(4)
 	db.SetConnMaxLifetime(30 * time.Minute)
+	db.SetConnMaxIdleTime(4 * time.Minute)
 
 	connectCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()

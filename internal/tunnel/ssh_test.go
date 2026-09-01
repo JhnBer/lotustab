@@ -182,6 +182,9 @@ func TestClientCloseClosesVia(t *testing.T) {
 	if !via.closed || !extra.closed {
 		t.Fatalf("via=%v extra=%v", via.closed, extra.closed)
 	}
+	if err := c.Close(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestOpenViaClosesHopOnError(t *testing.T) {
