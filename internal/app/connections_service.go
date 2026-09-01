@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"golang.org/x/sync/singleflight"
 
 	"lotustab/internal/core/connection"
 	"lotustab/internal/core/driver"
@@ -41,6 +43,8 @@ type ConnectionsService struct {
 	store    *storage.Store
 	secrets  *secrets.Store
 	manager  *connection.Manager
+	ops      *connection.OpRegistry
+	flight   singleflight.Group
 }
 
 // NewConnectionsService constructs the Wails connections service.
@@ -55,12 +59,22 @@ func NewConnectionsService(
 		store:    store,
 		secrets:  secretsStore,
 		manager:  manager,
+		ops:      connection.NewOpRegistry(),
 	}
 }
 
 func (s *ConnectionsService) ServiceShutdown() error {
+	s.ops.CancelEvery()
 	s.manager.CloseAll()
 	return nil
+}
+
+// Track registers an in-flight operation for a profile so Disconnect can cancel it.
+func (s *ConnectionsService) Track(ctx context.Context, profileID string) (context.Context, func()) {
+	if s == nil {
+		return ctx, func() {}
+	}
+	return s.ops.Track(ctx, profileID)
 }
 
 func (s *ConnectionsService) notifyChanged() {
@@ -153,6 +167,7 @@ func (s *ConnectionsService) Save(input SaveProfileInput) (connection.Profile, e
 
 // Delete removes a profile, its secret, and any open session.
 func (s *ConnectionsService) Delete(id string) error {
+	s.ops.CancelAll(id)
 	if err := s.manager.Remove(id); err != nil {
 		return err
 	}
@@ -184,18 +199,19 @@ func (s *ConnectionsService) FetchDatabases(ctx context.Context, input SaveProfi
 
 // Connect opens (or replaces) a live session for a saved profile.
 func (s *ConnectionsService) Connect(ctx context.Context, id string) error {
-	conn, err := s.openSaved(ctx, id)
-	if err != nil {
+	ctx, done := s.ops.Track(ctx, id)
+	defer done()
+	if _, err := s.ensureOpen(ctx, id); err != nil {
 		return err
 	}
-	s.manager.Put(id, conn)
 	_ = s.store.TouchRecent(id)
 	s.notifyChanged()
 	return nil
 }
 
-// Disconnect closes the live session for a profile.
+// Disconnect cancels in-flight operations and closes the live session.
 func (s *ConnectionsService) Disconnect(id string) error {
+	s.ops.CancelAll(id)
 	return s.afterChange(s.manager.Remove(id))
 }
 
@@ -225,6 +241,8 @@ func (s *ConnectionsService) TouchRecent(id string) error {
 
 // Databases lists databases on the server for a connected (or just-opened) profile.
 func (s *ConnectionsService) Databases(ctx context.Context, id string) ([]string, error) {
+	ctx, done := s.ops.Track(ctx, id)
+	defer done()
 	conn, err := s.ensureOpen(ctx, id)
 	if err != nil {
 		return nil, err
@@ -239,19 +257,46 @@ func (s *ConnectionsService) ensureOpen(ctx context.Context, id string) (driver.
 		}
 		_ = s.manager.Remove(id)
 	}
-	conn, err := s.openSaved(ctx, id)
-	if err != nil {
-		s.notifyChanged()
-		return nil, err
-	}
-	s.manager.Put(id, conn)
-	s.notifyChanged()
-	return conn, nil
+	return s.openOnce(ctx, id)
 }
 
 func (s *ConnectionsService) reconnect(ctx context.Context, id string) (driver.Conn, error) {
 	_ = s.manager.Remove(id)
-	return s.ensureOpen(ctx, id)
+	return s.openOnce(ctx, id)
+}
+
+func (s *ConnectionsService) openOnce(ctx context.Context, id string) (driver.Conn, error) {
+	for {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		v, err, shared := s.flight.Do(id, func() (any, error) {
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
+			if conn, ok := s.manager.Get(id); ok {
+				if err := pingConn(ctx, conn); err == nil {
+					return conn, nil
+				}
+				_ = s.manager.Remove(id)
+			}
+			conn, err := s.openSaved(ctx, id)
+			if err != nil {
+				s.notifyChanged()
+				return nil, err
+			}
+			s.manager.Put(id, conn)
+			s.notifyChanged()
+			return conn, nil
+		})
+		if err == nil {
+			return v.(driver.Conn), nil
+		}
+		if shared && ctx.Err() == nil && errors.Is(err, context.Canceled) {
+			continue
+		}
+		return nil, err
+	}
 }
 
 func pingConn(ctx context.Context, conn driver.Conn) error {
@@ -326,16 +371,16 @@ func (s *ConnectionsService) open(ctx context.Context, d driver.Driver, profile 
 	}
 	var client *tunnel.Client
 	if jumpOn {
-		jump, err := tunnel.Open(jumpCfg)
+		jump, err := tunnel.Open(ctx, jumpCfg)
 		if err != nil {
 			return nil, err
 		}
-		client, err = tunnel.OpenVia(jump, sshCfg)
+		client, err = tunnel.OpenVia(ctx, jump, sshCfg)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		client, err = tunnel.Open(sshCfg)
+		client, err = tunnel.Open(ctx, sshCfg)
 		if err != nil {
 			return nil, err
 		}

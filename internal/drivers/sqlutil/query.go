@@ -18,6 +18,16 @@ type ExecQuerier interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 }
 
+// Querier is *sql.DB or *sql.Conn.
+type Querier interface {
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+}
+
+// RowQuerier is *sql.DB or *sql.Conn.
+type RowQuerier interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
 // Query runs SQL against database/sql and maps the result to QueryResult.
 func Query(ctx context.Context, db ExecQuerier, query string, maxRows int) (*driver.QueryResult, error) {
 	if maxRows <= 0 {
@@ -103,7 +113,7 @@ func scanRows(rows *sql.Rows, maxRows int) (*driver.QueryResult, error) {
 }
 
 // QueryContext runs a parameterized SELECT and maps the result to QueryResult.
-func QueryContext(ctx context.Context, db *sql.DB, maxRows int, query string, args ...any) (*driver.QueryResult, error) {
+func QueryContext(ctx context.Context, db Querier, maxRows int, query string, args ...any) (*driver.QueryResult, error) {
 	if maxRows <= 0 {
 		maxRows = defaultMaxRows
 	}
@@ -123,7 +133,7 @@ func QueryContext(ctx context.Context, db *sql.DB, maxRows int, query string, ar
 }
 
 // Count runs a query expected to return a single integer.
-func Count(ctx context.Context, db *sql.DB, query string, args ...any) (int64, error) {
+func Count(ctx context.Context, db RowQuerier, query string, args ...any) (int64, error) {
 	var n int64
 	if err := db.QueryRowContext(ctx, query, args...).Scan(&n); err != nil {
 		return 0, err
@@ -132,7 +142,7 @@ func Count(ctx context.Context, db *sql.DB, query string, args ...any) (int64, e
 }
 
 // ListStrings runs a single-column query and returns string values.
-func ListStrings(ctx context.Context, db *sql.DB, query string) ([]string, error) {
+func ListStrings(ctx context.Context, db Querier, query string) ([]string, error) {
 	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err

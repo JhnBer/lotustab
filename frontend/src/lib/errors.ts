@@ -1,3 +1,11 @@
+export function isCanceled(err: unknown): boolean {
+  if (typeof err === "object" && err !== null && "name" in err && (err as { name: string }).name === "CancelError") {
+    return true;
+  }
+  const message = errorMessage(err).toLowerCase();
+  return message.includes("context canceled") || message.includes("context cancelled");
+}
+
 export function errorMessage(err: unknown): string {
   if (err == null) {
     return "Unknown error";

@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { watchDebounced } from "@vueuse/core";
-import { errorMessage } from "@/lib/errors";
+import { errorMessage, isCanceled } from "@/lib/errors";
 import { readJson, writeJson } from "@/lib/persist";
 import {
   QueryService,
@@ -422,13 +422,6 @@ export const useQueryStore = defineStore("query", () => {
 
   const inflight = new Map<string, { cancel: () => void }>();
 
-  function isCanceled(err: unknown): boolean {
-    if (typeof err === "object" && err !== null && "name" in err && (err as { name: string }).name === "CancelError") {
-      return true;
-    }
-    return errorMessage(err).toLowerCase().includes("context canceled");
-  }
-
   function cancel(id: string) {
     inflight.get(id)?.cancel();
   }
@@ -598,6 +591,7 @@ export const useQueryStore = defineStore("query", () => {
       tab.database ?? "",
       tab.pageSize,
       (tab.page - 1) * tab.pageSize,
+      useSettingsStore().queryTimeoutSeconds,
     );
     inflight.set(id, pending);
     try {
@@ -639,29 +633,38 @@ export const useQueryStore = defineStore("query", () => {
     if (!tab.filters) {
       tab.filters = [];
     }
+    cancel(id);
     tab.running = true;
     tab.error = "";
+    const pending = QueryService.BrowseTable(tab.profileId, {
+      database: tab.database,
+      schema: tab.schema,
+      name: tab.name,
+      limit: tab.pageSize,
+      offset: (tab.page - 1) * tab.pageSize,
+      orderBy: tab.orderBy,
+      orderDir: tab.orderDir,
+      filters: tab.filtersEnabled ? completeFilters(tab.filters) : [],
+    });
+    inflight.set(id, pending);
     try {
-      const result = await QueryService.BrowseTable(tab.profileId, {
-        database: tab.database,
-        schema: tab.schema,
-        name: tab.name,
-        limit: tab.pageSize,
-        offset: (tab.page - 1) * tab.pageSize,
-        orderBy: tab.orderBy,
-        orderDir: tab.orderDir,
-        filters: tab.filtersEnabled ? completeFilters(tab.filters) : [],
-      });
+      const result = await pending;
       tab.result = asQueryResult(result);
       tab.total = result?.total ?? 0;
       tab.primaryKey = result?.primaryKey ?? [];
     } catch (err) {
+      if (isCanceled(err)) {
+        return;
+      }
       tab.result = null;
       tab.total = 0;
       tab.primaryKey = [];
       tab.error = errorMessage(err);
     } finally {
-      tab.running = false;
+      if (inflight.get(id) === pending) {
+        inflight.delete(id);
+        tab.running = false;
+      }
     }
   }
 

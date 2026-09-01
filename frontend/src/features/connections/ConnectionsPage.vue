@@ -16,7 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import ConnectionDialog from "@/features/connections/ConnectionDialog.vue";
-import { errorMessage } from "@/lib/errors";
+import { errorMessage, isCanceled } from "@/lib/errors";
 import { connBg } from "@/lib/colors";
 import type { Profile } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
@@ -51,15 +51,22 @@ function openQuery(profile: Profile) {
 
 async function connect(profile: Profile) {
   if (connections.isConnecting(profile.id)) {
+    connections.cancelConnect(profile.id);
     return;
   }
   try {
     await connections.connect(profile.id);
+    if (!connections.isConnected(profile.id)) {
+      return;
+    }
     connections.select(profile.id);
     queries.openForProfile(profile.id, profile.name);
     toast.success(`Connected to ${profile.name}`);
     router.push("/query");
   } catch (err) {
+    if (isCanceled(err)) {
+      return;
+    }
     toast.error(errorMessage(err));
   }
 }
@@ -167,14 +174,23 @@ async function remove(profile: Profile) {
                   <span class="sr-only">{{ connections.isPinned(profile.id) ? "Unpin" : "Pin" }}</span>
                 </Button>
                 <Button
-                  v-if="!connections.isConnected(profile.id)"
+                  v-if="connections.isConnecting(profile.id)"
                   size="icon-sm"
                   variant="ghost"
-                  :disabled="connections.isConnecting(profile.id)"
+                  title="Cancel"
+                  @click="connections.cancelConnect(profile.id)"
+                >
+                  <Spinner class="size-3.5" />
+                  <span class="sr-only">Cancel</span>
+                </Button>
+                <Button
+                  v-else-if="!connections.isConnected(profile.id)"
+                  size="icon-sm"
+                  variant="ghost"
+                  title="Connect"
                   @click="connect(profile)"
                 >
-                  <Spinner v-if="connections.isConnecting(profile.id)" class="size-3.5" />
-                  <Plug v-else class="size-3.5" />
+                  <Plug class="size-3.5" />
                   <span class="sr-only">Connect</span>
                 </Button>
                 <Button

@@ -36,7 +36,8 @@ func NewQueryServiceFromConnections(connections *ConnectionsService) *QueryServi
 
 // Execute runs SQL for the given profile. The profile is connected if needed.
 // database is optional; empty uses the connection default catalog.
-func (s *QueryService) Execute(ctx context.Context, profileID, sqlText, database string, limit, offset int) (*driver.QueryResult, error) {
+// timeoutSeconds is 0 to wait until the caller cancels.
+func (s *QueryService) Execute(ctx context.Context, profileID, sqlText, database string, limit, offset, timeoutSeconds int) (*driver.QueryResult, error) {
 	if strings.TrimSpace(profileID) == "" {
 		return nil, fmt.Errorf("profile is required")
 	}
@@ -45,9 +46,21 @@ func (s *QueryService) Execute(ctx context.Context, profileID, sqlText, database
 	}
 	limit, offset = driver.ClampLimitOffset(limit, offset)
 	database = strings.TrimSpace(database)
-	return withLiveConn(s, ctx, profileID, func(conn driver.Conn) (*driver.QueryResult, error) {
+
+	queryCtx := ctx
+	if timeoutSeconds > 0 {
+		var cancel context.CancelFunc
+		queryCtx, cancel = context.WithTimeout(ctx, time.Duration(timeoutSeconds)*time.Second)
+		defer cancel()
+	}
+
+	result, err := withLiveConn(s, queryCtx, profileID, func(ctx context.Context, conn driver.Conn) (*driver.QueryResult, error) {
 		return conn.Query(ctx, sqlText, database, limit, offset)
 	})
+	if err != nil && queryCtx.Err() == context.DeadlineExceeded && ctx.Err() == nil {
+		return nil, fmt.Errorf("query timed out after %d seconds", timeoutSeconds)
+	}
+	return result, err
 }
 
 // ListTables returns tables and views in the given database.
@@ -58,7 +71,7 @@ func (s *QueryService) ListTables(ctx context.Context, profileID, database strin
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
-	tables, err := withLiveConn(s, ctx, profileID, func(conn driver.Conn) ([]driver.TableInfo, error) {
+	tables, err := withLiveConn(s, ctx, profileID, func(ctx context.Context, conn driver.Conn) ([]driver.TableInfo, error) {
 		return conn.ListTables(ctx, strings.TrimSpace(database))
 	})
 	if err != nil {
@@ -82,7 +95,7 @@ func (s *QueryService) BrowseTable(ctx context.Context, profileID string, req dr
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
-	return withLiveConn(s, ctx, profileID, func(conn driver.Conn) (*driver.TableBrowseResult, error) {
+	return withLiveConn(s, ctx, profileID, func(ctx context.Context, conn driver.Conn) (*driver.TableBrowseResult, error) {
 		return conn.BrowseTable(ctx, req)
 	})
 }
@@ -102,20 +115,21 @@ func (s *QueryService) ApplyEdits(ctx context.Context, profileID string, req dri
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
-	conn, err := s.connections.ensureOpen(ctx, profileID)
-	if err != nil {
-		return err
-	}
-	return conn.ApplyEdits(ctx, req)
+	_, err := withLiveConn(s, ctx, profileID, func(ctx context.Context, conn driver.Conn) (struct{}, error) {
+		return struct{}{}, conn.ApplyEdits(ctx, req)
+	})
+	return err
 }
 
-func withLiveConn[T any](s *QueryService, ctx context.Context, profileID string, fn func(driver.Conn) (T, error)) (T, error) {
+func withLiveConn[T any](s *QueryService, ctx context.Context, profileID string, fn func(context.Context, driver.Conn) (T, error)) (T, error) {
 	var zero T
+	ctx, done := s.connections.Track(ctx, profileID)
+	defer done()
 	conn, err := s.connections.ensureOpen(ctx, profileID)
 	if err != nil {
 		return zero, err
 	}
-	out, err := fn(conn)
+	out, err := fn(ctx, conn)
 	if err == nil || ctx.Err() != nil || !isStaleConn(err) {
 		return out, err
 	}
@@ -123,5 +137,5 @@ func withLiveConn[T any](s *QueryService, ctx context.Context, profileID string,
 	if err != nil {
 		return zero, err
 	}
-	return fn(conn)
+	return fn(ctx, conn)
 }

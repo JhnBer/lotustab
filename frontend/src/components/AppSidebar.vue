@@ -44,7 +44,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import ConnectionDialog from "@/features/connections/ConnectionDialog.vue";
-import { errorMessage } from "@/lib/errors";
+import { errorMessage, isCanceled } from "@/lib/errors";
 import { connBg, connTint } from "@/lib/colors";
 import type { Profile, TableInfo } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
@@ -213,14 +213,24 @@ function activateProfile(profile: Profile) {
 }
 
 async function connectSelected() {
-  if (!selected.value || connections.isConnecting(selected.value.id)) {
+  if (!selected.value) {
+    return;
+  }
+  if (connections.isConnecting(selected.value.id)) {
+    connections.cancelConnect(selected.value.id);
     return;
   }
   try {
     await connections.connect(selected.value.id);
+    if (!connections.isConnected(selected.value.id)) {
+      return;
+    }
     toast.success(`Connected to ${selected.value.name}`);
     router.push("/query");
   } catch (err) {
+    if (isCanceled(err)) {
+      return;
+    }
     toast.error(errorMessage(err));
   }
 }
@@ -235,12 +245,19 @@ async function togglePin(profile: Profile) {
 
 async function connectRecent(profile: Profile) {
   if (connections.isConnecting(profile.id)) {
+    connections.cancelConnect(profile.id);
     return;
   }
   try {
     await connections.connect(profile.id);
+    if (!connections.isConnected(profile.id)) {
+      return;
+    }
     toast.success(`Connected to ${profile.name}`);
   } catch (err) {
+    if (isCanceled(err)) {
+      return;
+    }
     toast.error(errorMessage(err));
   }
 }
@@ -422,16 +439,24 @@ function isDbOpen(name: string, showHeader: boolean): boolean {
                   />
                 </Button>
                 <Button
-                  v-if="!connections.isConnected(profile.id)"
+                  v-if="connections.isConnecting(profile.id)"
+                  size="icon-xs"
+                  variant="ghost"
+                  class="shrink-0"
+                  title="Cancel"
+                  @click.stop="connections.cancelConnect(profile.id)"
+                >
+                  <Spinner class="size-3.5" />
+                </Button>
+                <Button
+                  v-else-if="!connections.isConnected(profile.id)"
                   size="icon-xs"
                   variant="ghost"
                   class="shrink-0"
                   title="Connect"
-                  :disabled="connections.isConnecting(profile.id)"
                   @click.stop="connectRecent(profile)"
                 >
-                  <Spinner v-if="connections.isConnecting(profile.id)" class="size-3.5" />
-                  <Plug v-else class="size-3.5" />
+                  <Plug class="size-3.5" />
                 </Button>
                 <Button
                   v-else
@@ -461,13 +486,22 @@ function isDbOpen(name: string, showHeader: boolean): boolean {
       <SidebarGroup v-else-if="!currentConnected">
         <SidebarGroupContent class="px-2 py-2">
           <Button
+            v-if="connections.isConnecting(selected.id)"
+            size="sm"
+            variant="outline"
+            class="w-full"
+            @click="connections.cancelConnect(selected.id)"
+          >
+            <Spinner class="size-3.5" />
+            Cancel
+          </Button>
+          <Button
+            v-else
             size="sm"
             class="w-full"
-            :disabled="connections.isConnecting(selected.id)"
             @click="connectSelected"
           >
-            <Spinner v-if="connections.isConnecting(selected.id)" />
-            <Plug v-else class="size-3.5" />
+            <Plug class="size-3.5" />
             Connect
           </Button>
         </SidebarGroupContent>

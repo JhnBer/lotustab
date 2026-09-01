@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { watchDebounced } from "@vueuse/core";
-import { errorMessage } from "@/lib/errors";
+import { errorMessage, isCanceled } from "@/lib/errors";
 import { readJson, writeJson } from "@/lib/persist";
 import { ConnectionsService, QueryService, type TableInfo } from "@/lib/wails";
 
@@ -113,6 +113,7 @@ export const useExplorerStore = defineStore("explorer", () => {
   const loadingDbsById = ref<Record<string, boolean>>({});
   const loadingTablesById = ref<Record<string, Record<string, boolean>>>({});
   const errorById = ref<Record<string, string>>({});
+  const inflight = new Map<string, { cancel: () => void }>();
 
   const current = computed(() => (profileId.value ? slices.value[profileId.value] : undefined));
   const databases = computed(() => current.value?.databases ?? []);
@@ -170,29 +171,49 @@ export const useExplorerStore = defineStore("explorer", () => {
       return;
     }
     profileId.value = id;
+    const key = `db:${id}`;
+    inflight.get(key)?.cancel();
     loadingDbsById.value = { ...loadingDbsById.value, [id]: true };
     errorById.value = { ...errorById.value, [id]: "" };
+    const pending = ConnectionsService.Databases(id);
+    inflight.set(key, pending);
     try {
-      const list = (await ConnectionsService.Databases(id)) ?? [];
+      const list = (await pending) ?? [];
       patch(id, { databases: sortDatabases(list) });
     } catch (err) {
+      if (isCanceled(err)) {
+        return;
+      }
       errorById.value = { ...errorById.value, [id]: errorMessage(err) };
       throw err;
     } finally {
-      loadingDbsById.value = { ...loadingDbsById.value, [id]: false };
+      if (inflight.get(key) === pending) {
+        inflight.delete(key);
+        loadingDbsById.value = { ...loadingDbsById.value, [id]: false };
+      }
     }
   }
 
   async function loadTables(id: string, database: string) {
+    const key = `tables:${id}:${database}`;
+    inflight.get(key)?.cancel();
     setLoadingTables(id, database, true);
+    const pending = QueryService.ListTables(id, database);
+    inflight.set(key, pending);
     try {
-      const tables = (await QueryService.ListTables(id, database)) ?? [];
+      const tables = (await pending) ?? [];
       patch(id, { tablesByDb: { ...sliceOf(id).tablesByDb, [database]: tables } });
     } catch (err) {
+      if (isCanceled(err)) {
+        return;
+      }
       patch(id, { tablesByDb: { ...sliceOf(id).tablesByDb, [database]: [] } });
       throw err;
     } finally {
-      setLoadingTables(id, database, false);
+      if (inflight.get(key) === pending) {
+        inflight.delete(key);
+        setLoadingTables(id, database, false);
+      }
     }
   }
 

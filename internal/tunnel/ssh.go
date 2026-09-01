@@ -124,7 +124,7 @@ func newClient(sshClient *ssh.Client, extra, via io.Closer) *Client {
 }
 
 // Open dials the SSH server. The caller must Close the client.
-func Open(cfg Config) (*Client, error) {
+func Open(ctx context.Context, cfg Config) (*Client, error) {
 	auth, extra, err := authMethods(cfg)
 	if err != nil {
 		return nil, err
@@ -132,27 +132,26 @@ func Open(cfg Config) (*Client, error) {
 	sshCfg := clientConfig(cfg.User, auth)
 	addr := net.JoinHostPort(cfg.Host, cfg.Port)
 	dialer := net.Dialer{Timeout: sshCfg.Timeout, KeepAlive: dialKeepAlive}
-	netConn, err := dialer.Dial("tcp", addr)
+	netConn, err := dialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
 		if extra != nil {
 			_ = extra.Close()
 		}
 		return nil, fmt.Errorf("ssh: %w", err)
 	}
-	sshConn, chans, reqs, err := ssh.NewClientConn(netConn, addr, sshCfg)
+	client, err := handshake(ctx, netConn, addr, sshCfg)
 	if err != nil {
-		_ = netConn.Close()
 		if extra != nil {
 			_ = extra.Close()
 		}
-		return nil, fmt.Errorf("ssh: %w", err)
+		return nil, err
 	}
-	return newClient(ssh.NewClient(sshConn, chans, reqs), extra, nil), nil
+	return newClient(client, extra, nil), nil
 }
 
 // OpenVia dials cfg through an already-open hop. It takes ownership of hop:
 // on success hop is closed by Client.Close; on failure hop is closed immediately.
-func OpenVia(hop *Client, cfg Config) (*Client, error) {
+func OpenVia(ctx context.Context, hop *Client, cfg Config) (*Client, error) {
 	if hop == nil {
 		return nil, fmt.Errorf("ssh jump: missing hop")
 	}
@@ -170,8 +169,11 @@ func OpenVia(hop *Client, cfg Config) (*Client, error) {
 	}
 	sshCfg := clientConfig(cfg.User, auth)
 	addr := net.JoinHostPort(cfg.Host, cfg.Port)
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 15*time.Second)
+		defer cancel()
+	}
 	netConn, err := hop.ssh.DialContext(ctx, "tcp", addr)
 	if err != nil {
 		if extra != nil {
@@ -180,16 +182,41 @@ func OpenVia(hop *Client, cfg Config) (*Client, error) {
 		_ = hop.Close()
 		return nil, fmt.Errorf("ssh jump: %w", err)
 	}
-	sshConn, chans, reqs, err := ssh.NewClientConn(netConn, addr, sshCfg)
+	client, err := handshake(ctx, netConn, addr, sshCfg)
 	if err != nil {
-		_ = netConn.Close()
 		if extra != nil {
 			_ = extra.Close()
 		}
 		_ = hop.Close()
-		return nil, fmt.Errorf("ssh: %w", err)
+		return nil, err
 	}
-	return newClient(ssh.NewClient(sshConn, chans, reqs), extra, hop), nil
+	return newClient(client, extra, hop), nil
+}
+
+func handshake(ctx context.Context, netConn net.Conn, addr string, sshCfg *ssh.ClientConfig) (*ssh.Client, error) {
+	type outcome struct {
+		conn  ssh.Conn
+		chans <-chan ssh.NewChannel
+		reqs  <-chan *ssh.Request
+		err   error
+	}
+	done := make(chan outcome, 1)
+	go func() {
+		conn, chans, reqs, err := ssh.NewClientConn(netConn, addr, sshCfg)
+		done <- outcome{conn, chans, reqs, err}
+	}()
+	select {
+	case <-ctx.Done():
+		_ = netConn.Close()
+		<-done
+		return nil, fmt.Errorf("ssh: %w", ctx.Err())
+	case out := <-done:
+		if out.err != nil {
+			_ = netConn.Close()
+			return nil, fmt.Errorf("ssh: %w", out.err)
+		}
+		return ssh.NewClient(out.conn, out.chans, out.reqs), nil
+	}
 }
 
 func clientConfig(user string, auth []ssh.AuthMethod) *ssh.ClientConfig {

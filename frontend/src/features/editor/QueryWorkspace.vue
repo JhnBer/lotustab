@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { watch } from "vue";
-import { Play } from "@lucide/vue";
+import { computed, watch } from "vue";
+import { Play, Plug } from "@lucide/vue";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { errorMessage } from "@/lib/errors";
+import { errorMessage, isCanceled } from "@/lib/errors";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -32,6 +32,16 @@ const connections = useConnectionsStore();
 const queries = useQueryStore();
 const explorer = useExplorerStore();
 
+const connecting = computed(() => {
+  const id = connections.selectedId;
+  return Boolean(id && connections.isConnecting(id));
+});
+
+const selectedOffline = computed(() => {
+  const id = connections.selectedId;
+  return Boolean(id && !connections.isConnected(id) && !connections.isConnecting(id));
+});
+
 watch(
   () => connections.selectedId,
   (id) => queries.activateProfile(id),
@@ -46,9 +56,37 @@ async function run() {
   try {
     if (!connections.isConnected(tab.profileId)) {
       await connections.connect(tab.profileId);
+      if (!connections.isConnected(tab.profileId)) {
+        return;
+      }
     }
     await queries.run(tab.id);
   } catch (err) {
+    if (isCanceled(err)) {
+      return;
+    }
+    toast.error(errorMessage(err));
+  }
+}
+
+async function connectSelected() {
+  const id = connections.selectedId;
+  if (!id) {
+    return;
+  }
+  try {
+    await connections.connect(id);
+    if (!connections.isConnected(id)) {
+      return;
+    }
+    const profile = connections.selected;
+    if (profile) {
+      toast.success(`Connected to ${profile.name}`);
+    }
+  } catch (err) {
+    if (isCanceled(err)) {
+      return;
+    }
     toast.error(errorMessage(err));
   }
 }
@@ -67,11 +105,33 @@ function onDatabase(value: unknown) {
   <section class="flex h-full min-h-0 flex-1 flex-col -m-4 overflow-hidden">
     <WorkspaceTabBar />
 
-    <div v-if="!queries.activeTab" class="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-2 p-8 text-sm">
+    <div
+      v-if="connecting"
+      class="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-2 p-8 text-sm"
+    >
+      <Spinner />
+      <span>Connecting…</span>
+    </div>
+
+    <div
+      v-else-if="!connections.selectedId"
+      class="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-2 p-8 text-sm"
+    >
       <span>Select a connection to start querying.</span>
       <RouterLink to="/connections" class="text-foreground hover:underline">
         Open connections
       </RouterLink>
+    </div>
+
+    <div
+      v-else-if="selectedOffline && !queries.activeTab"
+      class="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-3 p-8 text-sm"
+    >
+      <span>Connect this database to start querying.</span>
+      <Button size="sm" @click="connectSelected">
+        <Plug class="size-3.5" />
+        Connect
+      </Button>
     </div>
 
     <TableBrowser

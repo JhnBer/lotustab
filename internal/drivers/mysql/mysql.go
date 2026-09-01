@@ -68,13 +68,30 @@ func (d *Driver) Open(ctx context.Context, cfg driver.ConnConfig) (driver.Conn, 
 	db.SetConnMaxLifetime(30 * time.Minute)
 	db.SetConnMaxIdleTime(4 * time.Minute)
 
+	killMC, err := mysqlConfig(cfg)
+	if err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	killConnector, err := mysqldriver.NewConnector(killMC)
+	if err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("mysql open: %w", err)
+	}
+	killDB := sql.OpenDB(killConnector)
+	killDB.SetMaxOpenConns(1)
+	killDB.SetMaxIdleConns(1)
+	killDB.SetConnMaxLifetime(30 * time.Minute)
+	killDB.SetConnMaxIdleTime(4 * time.Minute)
+
 	connectCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	if err := db.PingContext(connectCtx); err != nil {
 		_ = db.Close()
+		_ = killDB.Close()
 		return nil, fmt.Errorf("mysql ping: %w", err)
 	}
-	return &conn{db: db, database: strings.TrimSpace(cfg.Param("database", ""))}, nil
+	return &conn{db: db, killDB: killDB, database: strings.TrimSpace(cfg.Param("database", ""))}, nil
 }
 
 func mysqlConfig(cfg driver.ConnConfig) (*mysqldriver.Config, error) {
@@ -104,6 +121,7 @@ func mysqlConfig(cfg driver.ConnConfig) (*mysqldriver.Config, error) {
 
 type conn struct {
 	db       *sql.DB
+	killDB   *sql.DB
 	database string
 }
 
@@ -111,31 +129,47 @@ func (c *conn) Ping(ctx context.Context) error {
 	return c.db.PingContext(ctx)
 }
 
+func (c *conn) withSession(ctx context.Context, fn func(*sql.Conn) error) error {
+	session, err := c.db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer session.Close()
+
+	var connID uint64
+	if err := session.QueryRowContext(ctx, "SELECT CONNECTION_ID()").Scan(&connID); err != nil {
+		return err
+	}
+	if c.killDB != nil {
+		stop := watchKill(ctx, func() {
+			killCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_, _ = c.killDB.ExecContext(killCtx, fmt.Sprintf("KILL QUERY %d", connID))
+		})
+		defer stop()
+	}
+	return fn(session)
+}
+
 func (c *conn) Query(ctx context.Context, sqlText, database string, limit, offset int) (*driver.QueryResult, error) {
 	page := driver.PrepareQueryPage(sqlText, limit, offset)
 	database = strings.TrimSpace(database)
-	if database == "" || database == c.database {
-		result, err := sqlutil.Query(ctx, c.db, page.SQL, page.MaxRows)
-		if err != nil {
-			return nil, err
+	var result *driver.QueryResult
+	err := c.withSession(ctx, func(session *sql.Conn) error {
+		if database != "" && database != c.database {
+			if _, err := session.ExecContext(ctx, mysqlUse(database)); err != nil {
+				return err
+			}
+			defer func() {
+				if c.database != "" {
+					_, _ = session.ExecContext(ctx, mysqlUse(c.database))
+				}
+			}()
 		}
-		return driver.FinishQueryPage(result, page), nil
-	}
-
-	session, err := c.db.Conn(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if c.database != "" {
-			_, _ = session.ExecContext(ctx, mysqlUse(c.database))
-		}
-		_ = session.Close()
-	}()
-	if _, err := session.ExecContext(ctx, mysqlUse(database)); err != nil {
-		return nil, err
-	}
-	result, err := sqlutil.Query(ctx, session, page.SQL, page.MaxRows)
+		var err error
+		result, err = sqlutil.Query(ctx, session, page.SQL, page.MaxRows)
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -147,49 +181,56 @@ func mysqlUse(database string) string {
 }
 
 func (c *conn) Databases(ctx context.Context) ([]string, error) {
-	return sqlutil.ListStrings(ctx, c.db, "SHOW DATABASES")
+	var names []string
+	err := c.withSession(ctx, func(session *sql.Conn) error {
+		var err error
+		names, err = sqlutil.ListStrings(ctx, session, "SHOW DATABASES")
+		return err
+	})
+	return names, err
 }
 
 func (c *conn) ListTables(ctx context.Context, database string) ([]driver.TableInfo, error) {
 	database = strings.TrimSpace(database)
-	var (
-		rows *sql.Rows
-		err  error
-	)
-	if database == "" {
-		rows, err = c.db.QueryContext(ctx, `
+	var out []driver.TableInfo
+	err := c.withSession(ctx, func(session *sql.Conn) error {
+		var (
+			rows *sql.Rows
+			err  error
+		)
+		if database == "" {
+			rows, err = session.QueryContext(ctx, `
 			SELECT table_schema, table_name, table_type
 			FROM information_schema.tables
 			WHERE table_schema = DATABASE()
 			ORDER BY table_name`)
-	} else {
-		rows, err = c.db.QueryContext(ctx, `
+		} else {
+			rows, err = session.QueryContext(ctx, `
 			SELECT table_schema, table_name, table_type
 			FROM information_schema.tables
 			WHERE table_schema = ?
 			ORDER BY table_name`, database)
-	}
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	out := make([]driver.TableInfo, 0)
-	for rows.Next() {
-		var schema, name, tableType string
-		if err := rows.Scan(&schema, &name, &tableType); err != nil {
-			return nil, err
 		}
-		out = append(out, driver.TableInfo{
-			Schema: schema,
-			Name:   name,
-			Type:   mysqlObjectType(tableType),
-		})
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return out, nil
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+
+		out = make([]driver.TableInfo, 0)
+		for rows.Next() {
+			var schema, name, tableType string
+			if err := rows.Scan(&schema, &name, &tableType); err != nil {
+				return err
+			}
+			out = append(out, driver.TableInfo{
+				Schema: schema,
+				Name:   name,
+				Type:   mysqlObjectType(tableType),
+			})
+		}
+		return rows.Err()
+	})
+	return out, err
 }
 
 func (c *conn) BrowseTable(ctx context.Context, req driver.TableBrowseRequest) (*driver.TableBrowseResult, error) {
@@ -207,25 +248,32 @@ func (c *conn) BrowseTable(ctx context.Context, req driver.TableBrowseRequest) (
 		return nil, err
 	}
 
-	start := time.Now()
-	total, err := sqlutil.Count(ctx, c.db, "SELECT COUNT(*) FROM "+qualified+where, args...)
-	if err != nil {
-		return nil, err
-	}
+	var out *driver.TableBrowseResult
+	err = c.withSession(ctx, func(session *sql.Conn) error {
+		start := time.Now()
+		total, err := sqlutil.Count(ctx, session, "SELECT COUNT(*) FROM "+qualified+where, args...)
+		if err != nil {
+			return err
+		}
 
-	selectSQL := "SELECT * FROM " + qualified + where + sqlutil.OrderClause(sqlutil.QuoteMySQL, req.OrderBy, req.OrderDir) + " LIMIT ? OFFSET ?"
-	selectArgs := append(append([]any{}, args...), req.Limit, req.Offset)
-	result, err := sqlutil.QueryContext(ctx, c.db, req.Limit, selectSQL, selectArgs...)
+		selectSQL := "SELECT * FROM " + qualified + where + sqlutil.OrderClause(sqlutil.QuoteMySQL, req.OrderBy, req.OrderDir) + " LIMIT ? OFFSET ?"
+		selectArgs := append(append([]any{}, args...), req.Limit, req.Offset)
+		result, err := sqlutil.QueryContext(ctx, session, req.Limit, selectSQL, selectArgs...)
+		if err != nil {
+			return err
+		}
+		out = driver.BrowseFromQuery(result, total)
+		out.DurationMs = time.Since(start).Milliseconds()
+		pk, err := mysqlPrimaryKey(ctx, session, dbName, req.Name)
+		if err != nil {
+			return err
+		}
+		out.PrimaryKey = pk
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	out := driver.BrowseFromQuery(result, total)
-	out.DurationMs = time.Since(start).Milliseconds()
-	pk, err := mysqlPrimaryKey(ctx, c.db, dbName, req.Name)
-	if err != nil {
-		return nil, err
-	}
-	out.PrimaryKey = pk
 	return out, nil
 }
 
@@ -238,41 +286,43 @@ func (c *conn) ApplyEdits(ctx context.Context, req driver.ApplyEditsRequest) err
 	if dbName == "" {
 		dbName = req.Schema
 	}
-	pk, err := mysqlPrimaryKey(ctx, c.db, dbName, req.Name)
-	if err != nil {
-		return err
-	}
-	if len(pk) == 0 {
-		return fmt.Errorf("table has no primary key")
-	}
-
-	tx, err := c.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	qualified := mysqlQualified(dbName, req.Name)
-	err = sqlutil.ApplyRowEdits(ctx, func(ctx context.Context, q string, args ...any) (int64, error) {
-		res, execErr := tx.ExecContext(ctx, q, args...)
-		if execErr != nil {
-			return 0, execErr
+	return c.withSession(ctx, func(session *sql.Conn) error {
+		pk, err := mysqlPrimaryKey(ctx, session, dbName, req.Name)
+		if err != nil {
+			return err
 		}
-		return res.RowsAffected()
-	}, sqlutil.QuoteMySQL, sqlutil.Question, qualified, pk, req.Rows)
-	if err != nil {
-		return err
-	}
-	return tx.Commit()
+		if len(pk) == 0 {
+			return fmt.Errorf("table has no primary key")
+		}
+
+		tx, err := session.BeginTx(ctx, nil)
+		if err != nil {
+			return err
+		}
+		defer func() { _ = tx.Rollback() }()
+
+		qualified := mysqlQualified(dbName, req.Name)
+		err = sqlutil.ApplyRowEdits(ctx, func(ctx context.Context, q string, args ...any) (int64, error) {
+			res, execErr := tx.ExecContext(ctx, q, args...)
+			if execErr != nil {
+				return 0, execErr
+			}
+			return res.RowsAffected()
+		}, sqlutil.QuoteMySQL, sqlutil.Question, qualified, pk, req.Rows)
+		if err != nil {
+			return err
+		}
+		return tx.Commit()
+	})
 }
 
-func mysqlPrimaryKey(ctx context.Context, db *sql.DB, database, name string) ([]string, error) {
+func mysqlPrimaryKey(ctx context.Context, q sqlutil.Querier, database, name string) ([]string, error) {
 	var (
 		rows *sql.Rows
 		err  error
 	)
 	if database == "" {
-		rows, err = db.QueryContext(ctx, `
+		rows, err = q.QueryContext(ctx, `
 			SELECT COLUMN_NAME
 			FROM information_schema.KEY_COLUMN_USAGE
 			WHERE TABLE_SCHEMA = DATABASE()
@@ -280,7 +330,7 @@ func mysqlPrimaryKey(ctx context.Context, db *sql.DB, database, name string) ([]
 			  AND CONSTRAINT_NAME = 'PRIMARY'
 			ORDER BY ORDINAL_POSITION`, name)
 	} else {
-		rows, err = db.QueryContext(ctx, `
+		rows, err = q.QueryContext(ctx, `
 			SELECT COLUMN_NAME
 			FROM information_schema.KEY_COLUMN_USAGE
 			WHERE TABLE_SCHEMA = ?
@@ -324,5 +374,11 @@ func mysqlObjectType(tableType string) string {
 }
 
 func (c *conn) Close() error {
-	return c.db.Close()
+	err := c.db.Close()
+	if c.killDB != nil {
+		if e := c.killDB.Close(); err == nil {
+			err = e
+		}
+	}
+	return err
 }

@@ -24,10 +24,9 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { Spinner } from "@/components/ui/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { connBg, connTint } from "@/lib/colors";
-import { errorMessage } from "@/lib/errors";
+import { errorMessage, isCanceled } from "@/lib/errors";
 import type { Profile } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
 import { useSettingsStore } from "@/stores/settings";
@@ -96,12 +95,19 @@ async function disconnect(profile: Profile) {
 
 async function connect(profile: Profile) {
   if (connections.isConnecting(profile.id)) {
+    connections.cancelConnect(profile.id);
     return;
   }
   try {
     await connections.connect(profile.id);
+    if (!connections.isConnected(profile.id)) {
+      return;
+    }
     toast.success(`Connected to ${profile.name}`);
   } catch (err) {
+    if (isCanceled(err)) {
+      return;
+    }
     toast.error(errorMessage(err));
   }
 }
@@ -179,12 +185,13 @@ async function connect(profile: Profile) {
                         Disconnect
                       </ContextMenuItem>
                     </template>
+                    <template v-else-if="connections.isConnecting(profile.id)">
+                      <ContextMenuItem @click="connections.cancelConnect(profile.id)">
+                        Cancel connecting
+                      </ContextMenuItem>
+                    </template>
                     <template v-else>
-                      <ContextMenuItem
-                        :disabled="connections.isConnecting(profile.id)"
-                        @click="connect(profile)"
-                      >
-                        <Spinner v-if="connections.isConnecting(profile.id)" />
+                      <ContextMenuItem @click="connect(profile)">
                         Connect
                       </ContextMenuItem>
                     </template>

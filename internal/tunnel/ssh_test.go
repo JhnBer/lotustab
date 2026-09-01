@@ -1,6 +1,8 @@
 package tunnel
 
 import (
+	"context"
+	"errors"
 	"net"
 	"path/filepath"
 	"strings"
@@ -190,7 +192,7 @@ func TestClientCloseClosesVia(t *testing.T) {
 func TestOpenViaClosesHopOnError(t *testing.T) {
 	hopExtra := &trackClose{}
 	hop := &Client{extra: hopExtra}
-	_, err := OpenVia(hop, Config{
+	_, err := OpenVia(context.Background(), hop, Config{
 		Host: "db.internal",
 		Port: DefaultPort,
 		User: "ubuntu",
@@ -205,8 +207,49 @@ func TestOpenViaClosesHopOnError(t *testing.T) {
 }
 
 func TestOpenViaNilHop(t *testing.T) {
-	_, err := OpenVia(nil, Config{Host: "x", Port: DefaultPort, User: "u", Auth: AuthPassword, Password: "p"})
+	_, err := OpenVia(context.Background(), nil, Config{Host: "x", Port: DefaultPort, User: "u", Auth: AuthPassword, Password: "p"})
 	if err == nil || !strings.Contains(err.Error(), "missing hop") {
 		t.Fatalf("expected missing hop error, got %v", err)
+	}
+}
+
+func TestOpenCancelsDuringHandshake(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	hold := make(chan struct{})
+	t.Cleanup(func() {
+		close(hold)
+		_ = ln.Close()
+	})
+	go func() {
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		<-hold
+	}()
+
+	_, port, err := net.SplitHostPort(ln.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	_, err = Open(ctx, Config{
+		Host:     "127.0.0.1",
+		Port:     port,
+		User:     "ubuntu",
+		Auth:     AuthPassword,
+		Password: "secret",
+	})
+	if err == nil || !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected deadline error, got %v", err)
+	}
+	if time.Since(start) > 2*time.Second {
+		t.Fatalf("cancel took too long: %s", time.Since(start))
 	}
 }

@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 import { Events } from "@wailsio/runtime";
-import { errorMessage } from "@/lib/errors";
+import { errorMessage, isCanceled } from "@/lib/errors";
 import { readJson, writeJson } from "@/lib/persist";
 import {
   ConnectionsService,
@@ -39,7 +39,7 @@ export const useConnectionsStore = defineStore("connections", () => {
   const storedSelected = readJson<unknown>(SELECTED_KEY, "");
   const selectedId = ref(typeof storedSelected === "string" ? storedSelected : "");
   const connectingIds = ref<string[]>([]);
-  const pendingConnect = new Map<string, Promise<void>>();
+  const pendingConnect = new Map<string, { cancel: () => void; promise: Promise<void> }>();
   const loading = ref(false);
   const error = ref("");
 
@@ -187,20 +187,30 @@ export const useConnectionsStore = defineStore("connections", () => {
     }
     const pending = pendingConnect.get(id);
     if (pending) {
-      return pending;
+      return pending.promise;
     }
     connectingIds.value = [...connectingIds.value, id];
+    const call = ConnectionsService.Connect(id);
     const work = (async () => {
       try {
-        await ConnectionsService.Connect(id);
+        await call;
         await refresh();
+      } catch (err) {
+        if (isCanceled(err)) {
+          return;
+        }
+        throw err;
       } finally {
         connectingIds.value = connectingIds.value.filter((item) => item !== id);
         pendingConnect.delete(id);
       }
     })();
-    pendingConnect.set(id, work);
+    pendingConnect.set(id, { cancel: () => call.cancel(), promise: work });
     return work;
+  }
+
+  function cancelConnect(id: string) {
+    pendingConnect.get(id)?.cancel();
   }
 
   async function disconnect(id: string) {
@@ -274,6 +284,7 @@ export const useConnectionsStore = defineStore("connections", () => {
     fetchDatabases,
     remove,
     connect,
+    cancelConnect,
     disconnect,
     select,
     openInNewWindow,

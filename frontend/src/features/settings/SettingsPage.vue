@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { isTabLayout, PAGE_SIZES, useSettingsStore } from "@/stores/settings";
+import { isTabLayout, PAGE_SIZES, QUERY_TIMEOUTS, queryTimeoutLabel, useSettingsStore } from "@/stores/settings";
 
 const settings = useSettingsStore();
 const mode = useColorMode({ initialValue: "dark" });
@@ -40,6 +40,14 @@ function onTabLayout(value: unknown) {
   if (isTabLayout(value)) {
     settings.setTabLayout(value);
   }
+}
+
+function onQueryTimeout(value: unknown) {
+  const seconds = Number(value);
+  if (!Number.isFinite(seconds)) {
+    return;
+  }
+  settings.setQueryTimeout(seconds);
 }
 </script>
 
@@ -101,6 +109,23 @@ function onTabLayout(value: unknown) {
         <SelectContent>
           <SelectItem v-for="size in PAGE_SIZES" :key="size" :value="String(size)">
             {{ size }} / page
+          </SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+
+    <div class="flex items-center justify-between gap-4">
+      <div class="min-w-0">
+        <Label for="settings-query-timeout">Query timeout</Label>
+        <p class="text-muted-foreground mt-1 text-xs">Cancels a running query after this time. Off waits until you cancel.</p>
+      </div>
+      <Select :model-value="String(settings.queryTimeoutSeconds)" @update:model-value="onQueryTimeout">
+        <SelectTrigger id="settings-query-timeout" size="sm" class="w-36">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem v-for="seconds in QUERY_TIMEOUTS" :key="seconds" :value="String(seconds)">
+            {{ queryTimeoutLabel(seconds) }}
           </SelectItem>
         </SelectContent>
       </Select>

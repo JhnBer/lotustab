@@ -12,6 +12,9 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
+import * as context$0 from "../../../context/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
 import * as connection$0 from "../core/connection/models.js";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -47,7 +50,7 @@ export function Delete(id: string): $CancellablePromise<void> {
 }
 
 /**
- * Disconnect closes the live session for a profile.
+ * Disconnect cancels in-flight operations and closes the live session.
  */
 export function Disconnect(id: string): $CancellablePromise<void> {
     return $Call.ByID(3754654611, id);
@@ -100,4 +103,11 @@ export function Test(input: $models.SaveProfileInput): $CancellablePromise<void>
  */
 export function TouchRecent(id: string): $CancellablePromise<void> {
     return $Call.ByID(1581593595, id);
+}
+
+/**
+ * Track registers an in-flight operation for a profile so Disconnect can cancel it.
+ */
+export function Track(profileID: string): $CancellablePromise<[context$0.Context, any]> {
+    return $Call.ByID(651893124, profileID);
 }

@@ -5,6 +5,9 @@ import { Events } from "@wailsio/runtime";
 export const PAGE_SIZES = [50, 100, 250, 500, 1000, 5000, 10000] as const;
 export const DEFAULT_PAGE_SIZE = 100;
 
+export const QUERY_TIMEOUTS = [0, 15, 30, 60, 300, 900] as const;
+export const DEFAULT_QUERY_TIMEOUT = 0;
+
 export const TAB_LAYOUTS = ["scroll", "wrap"] as const;
 export type TabLayout = (typeof TAB_LAYOUTS)[number];
 export const DEFAULT_TAB_LAYOUT: TabLayout = "scroll";
@@ -13,10 +16,25 @@ const PAGE_SIZE_KEY = "lotustab.tablePageSize";
 const TINT_KEY = "lotustab.connectionTint";
 const SHOW_ALL_DBS_KEY = "lotustab.showAllDatabases";
 const TAB_LAYOUT_KEY = "lotustab.tabLayout";
+const QUERY_TIMEOUT_KEY = "lotustab.queryTimeout";
 const SETTINGS_CHANGED = "settings:changed";
 
 export function isPageSize(n: number): boolean {
   return (PAGE_SIZES as readonly number[]).includes(n);
+}
+
+export function isQueryTimeout(n: number): boolean {
+  return (QUERY_TIMEOUTS as readonly number[]).includes(n);
+}
+
+export function queryTimeoutLabel(seconds: number): string {
+  if (seconds <= 0) {
+    return "Off";
+  }
+  if (seconds < 60) {
+    return `${seconds}s`;
+  }
+  return `${seconds / 60} min`;
 }
 
 function readPageSize(): number {
@@ -41,11 +59,17 @@ function readTabLayout(): TabLayout {
   return isTabLayout(v) ? v : DEFAULT_TAB_LAYOUT;
 }
 
+function readQueryTimeout(): number {
+  const n = Number(localStorage.getItem(QUERY_TIMEOUT_KEY));
+  return isQueryTimeout(n) ? n : DEFAULT_QUERY_TIMEOUT;
+}
+
 type SettingsPayload = {
   connectionTint: boolean;
   defaultPageSize: number;
   showAllDatabases: boolean;
   tabLayout: TabLayout;
+  queryTimeoutSeconds: number;
 };
 
 export const useSettingsStore = defineStore("settings", () => {
@@ -53,6 +77,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const defaultPageSize = ref(readPageSize());
   const showAllDatabases = ref(readShowAllDatabases());
   const tabLayout = ref(readTabLayout());
+  const queryTimeoutSeconds = ref(readQueryTimeout());
 
   function snapshot(): SettingsPayload {
     return {
@@ -60,6 +85,7 @@ export const useSettingsStore = defineStore("settings", () => {
       defaultPageSize: defaultPageSize.value,
       showAllDatabases: showAllDatabases.value,
       tabLayout: tabLayout.value,
+      queryTimeoutSeconds: queryTimeoutSeconds.value,
     };
   }
 
@@ -68,6 +94,7 @@ export const useSettingsStore = defineStore("settings", () => {
     localStorage.setItem(PAGE_SIZE_KEY, String(defaultPageSize.value));
     localStorage.setItem(SHOW_ALL_DBS_KEY, String(showAllDatabases.value));
     localStorage.setItem(TAB_LAYOUT_KEY, tabLayout.value);
+    localStorage.setItem(QUERY_TIMEOUT_KEY, String(queryTimeoutSeconds.value));
   }
 
   function commit() {
@@ -80,11 +107,15 @@ export const useSettingsStore = defineStore("settings", () => {
       ? next.defaultPageSize
       : defaultPageSize.value;
     const layout = isTabLayout(next.tabLayout) ? next.tabLayout : tabLayout.value;
+    const timeout = isQueryTimeout(next.queryTimeoutSeconds)
+      ? next.queryTimeoutSeconds
+      : queryTimeoutSeconds.value;
     if (
       connectionTint.value === next.connectionTint &&
       defaultPageSize.value === size &&
       showAllDatabases.value === next.showAllDatabases &&
-      tabLayout.value === layout
+      tabLayout.value === layout &&
+      queryTimeoutSeconds.value === timeout
     ) {
       return;
     }
@@ -92,6 +123,7 @@ export const useSettingsStore = defineStore("settings", () => {
     defaultPageSize.value = size;
     showAllDatabases.value = next.showAllDatabases;
     tabLayout.value = layout;
+    queryTimeoutSeconds.value = timeout;
     persist();
   }
 
@@ -127,6 +159,14 @@ export const useSettingsStore = defineStore("settings", () => {
     commit();
   }
 
+  function setQueryTimeout(seconds: number) {
+    if (!isQueryTimeout(seconds) || queryTimeoutSeconds.value === seconds) {
+      return;
+    }
+    queryTimeoutSeconds.value = seconds;
+    commit();
+  }
+
   Events.On(SETTINGS_CHANGED, (ev) => {
     const data = ev.data as SettingsPayload | null;
     if (!data || typeof data !== "object") {
@@ -137,6 +177,7 @@ export const useSettingsStore = defineStore("settings", () => {
       defaultPageSize: Number(data.defaultPageSize),
       showAllDatabases: data.showAllDatabases !== false,
       tabLayout: isTabLayout(data.tabLayout) ? data.tabLayout : DEFAULT_TAB_LAYOUT,
+      queryTimeoutSeconds: Number(data.queryTimeoutSeconds),
     });
   });
 
@@ -145,9 +186,11 @@ export const useSettingsStore = defineStore("settings", () => {
     defaultPageSize,
     showAllDatabases,
     tabLayout,
+    queryTimeoutSeconds,
     setDefaultPageSize,
     setConnectionTint,
     setShowAllDatabases,
     setTabLayout,
+    setQueryTimeout,
   };
 });
