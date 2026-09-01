@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { FileCode2, Plus, Table2, X } from "@lucide/vue";
 import { VueDraggable } from "vue-draggable-plus";
 import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -50,10 +51,16 @@ async function copyName(title: string) {
 </script>
 
 <template>
-  <div class="flex min-h-10 items-stretch gap-1 border-b px-2 py-1">
-    <div
-      class="min-w-0 flex-1 self-stretch"
-      :class="wrapTabs ? '' : 'tab-strip-scroll overflow-x-auto'"
+  <div
+    class="flex min-h-10 gap-1 border-b px-2 py-1"
+    :class="wrapTabs ? 'items-start' : 'items-center'"
+  >
+    <component
+      :is="wrapTabs ? 'div' : ScrollArea"
+      :type="wrapTabs ? undefined : 'hover'"
+      :orientation="wrapTabs ? undefined : 'horizontal'"
+      class="min-w-0 flex-1"
+      :class="wrapTabs ? '' : 'pb-2.5'"
       style="--wails-draggable: no-drag"
     >
       <VueDraggable
@@ -61,19 +68,23 @@ async function copyName(title: string) {
         :animation="150"
         filter=".tab-close"
         :prevent-on-filter="true"
+        :force-fallback="true"
+        :fallback-on-body="true"
+        :fallback-tolerance="4"
+        :direction="wrapTabs ? undefined : 'horizontal'"
         class="flex gap-1"
-        :class="wrapTabs ? 'flex-wrap' : 'h-full flex-nowrap items-center'"
+        :class="wrapTabs ? 'flex-wrap' : 'w-max min-w-full flex-nowrap items-center'"
       >
         <ContextMenu v-for="tab in visibleTabs" :key="tab.id">
           <ContextMenuTrigger as-child>
             <div
-              class="flex max-w-48 shrink-0 select-none items-center gap-1 rounded-md px-2 py-1 text-xs"
+              class="flex max-w-48 shrink-0 cursor-grab select-none items-center gap-1 rounded-md px-2 py-1 text-xs active:cursor-grabbing [-webkit-user-drag:none]"
               :class="tab.id === queries.activeTabId ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/60'"
               @click="queries.selectTab(tab.id)"
             >
-              <Table2 v-if="tab.kind === 'table'" class="size-3 shrink-0" />
-              <FileCode2 v-else class="size-3 shrink-0" />
-              <span class="truncate">{{ tab.title }}</span>
+              <Table2 v-if="tab.kind === 'table'" class="pointer-events-none size-3 shrink-0" />
+              <FileCode2 v-else class="pointer-events-none size-3 shrink-0" />
+              <span class="pointer-events-none truncate">{{ tab.title }}</span>
               <span
                 class="tab-close hover:bg-background cursor-pointer rounded-sm p-0.5"
                 @click.stop="queries.close(tab.id)"
@@ -93,11 +104,12 @@ async function copyName(title: string) {
           </ContextMenuContent>
         </ContextMenu>
       </VueDraggable>
-    </div>
+    </component>
     <Button
       size="icon-xs"
       variant="ghost"
-      class="shrink-0 self-start"
+      class="shrink-0"
+      :class="wrapTabs ? 'self-start' : 'mb-2.5 self-center'"
       :disabled="!connections.selected"
       @click="addTab"
     >
