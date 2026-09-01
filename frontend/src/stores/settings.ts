@@ -5,9 +5,14 @@ import { Events } from "@wailsio/runtime";
 export const PAGE_SIZES = [50, 100, 250, 500, 1000, 5000, 10000] as const;
 export const DEFAULT_PAGE_SIZE = 100;
 
+export const TAB_LAYOUTS = ["scroll", "wrap"] as const;
+export type TabLayout = (typeof TAB_LAYOUTS)[number];
+export const DEFAULT_TAB_LAYOUT: TabLayout = "scroll";
+
 const PAGE_SIZE_KEY = "lotustab.tablePageSize";
 const TINT_KEY = "lotustab.connectionTint";
 const SHOW_ALL_DBS_KEY = "lotustab.showAllDatabases";
+const TAB_LAYOUT_KEY = "lotustab.tabLayout";
 const SETTINGS_CHANGED = "settings:changed";
 
 export function isPageSize(n: number): boolean {
@@ -27,22 +32,34 @@ function readShowAllDatabases(): boolean {
   return localStorage.getItem(SHOW_ALL_DBS_KEY) !== "false";
 }
 
+export function isTabLayout(v: unknown): v is TabLayout {
+  return (TAB_LAYOUTS as readonly string[]).includes(v as string);
+}
+
+function readTabLayout(): TabLayout {
+  const v = localStorage.getItem(TAB_LAYOUT_KEY);
+  return isTabLayout(v) ? v : DEFAULT_TAB_LAYOUT;
+}
+
 type SettingsPayload = {
   connectionTint: boolean;
   defaultPageSize: number;
   showAllDatabases: boolean;
+  tabLayout: TabLayout;
 };
 
 export const useSettingsStore = defineStore("settings", () => {
   const connectionTint = ref(readTint());
   const defaultPageSize = ref(readPageSize());
   const showAllDatabases = ref(readShowAllDatabases());
+  const tabLayout = ref(readTabLayout());
 
   function snapshot(): SettingsPayload {
     return {
       connectionTint: connectionTint.value,
       defaultPageSize: defaultPageSize.value,
       showAllDatabases: showAllDatabases.value,
+      tabLayout: tabLayout.value,
     };
   }
 
@@ -50,6 +67,7 @@ export const useSettingsStore = defineStore("settings", () => {
     localStorage.setItem(TINT_KEY, String(connectionTint.value));
     localStorage.setItem(PAGE_SIZE_KEY, String(defaultPageSize.value));
     localStorage.setItem(SHOW_ALL_DBS_KEY, String(showAllDatabases.value));
+    localStorage.setItem(TAB_LAYOUT_KEY, tabLayout.value);
   }
 
   function commit() {
@@ -61,16 +79,19 @@ export const useSettingsStore = defineStore("settings", () => {
     const size = isPageSize(next.defaultPageSize)
       ? next.defaultPageSize
       : defaultPageSize.value;
+    const layout = isTabLayout(next.tabLayout) ? next.tabLayout : tabLayout.value;
     if (
       connectionTint.value === next.connectionTint &&
       defaultPageSize.value === size &&
-      showAllDatabases.value === next.showAllDatabases
+      showAllDatabases.value === next.showAllDatabases &&
+      tabLayout.value === layout
     ) {
       return;
     }
     connectionTint.value = next.connectionTint;
     defaultPageSize.value = size;
     showAllDatabases.value = next.showAllDatabases;
+    tabLayout.value = layout;
     persist();
   }
 
@@ -98,6 +119,14 @@ export const useSettingsStore = defineStore("settings", () => {
     commit();
   }
 
+  function setTabLayout(layout: TabLayout) {
+    if (tabLayout.value === layout) {
+      return;
+    }
+    tabLayout.value = layout;
+    commit();
+  }
+
   Events.On(SETTINGS_CHANGED, (ev) => {
     const data = ev.data as SettingsPayload | null;
     if (!data || typeof data !== "object") {
@@ -107,6 +136,7 @@ export const useSettingsStore = defineStore("settings", () => {
       connectionTint: Boolean(data.connectionTint),
       defaultPageSize: Number(data.defaultPageSize),
       showAllDatabases: data.showAllDatabases !== false,
+      tabLayout: isTabLayout(data.tabLayout) ? data.tabLayout : DEFAULT_TAB_LAYOUT,
     });
   });
 
@@ -114,8 +144,10 @@ export const useSettingsStore = defineStore("settings", () => {
     connectionTint,
     defaultPageSize,
     showAllDatabases,
+    tabLayout,
     setDefaultPageSize,
     setConnectionTint,
     setShowAllDatabases,
+    setTabLayout,
   };
 });

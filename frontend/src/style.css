@@ -153,3 +153,18 @@
 .cm-scroller {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
+
+.tab-strip-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted-foreground) transparent;
+}
+.tab-strip-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+.tab-strip-scroll::-webkit-scrollbar-thumb {
+  background: var(--muted-foreground);
+  border-radius: 9999px;
+}
+.tab-strip-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}

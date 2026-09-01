@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { PAGE_SIZES, useSettingsStore } from "@/stores/settings";
+import { isTabLayout, PAGE_SIZES, useSettingsStore } from "@/stores/settings";
 
 const settings = useSettingsStore();
 const mode = useColorMode({ initialValue: "dark" });
@@ -34,6 +34,12 @@ function onTint(value: unknown) {
 
 function onShowAllDatabases(value: unknown) {
   settings.setShowAllDatabases(Boolean(value));
+}
+
+function onTabLayout(value: unknown) {
+  if (isTabLayout(value)) {
+    settings.setTabLayout(value);
+  }
 }
 </script>
 
@@ -71,6 +77,19 @@ function onShowAllDatabases(value: unknown) {
         :model-value="settings.showAllDatabases"
         @update:model-value="onShowAllDatabases"
       />
+    </div>
+
+    <div class="flex items-center justify-between gap-4">
+      <Label for="settings-tab-layout">Tab layout</Label>
+      <Select :model-value="settings.tabLayout" @update:model-value="onTabLayout">
+        <SelectTrigger id="settings-tab-layout" size="sm" class="w-36">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="scroll">Scroll</SelectItem>
+          <SelectItem value="wrap">Wrap</SelectItem>
+        </SelectContent>
+      </Select>
     </div>
 
     <div class="flex items-center justify-between gap-4">

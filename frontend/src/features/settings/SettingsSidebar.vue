@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useRoute } from "vue-router";
 import {
   Sidebar,
   SidebarContent,
@@ -10,6 +11,8 @@ import {
   SidebarMenuItem,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
+
+const route = useRoute();
 </script>
 
 <template>
@@ -29,8 +32,13 @@ import {
         <SidebarGroupContent>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton :is-active="true">
-                General
+              <SidebarMenuButton as-child :is-active="route.path === '/settings'">
+                <RouterLink to="/settings">General</RouterLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton as-child :is-active="route.path === '/settings/shortcuts'">
+                <RouterLink to="/settings/shortcuts">Shortcuts</RouterLink>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>

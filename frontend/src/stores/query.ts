@@ -525,18 +525,22 @@ export const useQueryStore = defineStore("query", () => {
     );
   }
 
-  function reorder(profileId: string, fromIndex: number, toIndex: number) {
-    if (fromIndex < 0 || fromIndex === toIndex) {
-      return;
-    }
+  function setOrder(profileId: string, ids: string[]) {
     const group = tabs.value.filter((t) => t.profileId === profileId);
-    const [moved] = group.splice(fromIndex, 1);
-    if (!moved) {
+    if (group.length !== ids.length) {
       return;
     }
-    group.splice(toIndex, 0, moved);
+    const byId = new Map(group.map((t) => [t.id, t]));
+    const ordered: WorkspaceTab[] = [];
+    for (const id of ids) {
+      const tab = byId.get(id);
+      if (!tab) {
+        return;
+      }
+      ordered.push(tab);
+    }
     let i = 0;
-    tabs.value = tabs.value.map((t) => (t.profileId === profileId ? group[i++]! : t));
+    tabs.value = tabs.value.map((t) => (t.profileId === profileId ? ordered[i++]! : t));
   }
 
   function setSql(id: string, sql: string) {
@@ -841,7 +845,7 @@ export const useQueryStore = defineStore("query", () => {
     removeForProfile,
     restore,
     dropTableData,
-    reorder,
+    setOrder,
     setSql,
     setDatabase,
     run,

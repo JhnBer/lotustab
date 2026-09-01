@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
-import { useColorMode } from "@vueuse/core";
+import { useColorMode, useEventListener } from "@vueuse/core";
 import { useRoute, useRouter } from "vue-router";
 import { toast } from "vue-sonner";
 import { Events, Window } from "@wailsio/runtime";
@@ -22,9 +22,10 @@ import {
 import { Toaster } from "@/components/ui/sonner";
 import { errorMessage } from "@/lib/errors";
 import { connTint } from "@/lib/colors";
+import { matchWorkspaceShortcut } from "@/lib/shortcuts";
 import { WindowsService } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
-import { useQueryStore, type WorkspaceSnapshot } from "@/stores/query";
+import { isTableTab, useQueryStore, type WorkspaceSnapshot } from "@/stores/query";
 import { useSettingsStore } from "@/stores/settings";
 
 useColorMode({ initialValue: "dark" });
@@ -57,6 +58,92 @@ function restoreHandoff(raw: string | null | undefined): boolean {
     return false;
   }
 }
+
+function goQuery() {
+  if (route.path !== "/query") {
+    void router.push("/query");
+  }
+}
+
+function cycleTab(delta: 1 | -1) {
+  const profileId = connections.selectedId;
+  if (!profileId) {
+    return;
+  }
+  const group = queries.tabs.filter((t) => t.profileId === profileId);
+  if (group.length === 0) {
+    return;
+  }
+  const index = group.findIndex((t) => t.id === queries.activeTabId);
+  const from = index < 0 ? 0 : index;
+  const next = group[(from + delta + group.length) % group.length];
+  if (!next) {
+    return;
+  }
+  queries.selectTab(next.id);
+  goQuery();
+}
+
+function newQueryTab() {
+  const profile = connections.selected;
+  if (!profile) {
+    return;
+  }
+  queries.add(profile.id, profile.name);
+  goQuery();
+}
+
+async function newWindow() {
+  const profile = connections.selected;
+  if (!profile) {
+    if (route.path !== "/connections") {
+      await router.push("/connections");
+    }
+    return;
+  }
+  try {
+    await connections.openInNewWindow(profile);
+    if (!connections.selectedId) {
+      await router.push("/connections");
+    }
+  } catch (err) {
+    toast.error(errorMessage(err));
+  }
+}
+
+useEventListener("keydown", (event: KeyboardEvent) => {
+  const id = matchWorkspaceShortcut(event);
+  if (!id) {
+    return;
+  }
+  event.preventDefault();
+  switch (id) {
+    case "tab.next":
+      cycleTab(1);
+      break;
+    case "tab.prev":
+      cycleTab(-1);
+      break;
+    case "tab.close":
+      if (queries.activeTabId) {
+        queries.close(queries.activeTabId);
+      }
+      break;
+    case "tab.reload": {
+      const tab = queries.activeTab;
+      if (isTableTab(tab)) {
+        void queries.loadTable(tab.id);
+      }
+      break;
+    }
+    case "tab.new":
+      newQueryTab();
+      break;
+    case "window.new":
+      void newWindow();
+      break;
+  }
+});
 
 onMounted(async () => {
   try {

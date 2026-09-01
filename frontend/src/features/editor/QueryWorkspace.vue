@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
-import { FileCode2, Play, Plus, Table2, X } from "@lucide/vue";
+import { watch } from "vue";
+import { Play } from "@lucide/vue";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -18,6 +18,7 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import SqlEditor from "@/features/editor/SqlEditor.vue";
+import WorkspaceTabBar from "@/features/editor/WorkspaceTabBar.vue";
 import ResultsTable from "@/features/results/ResultsTable.vue";
 import TableBrowser from "@/features/results/TableBrowser.vue";
 import TablePager from "@/features/results/TablePager.vue";
@@ -31,42 +32,11 @@ const connections = useConnectionsStore();
 const queries = useQueryStore();
 const explorer = useExplorerStore();
 
-const visibleTabs = computed(() =>
-  queries.tabs.filter((t) => t.profileId === connections.selectedId),
-);
-
 watch(
   () => connections.selectedId,
   (id) => queries.activateProfile(id),
   { immediate: true },
 );
-
-const fromIndex = ref(-1);
-
-function onDragStart(event: DragEvent, index: number) {
-  fromIndex.value = index;
-  event.dataTransfer?.setData("text/plain", String(index));
-}
-
-function onDragOver(event: DragEvent) {
-  event.preventDefault();
-}
-
-function onDrop(index: number) {
-  if (fromIndex.value < 0) {
-    return;
-  }
-  queries.reorder(connections.selectedId, fromIndex.value, index);
-  fromIndex.value = -1;
-}
-
-function addTab() {
-  const profile = connections.selected;
-  if (!profile) {
-    return;
-  }
-  queries.add(profile.id, profile.name);
-}
 
 async function run() {
   const tab = queries.activeTab;
@@ -95,39 +65,7 @@ function onDatabase(value: unknown) {
 
 <template>
   <section class="flex h-full min-h-0 flex-1 flex-col -m-4 overflow-hidden">
-    <div class="flex items-center gap-1 border-b px-2 py-1 min-h-10">
-      <div class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto" style="--wails-draggable: no-drag">
-        <div
-          v-for="(tab, index) in visibleTabs"
-          :key="tab.id"
-          draggable="true"
-          class="flex max-w-[12rem] cursor-grab items-center gap-1 rounded-md px-2 py-1 text-xs active:cursor-grabbing"
-          :class="[
-            tab.id === queries.activeTabId ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/60',
-            fromIndex === index ? 'opacity-50' : '',
-          ]"
-          @click="queries.selectTab(tab.id)"
-          @dragstart="onDragStart($event, index)"
-          @dragover="onDragOver"
-          @drop="onDrop(index)"
-          @dragend="fromIndex = -1"
-        >
-          <Table2 v-if="tab.kind === 'table'" class="size-3 shrink-0" />
-          <FileCode2 v-else class="size-3 shrink-0" />
-          <span class="truncate">{{ tab.title }}</span>
-          <span
-            class="hover:bg-background rounded-sm p-0.5"
-            @click.stop="queries.close(tab.id)"
-            @mousedown.stop
-          >
-            <X class="size-3" />
-          </span>
-        </div>
-        <Button size="icon-xs" variant="ghost" :disabled="!connections.selected" @click="addTab">
-          <Plus class="size-3.5" />
-        </Button>
-      </div>
-    </div>
+    <WorkspaceTabBar />
 
     <div v-if="!queries.activeTab" class="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-2 p-8 text-sm">
       <span>Select a connection to start querying.</span>
