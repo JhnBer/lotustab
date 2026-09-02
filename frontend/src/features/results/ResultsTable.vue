@@ -202,10 +202,21 @@ function cellText(value: unknown): string {
   if (isNull(value)) {
     return "NULL";
   }
+  if (isEmptyStringValue(value)) {
+    return "empty string";
+  }
   if (typeof value === "object") {
     return JSON.stringify(value);
   }
   return String(value);
+}
+
+function isEmptyStringValue(value: unknown) {
+  return value === "" || value === "''";
+}
+
+function isPlaceholderValue(value: unknown) {
+  return isNull(value) || isEmptyStringValue(value);
 }
 
 function originalValue(rowIndex: number, colIndex: number) {
@@ -484,7 +495,7 @@ async function pasteCell() {
                         isDirty(item.index, col.index)
                           ? 'bg-yellow-500/15 ring-yellow-500 hover:bg-yellow-500/25 ring-1 ring-inset'
                           : 'hover:bg-muted/50',
-                        isNull(cellValue(item.index, col.index)) ? 'text-muted-foreground italic' : '',
+                        isPlaceholderValue(cellValue(item.index, col.index)) ? 'text-muted-foreground italic' : '',
                       ]"
                       :style="{ width: `${col.size}px` }"
                       :title="isEditing(item.index, col.index) ? undefined : cellText(cellValue(item.index, col.index))"

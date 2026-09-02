@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { FileCode2, Plus, Table2, X } from "@lucide/vue";
+import { FileCode2, Plus, Table2, TableProperties, X } from "@lucide/vue";
 import { VueDraggable } from "vue-draggable-plus";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -52,7 +52,7 @@ async function copyName(title: string) {
 
 <template>
   <div
-    class="flex min-h-10 gap-1 border-b px-2 py-1"
+    class="flex min-h-10 shrink-0 gap-1 border-b px-2 py-1"
     :class="wrapTabs ? 'items-start' : 'items-center'"
   >
     <component
@@ -82,7 +82,11 @@ async function copyName(title: string) {
               :class="tab.id === queries.activeTabId ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/60'"
               @click="queries.selectTab(tab.id)"
             >
-              <Table2 v-if="tab.kind === 'table'" class="pointer-events-none size-3 shrink-0" />
+              <TableProperties
+                v-if="tab.kind === 'table' && tab.view === 'structure'"
+                class="pointer-events-none size-3 shrink-0"
+              />
+              <Table2 v-else-if="tab.kind === 'table'" class="pointer-events-none size-3 shrink-0" />
               <FileCode2 v-else class="pointer-events-none size-3 shrink-0" />
               <span class="pointer-events-none truncate">{{ tab.title }}</span>
               <span

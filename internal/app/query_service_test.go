@@ -60,3 +60,32 @@ func TestApplyEditsValidatesInput(t *testing.T) {
 		t.Fatalf("expected no edits error, got %v", err)
 	}
 }
+
+func TestDescribeTableValidatesInput(t *testing.T) {
+	s := &QueryService{}
+	_, err := s.DescribeTable(context.Background(), "", driver.TableRef{Name: "users"})
+	if err == nil || !strings.Contains(err.Error(), "profile") {
+		t.Fatalf("expected profile error, got %v", err)
+	}
+	_, err = s.DescribeTable(context.Background(), "abc", driver.TableRef{Name: "  "})
+	if err == nil || !strings.Contains(err.Error(), "table") {
+		t.Fatalf("expected table error, got %v", err)
+	}
+}
+
+func TestAlterTableValidatesInput(t *testing.T) {
+	s := &QueryService{}
+	op := driver.ColumnOp{Kind: driver.ColumnOpDrop, Name: "age"}
+	err := s.AlterTable(context.Background(), "", driver.AlterTableRequest{Name: "users", Ops: []driver.ColumnOp{op}})
+	if err == nil || !strings.Contains(err.Error(), "profile") {
+		t.Fatalf("expected profile error, got %v", err)
+	}
+	err = s.AlterTable(context.Background(), "abc", driver.AlterTableRequest{Name: "  ", Ops: []driver.ColumnOp{op}})
+	if err == nil || !strings.Contains(err.Error(), "table") {
+		t.Fatalf("expected table error, got %v", err)
+	}
+	err = s.AlterTable(context.Background(), "abc", driver.AlterTableRequest{Name: "users"})
+	if err == nil || !strings.Contains(err.Error(), "no schema") {
+		t.Fatalf("expected no schema changes error, got %v", err)
+	}
+}

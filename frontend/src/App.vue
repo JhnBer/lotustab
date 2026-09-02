@@ -132,7 +132,7 @@ useEventListener("keydown", (event: KeyboardEvent) => {
     case "tab.reload": {
       const tab = queries.activeTab;
       if (isTableTab(tab)) {
-        void queries.loadTable(tab.id);
+        void queries.reloadTab(tab.id);
       }
       break;
     }

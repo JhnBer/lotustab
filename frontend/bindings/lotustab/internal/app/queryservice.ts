@@ -15,6 +15,13 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as driver$0 from "../core/driver/models.js";
 
 /**
+ * AlterTable applies accumulated column operations in a single request.
+ */
+export function AlterTable(profileID: string, req: driver$0.AlterTableRequest): $CancellablePromise<void> {
+    return $Call.ByID(1524686696, profileID, req);
+}
+
+/**
  * ApplyEdits writes accumulated cell edits in a single transaction.
  */
 export function ApplyEdits(profileID: string, req: driver$0.ApplyEditsRequest): $CancellablePromise<void> {
@@ -26,6 +33,13 @@ export function ApplyEdits(profileID: string, req: driver$0.ApplyEditsRequest): 
  */
 export function BrowseTable(profileID: string, req: driver$0.TableBrowseRequest): $CancellablePromise<driver$0.TableBrowseResult | null> {
     return $Call.ByID(3342274770, profileID, req);
+}
+
+/**
+ * DescribeTable returns column metadata for a table.
+ */
+export function DescribeTable(profileID: string, ref: driver$0.TableRef): $CancellablePromise<driver$0.TableStructure | null> {
+    return $Call.ByID(3872960519, profileID, ref);
 }
 
 /**

@@ -10,5 +10,7 @@ type Conn interface {
 	ListTables(ctx context.Context, database string) ([]TableInfo, error)
 	BrowseTable(ctx context.Context, req TableBrowseRequest) (*TableBrowseResult, error)
 	ApplyEdits(ctx context.Context, req ApplyEditsRequest) error
+	DescribeTable(ctx context.Context, ref TableRef) (*TableStructure, error)
+	AlterTable(ctx context.Context, req AlterTableRequest) error
 	Close() error
 }

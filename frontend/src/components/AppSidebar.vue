@@ -35,6 +35,12 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { Spinner } from "@/components/ui/spinner";
 import {
   Select,
@@ -336,7 +342,7 @@ async function refreshExplorer() {
   }
 }
 
-function openTable(database: string, table: TableInfo) {
+function openTable(database: string, table: TableInfo, view: "data" | "structure" = "data") {
   if (!selected.value) {
     return;
   }
@@ -345,6 +351,7 @@ function openTable(database: string, table: TableInfo) {
     database,
     schema: table.schema,
     name: table.name,
+    view,
   });
   router.push("/query");
 }
@@ -588,11 +595,23 @@ function isDbOpen(name: string, showHeader: boolean): boolean {
                         v-for="table in group.tables"
                         :key="`${table.schema}.${table.name}`"
                       >
-                        <SidebarMenuSubButton as="button" @click="openTable(entry.name, table)">
-                          <Eye v-if="table.type === 'view'" class="size-3.5" />
-                          <Table2 v-else class="size-3.5" />
-                          <span>{{ table.name }}</span>
-                        </SidebarMenuSubButton>
+                        <ContextMenu>
+                          <ContextMenuTrigger as-child>
+                            <SidebarMenuSubButton as="button" @click="openTable(entry.name, table)">
+                              <Eye v-if="table.type === 'view'" class="size-3.5" />
+                              <Table2 v-else class="size-3.5" />
+                              <span>{{ table.name }}</span>
+                            </SidebarMenuSubButton>
+                          </ContextMenuTrigger>
+                          <ContextMenuContent>
+                            <ContextMenuItem @select="openTable(entry.name, table)">
+                              Open table
+                            </ContextMenuItem>
+                            <ContextMenuItem @select="openTable(entry.name, table, 'structure')">
+                              Open structure
+                            </ContextMenuItem>
+                          </ContextMenuContent>
+                        </ContextMenu>
                       </SidebarMenuSubItem>
                     </SidebarMenuSub>
                   </SidebarMenuSubItem>
@@ -602,11 +621,23 @@ function isDbOpen(name: string, showHeader: boolean): boolean {
                     v-for="table in entry.tables"
                     :key="`${table.schema}.${table.name}`"
                   >
-                    <SidebarMenuSubButton as="button" @click="openTable(entry.name, table)">
-                      <Eye v-if="table.type === 'view'" class="size-3.5" />
-                      <Table2 v-else class="size-3.5" />
-                      <span>{{ table.name }}</span>
-                    </SidebarMenuSubButton>
+                    <ContextMenu>
+                      <ContextMenuTrigger as-child>
+                        <SidebarMenuSubButton as="button" @click="openTable(entry.name, table)">
+                          <Eye v-if="table.type === 'view'" class="size-3.5" />
+                          <Table2 v-else class="size-3.5" />
+                          <span>{{ table.name }}</span>
+                        </SidebarMenuSubButton>
+                      </ContextMenuTrigger>
+                      <ContextMenuContent>
+                        <ContextMenuItem @select="openTable(entry.name, table)">
+                          Open table
+                        </ContextMenuItem>
+                        <ContextMenuItem @select="openTable(entry.name, table, 'structure')">
+                          Open structure
+                        </ContextMenuItem>
+                      </ContextMenuContent>
+                    </ContextMenu>
                   </SidebarMenuSubItem>
                   <SidebarMenuSubItem
                     v-if="entry.tables.length === 0"

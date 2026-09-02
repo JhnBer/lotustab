@@ -6,8 +6,11 @@ export {
 } from "./models.js";
 
 export type {
+    AlterTableRequest,
     ApplyEditsRequest,
     Column,
+    ColumnInfo,
+    ColumnOp,
     DriverInfo,
     Field,
     Option,
@@ -16,5 +19,7 @@ export type {
     TableBrowseRequest,
     TableBrowseResult,
     TableFilter,
-    TableInfo
+    TableInfo,
+    TableRef,
+    TableStructure
 } from "./models.js";

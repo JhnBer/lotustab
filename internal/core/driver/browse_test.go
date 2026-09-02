@@ -66,6 +66,46 @@ func TestClampApplyEdits(t *testing.T) {
 	}
 }
 
+func TestClampTableRef(t *testing.T) {
+	got := driver.ClampTableRef(driver.TableRef{Database: " db ", Schema: " public ", Name: " users "})
+	if got.Database != "db" || got.Schema != "public" || got.Name != "users" {
+		t.Fatalf("trimmed identifiers: %+v", got)
+	}
+}
+
+func TestClampAlterTable(t *testing.T) {
+	def := "  now()  "
+	after := " id "
+	got := driver.ClampAlterTable(driver.AlterTableRequest{
+		Database: " db ",
+		Schema:   " public ",
+		Name:     " users ",
+		Ops: []driver.ColumnOp{{
+			Kind:    " ADD ",
+			Name:    " age ",
+			NewName: " years ",
+			Column:  &driver.ColumnInfo{Name: " years ", Type: " int ", Default: &def},
+			After:   &after,
+		}},
+	})
+	if got.Database != "db" || got.Schema != "public" || got.Name != "users" {
+		t.Fatalf("trimmed identifiers: %+v", got)
+	}
+	if len(got.Ops) != 1 {
+		t.Fatalf("ops: %d", len(got.Ops))
+	}
+	op := got.Ops[0]
+	if op.Kind != "add" || op.Name != "age" || op.NewName != "years" {
+		t.Fatalf("op identity: %+v", op)
+	}
+	if op.Column == nil || op.Column.Name != "years" || op.Column.Type != "int" || op.Column.Default == nil || *op.Column.Default != "now()" {
+		t.Fatalf("column: %+v", op.Column)
+	}
+	if op.After == nil || *op.After != "id" {
+		t.Fatalf("after: %+v", op.After)
+	}
+}
+
 func TestBrowseFromQueryEmptyPrimaryKey(t *testing.T) {
 	got := driver.BrowseFromQuery(nil, 0)
 	if got.PrimaryKey == nil {

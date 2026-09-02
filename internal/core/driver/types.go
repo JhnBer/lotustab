@@ -117,6 +117,57 @@ type ApplyEditsRequest struct {
 	Rows     []RowEdit `json:"rows"`
 }
 
+const (
+	ColumnOpAdd     = "add"
+	ColumnOpDrop    = "drop"
+	ColumnOpModify  = "modify"
+	ColumnOpReorder = "reorder"
+)
+
+// TableRef identifies a table inside a connection catalog.
+type TableRef struct {
+	Database string `json:"database"`
+	Schema   string `json:"schema"`
+	Name     string `json:"name"`
+}
+
+// ColumnInfo is catalog metadata for one table column.
+type ColumnInfo struct {
+	Name          string  `json:"name"`
+	Type          string  `json:"type"`
+	Nullable      bool    `json:"nullable"`
+	Default       *string `json:"default"`
+	AutoIncrement bool    `json:"autoIncrement"`
+	IsPrimaryKey  bool    `json:"isPrimaryKey"`
+	Extra         string  `json:"extra,omitempty"`
+	Comment       string  `json:"comment"`
+	Ordinal       int     `json:"ordinal"`
+}
+
+// TableStructure is the editable column list for a table.
+type TableStructure struct {
+	Columns    []ColumnInfo `json:"columns"`
+	CanReorder bool         `json:"canReorder"`
+}
+
+// ColumnOp is one pending schema change against a table.
+// After is the previous column's (new) name; empty string means FIRST; nil leaves position unchanged.
+type ColumnOp struct {
+	Kind    string      `json:"kind"`
+	Name    string      `json:"name"`
+	NewName string      `json:"newName,omitempty"`
+	Column  *ColumnInfo `json:"column,omitempty"`
+	After   *string     `json:"after"`
+}
+
+// AlterTableRequest applies accumulated column operations to a single table.
+type AlterTableRequest struct {
+	Database string     `json:"database"`
+	Schema   string     `json:"schema"`
+	Name     string     `json:"name"`
+	Ops      []ColumnOp `json:"ops"`
+}
+
 // DriverInfo is the public description of a registered driver.
 type DriverInfo struct {
 	ID             string  `json:"id"`

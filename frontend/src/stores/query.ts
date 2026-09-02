@@ -7,6 +7,7 @@ import {
   QueryService,
   type QueryResult,
   type TableBrowseResult,
+  type TableStructure,
 } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
 import { useSettingsStore } from "@/stores/settings";
@@ -22,6 +23,17 @@ import {
   emptyFilter,
   type TableFilter,
 } from "@/features/results/filters";
+import {
+  columnsToDraft,
+  emptyDraftColumn,
+  isStructureDirty,
+  nextColumnName,
+  structureOps,
+  type DraftColumn,
+  type TableView,
+} from "@/features/results/structure";
+
+export type { DraftColumn, TableView } from "@/features/results/structure";
 
 export type SortDir = "asc" | "desc" | "";
 
@@ -58,6 +70,10 @@ export interface TableTab extends TabBase {
   filtersEnabled: boolean;
   filtersOpen: boolean;
   filters: TableFilter[];
+  view: TableView;
+  structure: TableStructure | null;
+  structureDraft: DraftColumn[] | null;
+  structureError: string;
 }
 
 export type WorkspaceTab = QueryTab | TableTab;
@@ -88,6 +104,7 @@ type PersistedTableTab = Pick<
   | "filtersEnabled"
   | "filtersOpen"
   | "filters"
+  | "view"
 >;
 type PersistedTab = PersistedQueryTab | PersistedTableTab;
 type PersistedWorkspace = {
@@ -128,6 +145,12 @@ function tableTitle(schema: string, name: string, database: string): string {
     return `${schema}.${name}`;
   }
   return name;
+}
+
+function afterPaint(fn: () => void) {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(fn);
+  });
 }
 
 function asQueryResult(result: TableBrowseResult | null): QueryResult | null {
@@ -179,6 +202,7 @@ function persistTab(tab: WorkspaceTab): PersistedTab {
     filtersEnabled: tab.filtersEnabled,
     filtersOpen: tab.filtersOpen,
     filters: tab.filters ?? [],
+    view: tab.view === "structure" ? "structure" : "data",
   };
 }
 
@@ -220,6 +244,10 @@ function restoreTableTab(tab: PersistedTableTab): TableTab {
     filtersEnabled: Boolean(tab.filtersEnabled),
     filtersOpen: Boolean(tab.filtersOpen),
     filters: tab.filters ?? [],
+    view: tab.view === "structure" ? "structure" : "data",
+    structure: null,
+    structureDraft: null,
+    structureError: "",
   };
 }
 
@@ -294,6 +322,8 @@ function hydrateTabs(stored: PersistedWorkspace): WorkspaceTab[] {
   return stored.tabs.map((tab) => (tab.kind === "query" ? restoreQueryTab(tab) : restoreTableTab(tab)));
 }
 
+const MOUNTED_TAB_LIMIT = 5;
+
 export const useQueryStore = defineStore("query", () => {
   const stored = parseWorkspace(readJson(WORKSPACE_KEY, {}));
   const tabs = ref<WorkspaceTab[]>(hydrateTabs(stored));
@@ -305,6 +335,8 @@ export const useQueryStore = defineStore("query", () => {
   const activeByProfile = ref<Record<string, string>>(
     parseActiveByProfile(stored.activeByProfile, tabs.value, activeTabId.value),
   );
+  const recentTabIds = ref<string[]>(activeTabId.value ? [activeTabId.value] : []);
+  const coldMountId = ref("");
 
   watchDebounced(
     () => ({
@@ -318,6 +350,42 @@ export const useQueryStore = defineStore("query", () => {
 
   const activeTab = computed(() => tabs.value.find((t) => t.id === activeTabId.value));
 
+  function touchRecent(id: string) {
+    if (!id) {
+      return;
+    }
+    recentTabIds.value = [id, ...recentTabIds.value.filter((x) => x !== id)];
+  }
+
+  function forgetRecent(id: string) {
+    if (!recentTabIds.value.includes(id)) {
+      return;
+    }
+    recentTabIds.value = recentTabIds.value.filter((x) => x !== id);
+  }
+
+  function mountedTabIds(profileId: string): string[] {
+    if (!profileId) {
+      return [];
+    }
+    const inProfile = new Set(tabs.value.filter((t) => t.profileId === profileId).map((t) => t.id));
+    const out: string[] = [];
+    const active = activeTabId.value;
+    if (active && inProfile.has(active)) {
+      out.push(active);
+    }
+    for (const id of recentTabIds.value) {
+      if (out.length >= MOUNTED_TAB_LIMIT) {
+        break;
+      }
+      if (!inProfile.has(id) || out.includes(id)) {
+        continue;
+      }
+      out.push(id);
+    }
+    return out;
+  }
+
   function selectTab(id: string) {
     if (!id) {
       activeTabId.value = "";
@@ -328,7 +396,17 @@ export const useQueryStore = defineStore("query", () => {
       activeTabId.value = "";
       return;
     }
+    const isCold = !mountedTabIds(tab.profileId).includes(id);
     activeTabId.value = id;
+    touchRecent(id);
+    if (isCold) {
+      coldMountId.value = id;
+      afterPaint(() => {
+        if (coldMountId.value === id) {
+          coldMountId.value = "";
+        }
+      });
+    }
     if (activeByProfile.value[tab.profileId] === id) {
       return;
     }
@@ -378,18 +456,30 @@ export const useQueryStore = defineStore("query", () => {
     database: string;
     schema: string;
     name: string;
+    view?: TableView;
   }) {
+    const view = opts.view === "structure" ? "structure" : "data";
     const existing = tabs.value.find(
       (t): t is TableTab =>
         t.kind === "table" &&
         t.profileId === opts.profileId &&
         t.database === opts.database &&
         t.schema === opts.schema &&
-        t.name === opts.name,
+        t.name === opts.name &&
+        t.view === view,
     );
     if (existing) {
       selectTab(existing.id);
-      void loadTable(existing.id);
+      if (existing.view === "structure") {
+        if (existing.structure || existing.structureDraft) {
+          return existing;
+        }
+        existing.running = true;
+        afterPaint(() => void loadStructure(existing.id));
+      } else if (!existing.result) {
+        existing.running = true;
+        afterPaint(() => void loadTable(existing.id));
+      }
       return existing;
     }
     const tab: TableTab = {
@@ -404,7 +494,7 @@ export const useQueryStore = defineStore("query", () => {
       pageSize: storedPageSize(),
       orderBy: "",
       orderDir: "",
-      running: false,
+      running: true,
       error: "",
       result: null,
       total: 0,
@@ -413,10 +503,14 @@ export const useQueryStore = defineStore("query", () => {
       filtersEnabled: false,
       filtersOpen: false,
       filters: [],
+      view,
+      structure: null,
+      structureDraft: null,
+      structureError: "",
     };
     tabs.value.push(tab);
     selectTab(tab.id);
-    void loadTable(tab.id);
+    afterPaint(() => void reloadTab(tab.id));
     return tab;
   }
 
@@ -435,6 +529,7 @@ export const useQueryStore = defineStore("query", () => {
     const profileId = tabs.value[index]!.profileId;
     const groupIndex = tabs.value.filter((t) => t.profileId === profileId).findIndex((t) => t.id === id);
     tabs.value.splice(index, 1);
+    forgetRecent(id);
     if (activeTabId.value !== id) {
       return;
     }
@@ -454,7 +549,7 @@ export const useQueryStore = defineStore("query", () => {
     return {
       tabs: group.map((t) => {
         if (t.kind === "table") {
-          return { ...t, running: false, edits: [] };
+          return { ...t, running: false, edits: [], structureDraft: t.structureDraft ? t.structureDraft.map((col) => ({ ...col })) : null };
         }
         return { ...t, running: false };
       }),
@@ -465,7 +560,9 @@ export const useQueryStore = defineStore("query", () => {
   function removeForProfile(profileId: string) {
     const removingActive =
       tabs.value.find((t) => t.id === activeTabId.value)?.profileId === profileId;
+    const removed = new Set(tabs.value.filter((t) => t.profileId === profileId).map((t) => t.id));
     tabs.value = tabs.value.filter((t) => t.profileId !== profileId);
+    recentTabIds.value = recentTabIds.value.filter((id) => !removed.has(id));
     forgetProfile(profileId);
     if (removingActive) {
       selectTab(tabs.value[0]?.id ?? "");
@@ -487,6 +584,7 @@ export const useQueryStore = defineStore("query", () => {
       !placeholder.result
     ) {
       tabs.value = tabs.value.filter((t) => t.id !== placeholder.id);
+      forgetRecent(placeholder.id);
     }
     const existing = new Set(tabs.value.map((t) => t.id));
     for (const tab of snapshot.tabs) {
@@ -507,6 +605,10 @@ export const useQueryStore = defineStore("query", () => {
             filtersEnabled: tab.filtersEnabled ?? false,
             filtersOpen: tab.filtersOpen ?? false,
             filters: tab.filters ?? [],
+            view: tab.view === "structure" ? "structure" : "data",
+            structure: tab.structure ?? null,
+            structureDraft: null,
+            structureError: "",
           });
         }
       }
@@ -561,6 +663,9 @@ export const useQueryStore = defineStore("query", () => {
       tab.edits = [];
       tab.error = "";
       tab.running = false;
+      tab.structure = null;
+      tab.structureDraft = null;
+      tab.structureError = "";
     }
   }
 
@@ -625,6 +730,7 @@ export const useQueryStore = defineStore("query", () => {
       return;
     }
     if (!useConnectionsStore().isConnected(tab.profileId)) {
+      tab.running = false;
       return;
     }
     if (!tab.edits) {
@@ -834,10 +940,182 @@ export const useQueryStore = defineStore("query", () => {
     await loadTable(id);
   }
 
+  function tableTab(id: string): TableTab | undefined {
+    const tab = tabs.value.find((t) => t.id === id);
+    if (!tab || tab.kind !== "table") {
+      return undefined;
+    }
+    return tab;
+  }
+
+  function reloadTab(id: string) {
+    const tab = tableTab(id);
+    if (!tab) {
+      return;
+    }
+    if (tab.view === "structure") {
+      return loadStructure(id);
+    }
+    return loadTable(id);
+  }
+
+  function clearBrowse(tab: TableTab) {
+    tab.edits = [];
+    tab.result = null;
+    tab.total = 0;
+    tab.primaryKey = [];
+  }
+
+  async function loadStructure(id: string, opts?: { force?: boolean }) {
+    const tab = tableTab(id);
+    if (!tab) {
+      return;
+    }
+    if (!useConnectionsStore().isConnected(tab.profileId)) {
+      tab.running = false;
+      return;
+    }
+    const keepDraft =
+      !opts?.force &&
+      Boolean(tab.structureDraft) &&
+      isStructureDirty(tab.structure?.columns, tab.structureDraft, tab.structure?.canReorder ?? false);
+    cancel(id);
+    tab.running = true;
+    tab.structureError = "";
+    const pending = QueryService.DescribeTable(tab.profileId, {
+      database: tab.database,
+      schema: tab.schema,
+      name: tab.name,
+    });
+    inflight.set(id, pending);
+    try {
+      const result = await pending;
+      tab.structure = result
+        ? { columns: result.columns ?? [], canReorder: Boolean(result.canReorder) }
+        : { columns: [], canReorder: false };
+      if (!keepDraft) {
+        tab.structureDraft = columnsToDraft(tab.structure.columns);
+      }
+    } catch (err) {
+      if (isCanceled(err)) {
+        return;
+      }
+      tab.structure = null;
+      if (!keepDraft) {
+        tab.structureDraft = null;
+      }
+      tab.structureError = errorMessage(err);
+    } finally {
+      if (inflight.get(id) === pending) {
+        inflight.delete(id);
+        tab.running = false;
+      }
+    }
+  }
+
+  function ensureStructureDraft(tab: TableTab): DraftColumn[] {
+    if (!tab.structureDraft) {
+      tab.structureDraft = columnsToDraft(tab.structure?.columns ?? []);
+    }
+    return tab.structureDraft;
+  }
+
+  function updateStructureColumn(id: string, key: string, patch: Partial<DraftColumn>) {
+    const tab = tableTab(id);
+    if (!tab) {
+      return;
+    }
+    const draft = ensureStructureDraft(tab);
+    const index = draft.findIndex((col) => col.key === key);
+    if (index < 0) {
+      return;
+    }
+    tab.structureDraft = draft.map((col, i) => (i === index ? { ...col, ...patch, key: col.key } : col));
+  }
+
+  function addStructureColumn(id: string) {
+    const tab = tableTab(id);
+    if (!tab) {
+      return;
+    }
+    const draft = ensureStructureDraft(tab);
+    tab.structureDraft = [...draft, emptyDraftColumn(nextColumnName(draft))];
+  }
+
+  function toggleDropStructureColumn(id: string, key: string) {
+    const tab = tableTab(id);
+    if (!tab) {
+      return;
+    }
+    const draft = ensureStructureDraft(tab);
+    const index = draft.findIndex((col) => col.key === key);
+    if (index < 0) {
+      return;
+    }
+    const col = draft[index]!;
+    if (col.originalName === null) {
+      tab.structureDraft = draft.filter((item) => item.key !== key);
+      return;
+    }
+    tab.structureDraft = draft.map((item) =>
+      item.key === key ? { ...item, dropped: !item.dropped } : item,
+    );
+  }
+
+  function moveStructureColumns(id: string, next: DraftColumn[]) {
+    const tab = tableTab(id);
+    if (!tab) {
+      return;
+    }
+    tab.structureDraft = next;
+  }
+
+  function cancelStructure(id: string) {
+    const tab = tableTab(id);
+    if (!tab) {
+      return;
+    }
+    tab.structureDraft = columnsToDraft(tab.structure?.columns ?? []);
+  }
+
+  async function applyStructure(id: string) {
+    const tab = tableTab(id);
+    if (!tab) {
+      return;
+    }
+    const ops = structureOps(tab.structure?.columns, tab.structureDraft, tab.structure?.canReorder ?? false);
+    if (ops.length === 0) {
+      return;
+    }
+    await QueryService.AlterTable(tab.profileId, {
+      database: tab.database,
+      schema: tab.schema,
+      name: tab.name,
+      ops,
+    });
+    clearBrowse(tab);
+    const dataTab = tabs.value.find(
+      (t): t is TableTab =>
+        t.kind === "table" &&
+        t.view === "data" &&
+        t.id !== tab.id &&
+        t.profileId === tab.profileId &&
+        t.database === tab.database &&
+        t.schema === tab.schema &&
+        t.name === tab.name,
+    );
+    if (dataTab) {
+      clearBrowse(dataTab);
+    }
+    await loadStructure(id, { force: true });
+  }
+
   return {
     tabs,
     activeTabId,
     activeTab,
+    mountedTabIds,
+    coldMountId,
     selectTab,
     activateProfile,
     openForProfile,
@@ -854,6 +1132,14 @@ export const useQueryStore = defineStore("query", () => {
     run,
     cancel,
     loadTable,
+    loadStructure,
+    reloadTab,
+    updateStructureColumn,
+    addStructureColumn,
+    toggleDropStructureColumn,
+    moveStructureColumns,
+    cancelStructure,
+    applyStructure,
     setPage,
     setPageSize,
     cycleSort,

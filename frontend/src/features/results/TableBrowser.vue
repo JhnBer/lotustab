@@ -1,32 +1,62 @@
 <script setup lang="ts">
-import { computed, watch } from "vue";
-import { ChevronDown, ChevronRight, Filter, Plus } from "@lucide/vue";
+import { computed, ref, watch } from "vue";
+import { ChevronDown, ChevronRight, Filter, Plus, RotateCw } from "@lucide/vue";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Toggle } from "@/components/ui/toggle";
 import ResultsTable from "@/features/results/ResultsTable.vue";
 import TableFilters from "@/features/results/TableFilters.vue";
 import TablePager from "@/features/results/TablePager.vue";
+import TableStructure from "@/features/results/TableStructure.vue";
+import { isStructureDirty, structureOps } from "@/features/results/structure";
 import { errorMessage } from "@/lib/errors";
 import { useConnectionsStore } from "@/stores/connections";
 import { type TableTab, useQueryStore } from "@/stores/query";
 
 const props = defineProps<{
   tab: TableTab;
+  active: boolean;
 }>();
 
 const connections = useConnectionsStore();
 const queries = useQueryStore();
 const connected = computed(() => connections.isConnected(props.tab.profileId));
 const loading = computed(() => props.tab.running || connections.isConnecting(props.tab.profileId));
+const structureView = computed(() => props.tab.view === "structure");
+const structureDirty = computed(() =>
+  isStructureDirty(props.tab.structure?.columns, props.tab.structureDraft, Boolean(props.tab.structure?.canReorder)),
+);
+const columnCount = computed(
+  () => props.tab.structureDraft?.filter((col) => !col.dropped).length ?? props.tab.structure?.columns?.length ?? 0,
+);
+const confirmDrop = ref(false);
+const dropCount = computed(
+  () => structureOps(props.tab.structure?.columns, props.tab.structureDraft, Boolean(props.tab.structure?.canReorder)).filter((op) => op.kind === "drop").length,
+);
 
 watch(
-  connected,
-  (isConnected) => {
-    if (!isConnected || props.tab.result || props.tab.running) {
+  () => Boolean(props.active) && connected.value,
+  (shouldLoad) => {
+    if (!shouldLoad) {
       return;
     }
-    void queries.loadTable(props.tab.id);
+    if (structureView.value) {
+      if (!props.tab.structure && !props.tab.structureDraft && !props.tab.running) {
+        void queries.loadStructure(props.tab.id);
+      }
+      return;
+    }
+    if (!props.tab.result && !props.tab.running) {
+      void queries.loadTable(props.tab.id);
+    }
   },
   { immediate: true },
 );
@@ -35,9 +65,44 @@ function onEdit(row: number, column: string, value: unknown) {
   queries.setCellDraft(props.tab.id, row, column, value);
 }
 
+function openCompanion() {
+  queries.openTable({
+    profileId: props.tab.profileId,
+    database: props.tab.database,
+    schema: props.tab.schema,
+    name: props.tab.name,
+    view: structureView.value ? "data" : "structure",
+  });
+}
+
 async function onApply() {
+  if (structureView.value) {
+    if (dropCount.value > 0) {
+      confirmDrop.value = true;
+      return;
+    }
+    await applyStructure();
+    return;
+  }
   try {
     await queries.applyEdits(props.tab.id);
+  } catch (err) {
+    toast.error(errorMessage(err));
+  }
+}
+
+function onCancel() {
+  if (structureView.value) {
+    queries.cancelStructure(props.tab.id);
+    return;
+  }
+  queries.clearEdits(props.tab.id);
+}
+
+async function applyStructure() {
+  confirmDrop.value = false;
+  try {
+    await queries.applyStructure(props.tab.id);
   } catch (err) {
     toast.error(errorMessage(err));
   }
@@ -45,14 +110,23 @@ async function onApply() {
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col">
-    <div class="flex items-center gap-2 border-b px-3 py-2 text-xs">
+  <div class="flex min-h-0 flex-1 flex-col bg-background">
+    <div v-if="!structureView" class="flex items-center gap-2 border-b px-3 py-2 text-xs">
       <div class="text-muted-foreground min-w-0 flex-1 truncate">
         <span class="text-foreground font-medium">{{ tab.title }}</span>
         <span v-if="tab.database" class="ml-1">· {{ tab.database }}</span>
         <span v-if="tab.result && !tab.running"> · {{ tab.result.durationMs }} ms</span>
       </div>
       <div class="flex shrink-0 items-center gap-1">
+        <Button
+          size="icon-xs"
+          variant="outline"
+          :disabled="loading"
+          aria-label="Refresh table"
+          @click="queries.loadTable(tab.id)"
+        >
+          <RotateCw class="size-3.5" :class="tab.running ? 'animate-spin' : ''" />
+        </Button>
         <Button
           size="icon-xs"
           variant="outline"
@@ -91,42 +165,66 @@ async function onApply() {
         </Button>
       </div>
     </div>
-    <TableFilters
-      v-show="tab.filtersOpen"
-      :filters="tab.filters ?? []"
-      :columns="tab.result?.columns ?? []"
-      :disabled="!tab.filtersEnabled"
-      @update:filters="queries.setFilters(tab.id, $event)"
-      @apply="queries.applyFilters(tab.id)"
-    />
-    <ResultsTable
-      class="min-h-0 flex-1"
-      :result="tab.result"
-      :error="tab.error"
-      :running="loading"
-      sortable
-      :sort-column="tab.orderBy"
-      :sort-dir="tab.orderDir"
-      :show-status="false"
-      :row-offset="(tab.page - 1) * tab.pageSize"
-      :editable="(tab.primaryKey?.length ?? 0) > 0"
-      :edits="tab.edits ?? []"
-      :primary-key="tab.primaryKey ?? []"
-      :empty-hint="connected ? 'Loading table…' : 'Connect to view this table.'"
-      @sort="queries.cycleSort(tab.id, $event)"
-      @edit="onEdit"
-    />
+    <template v-if="structureView">
+      <TableStructure :tab="tab" :running="loading" />
+    </template>
+    <template v-else>
+      <TableFilters
+        v-show="tab.filtersOpen"
+        :filters="tab.filters ?? []"
+        :columns="tab.result?.columns ?? []"
+        :disabled="!tab.filtersEnabled"
+        @update:filters="queries.setFilters(tab.id, $event)"
+        @apply="queries.applyFilters(tab.id)"
+      />
+      <ResultsTable
+        class="min-h-0 flex-1"
+        :result="tab.result"
+        :error="tab.error"
+        :running="loading"
+        sortable
+        :sort-column="tab.orderBy"
+        :sort-dir="tab.orderDir"
+        :show-status="false"
+        :row-offset="(tab.page - 1) * tab.pageSize"
+        :editable="(tab.primaryKey?.length ?? 0) > 0"
+        :edits="tab.edits ?? []"
+        :primary-key="tab.primaryKey ?? []"
+        :empty-hint="connected ? 'Loading table…' : 'Connect to view this table.'"
+        @sort="queries.cycleSort(tab.id, $event)"
+        @edit="onEdit"
+      />
+    </template>
     <TablePager
       :page="tab.page"
       :page-size="tab.pageSize"
       :row-count="tab.result?.rows?.length ?? 0"
       :running="loading"
       :total="tab.total"
-      :dirty="(tab.edits?.length ?? 0) > 0"
+      :dirty="structureView ? structureDirty : (tab.edits?.length ?? 0) > 0"
+      :switch-label="structureView ? 'Table' : 'Structure'"
+      :compact="structureView"
+      :label="structureView ? `${columnCount} columns` : undefined"
       @page="queries.setPage(tab.id, $event)"
       @page-size="queries.setPageSize(tab.id, $event)"
       @apply="onApply"
-      @cancel="queries.clearEdits(tab.id)"
+      @cancel="onCancel"
+      @switch="openCompanion"
     />
+
+    <Dialog :open="confirmDrop" @update:open="confirmDrop = $event">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Drop {{ dropCount }} {{ dropCount === 1 ? "column" : "columns" }}?</DialogTitle>
+          <DialogDescription>
+            Dropping columns cannot be undone and will permanently delete their data.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" @click="confirmDrop = false">Cancel</Button>
+          <Button variant="destructive" @click="applyStructure">Apply</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>

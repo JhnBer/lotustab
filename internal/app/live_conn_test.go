@@ -79,6 +79,10 @@ func (c *stubConn) BrowseTable(context.Context, driver.TableBrowseRequest) (*dri
 	return &driver.TableBrowseResult{}, nil
 }
 func (c *stubConn) ApplyEdits(context.Context, driver.ApplyEditsRequest) error { return nil }
+func (c *stubConn) DescribeTable(context.Context, driver.TableRef) (*driver.TableStructure, error) {
+	return &driver.TableStructure{Columns: []driver.ColumnInfo{}}, nil
+}
+func (c *stubConn) AlterTable(context.Context, driver.AlterTableRequest) error { return nil }
 func (c *stubConn) Close() error {
 	c.closed = true
 	return nil

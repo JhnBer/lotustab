@@ -121,6 +121,44 @@ func (s *QueryService) ApplyEdits(ctx context.Context, profileID string, req dri
 	return err
 }
 
+// DescribeTable returns column metadata for a table.
+func (s *QueryService) DescribeTable(ctx context.Context, profileID string, ref driver.TableRef) (*driver.TableStructure, error) {
+	if strings.TrimSpace(profileID) == "" {
+		return nil, fmt.Errorf("profile is required")
+	}
+	ref = driver.ClampTableRef(ref)
+	if ref.Name == "" {
+		return nil, fmt.Errorf("table is required")
+	}
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	return withLiveConn(s, ctx, profileID, func(ctx context.Context, conn driver.Conn) (*driver.TableStructure, error) {
+		return conn.DescribeTable(ctx, ref)
+	})
+}
+
+// AlterTable applies accumulated column operations in a single request.
+func (s *QueryService) AlterTable(ctx context.Context, profileID string, req driver.AlterTableRequest) error {
+	if strings.TrimSpace(profileID) == "" {
+		return fmt.Errorf("profile is required")
+	}
+	req = driver.ClampAlterTable(req)
+	if req.Name == "" {
+		return fmt.Errorf("table is required")
+	}
+	if len(req.Ops) == 0 {
+		return fmt.Errorf("no schema changes")
+	}
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	_, err := withLiveConn(s, ctx, profileID, func(ctx context.Context, conn driver.Conn) (struct{}, error) {
+		return struct{}{}, conn.AlterTable(ctx, req)
+	})
+	return err
+}
+
 func withLiveConn[T any](s *QueryService, ctx context.Context, profileID string, fn func(context.Context, driver.Conn) (T, error)) (T, error) {
 	var zero T
 	ctx, done := s.connections.Track(ctx, profileID)

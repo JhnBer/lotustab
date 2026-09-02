@@ -24,7 +24,7 @@ import TableBrowser from "@/features/results/TableBrowser.vue";
 import TablePager from "@/features/results/TablePager.vue";
 import { useConnectionsStore } from "@/stores/connections";
 import { useExplorerStore } from "@/stores/explorer";
-import { isQueryTab, isTableTab, useQueryStore } from "@/stores/query";
+import { isQueryTab, isTableTab, useQueryStore, type QueryTab, type TableTab } from "@/stores/query";
 
 const NONE = "__none__";
 
@@ -41,6 +41,20 @@ const selectedOffline = computed(() => {
   const id = connections.selectedId;
   return Boolean(id && !connections.isConnected(id) && !connections.isConnecting(id));
 });
+
+const profileMountedIds = computed(() => new Set(queries.mountedTabIds(connections.selectedId ?? "")));
+const profileTableTabs = computed(() =>
+  queries.tabs.filter(
+    (t): t is TableTab =>
+      isTableTab(t) && t.profileId === connections.selectedId && profileMountedIds.value.has(t.id),
+  ),
+);
+const profileQueryTabs = computed(() =>
+  queries.tabs.filter(
+    (t): t is QueryTab =>
+      isQueryTab(t) && t.profileId === connections.selectedId && profileMountedIds.value.has(t.id),
+  ),
+);
 
 watch(
   () => connections.selectedId,
@@ -134,18 +148,28 @@ function onDatabase(value: unknown) {
       </Button>
     </div>
 
-    <TableBrowser
-      v-else-if="isTableTab(queries.activeTab)"
-      :key="queries.activeTab.id"
-      :tab="queries.activeTab"
-    />
-
-    <ResizablePanelGroup v-else-if="isQueryTab(queries.activeTab)" direction="vertical" class="min-h-0 flex-1">
+    <template v-else>
+      <div class="relative min-h-0 flex-1">
+        <TableBrowser
+          v-for="tab in profileTableTabs"
+          :key="tab.id"
+          class="absolute inset-0"
+          :class="tab.id === queries.activeTabId ? '' : 'invisible pointer-events-none'"
+          :tab="tab"
+          :active="tab.id === queries.activeTabId"
+        />
+        <ResizablePanelGroup
+          v-for="tab in profileQueryTabs"
+          :key="tab.id"
+          direction="vertical"
+          class="absolute inset-0"
+          :class="tab.id === queries.activeTabId ? '' : 'invisible pointer-events-none'"
+        >
       <ResizablePanel :default-size="45" :min-size="20">
         <div class="flex h-full min-h-0 flex-col">
           <div class="flex items-center gap-2 border-b px-3 py-2 text-xs" style="--wails-draggable: no-drag">
             <Select
-              :model-value="queries.activeTab.database || undefined"
+              :model-value="tab.database || undefined"
               @update:model-value="onDatabase"
             >
               <SelectTrigger size="sm" class="h-7 w-44">
@@ -162,25 +186,24 @@ function onDatabase(value: unknown) {
               You can choose a database here or specify it in the query.
             </span>
             <Button
-              v-if="queries.activeTab.running"
+              v-if="tab.running"
               size="sm"
               variant="outline"
               class="shrink-0"
-              @click="queries.cancel(queries.activeTab.id)"
+              @click="queries.cancel(tab.id)"
             >
               Cancel
             </Button>
-            <Button size="sm" class="shrink-0" :disabled="queries.activeTab.running" @click="run">
-              <Spinner v-if="queries.activeTab.running" class="size-3.5" />
+            <Button size="sm" class="shrink-0" :disabled="tab.running" @click="run">
+              <Spinner v-if="tab.running" class="size-3.5" />
               <Play v-else class="size-3.5" />
               Run
             </Button>
           </div>
           <SqlEditor
-            :key="queries.activeTab.id"
             class="min-h-0 flex-1"
-            :model-value="queries.activeTab.sql"
-            @update:model-value="queries.setSql(queries.activeTab!.id, $event)"
+            :model-value="tab.sql"
+            @update:model-value="queries.setSql(tab.id, $event)"
             @run="run"
           />
         </div>
@@ -190,24 +213,32 @@ function onDatabase(value: unknown) {
         <div class="flex h-full min-h-0 flex-col">
           <ResultsTable
             class="min-h-0 flex-1"
-            :result="queries.activeTab.result"
-            :error="queries.activeTab.error"
-            :running="queries.activeTab.running"
+            :result="tab.result"
+            :error="tab.error"
+            :running="tab.running"
             :show-status="false"
-            :row-offset="(queries.activeTab.page - 1) * queries.activeTab.pageSize"
+            :row-offset="(tab.page - 1) * tab.pageSize"
           />
           <TablePager
-            :page="queries.activeTab.page"
-            :page-size="queries.activeTab.pageSize"
-            :row-count="queries.activeTab.result?.rows?.length ?? 0"
-            :running="queries.activeTab.running"
-            :truncated="queries.activeTab.result?.truncated"
-            :duration-ms="queries.activeTab.result?.durationMs"
-            @page="queries.setPage(queries.activeTab!.id, $event)"
-            @page-size="queries.setPageSize(queries.activeTab!.id, $event)"
+            :page="tab.page"
+            :page-size="tab.pageSize"
+            :row-count="tab.result?.rows?.length ?? 0"
+            :running="tab.running"
+            :truncated="tab.result?.truncated"
+            :duration-ms="tab.result?.durationMs"
+            @page="queries.setPage(tab.id, $event)"
+            @page-size="queries.setPageSize(tab.id, $event)"
           />
         </div>
       </ResizablePanel>
     </ResizablePanelGroup>
+        <div
+          v-if="queries.coldMountId && queries.coldMountId === queries.activeTabId"
+          class="absolute inset-0 z-10 flex items-center justify-center bg-background/60"
+        >
+          <Spinner />
+        </div>
+      </div>
+    </template>
   </section>
 </template>
