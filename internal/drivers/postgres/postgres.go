@@ -194,6 +194,11 @@ func (c *conn) ListTables(ctx context.Context, database string) ([]driver.TableI
 	}
 	defer rows.Close()
 
+	dbName := strings.TrimSpace(database)
+	if dbName == "" {
+		dbName = c.database
+	}
+
 	out := make([]driver.TableInfo, 0)
 	for rows.Next() {
 		var schema, name, tableType string
@@ -204,7 +209,54 @@ func (c *conn) ListTables(ctx context.Context, database string) ([]driver.TableI
 		if strings.EqualFold(tableType, "VIEW") {
 			kind = driver.ObjectView
 		}
-		out = append(out, driver.TableInfo{Schema: schema, Name: name, Type: kind})
+		out = append(out, driver.TableInfo{Database: dbName, Schema: schema, Name: name, Type: kind})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *conn) SearchTables(ctx context.Context, database, query string, limit int) ([]driver.TableInfo, error) {
+	query = strings.TrimSpace(query)
+	limit = driver.ClampSearchLimit(limit)
+	if query == "" {
+		return []driver.TableInfo{}, nil
+	}
+	pool, cleanup, err := c.poolFor(ctx, database)
+	if err != nil {
+		return nil, err
+	}
+	defer cleanup()
+
+	dbName := strings.TrimSpace(database)
+	if dbName == "" {
+		dbName = c.database
+	}
+
+	rows, err := pool.Query(ctx, `
+		SELECT table_schema, table_name, table_type
+		FROM information_schema.tables
+		WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+		  AND table_name ILIKE $1 ESCAPE '\'
+		ORDER BY table_schema, table_name
+		LIMIT $2`, sqlutil.LikeContains(query), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]driver.TableInfo, 0)
+	for rows.Next() {
+		var schema, name, tableType string
+		if err := rows.Scan(&schema, &name, &tableType); err != nil {
+			return nil, err
+		}
+		kind := driver.ObjectTable
+		if strings.EqualFold(tableType, "VIEW") {
+			kind = driver.ObjectView
+		}
+		out = append(out, driver.TableInfo{Database: dbName, Schema: schema, Name: name, Type: kind})
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

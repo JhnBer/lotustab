@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  COMMON_COLUMN_TYPES,
+  columnTypesFor,
   defaultsEqual,
   originalFor,
   type DraftColumn,
@@ -32,6 +32,7 @@ const props = defineProps<{
   columns?: ColumnInfo[] | null;
   running?: boolean;
   canDrag?: boolean;
+  driverId?: string;
 }>();
 
 const emit = defineEmits<{
@@ -43,11 +44,12 @@ const emit = defineEmits<{
 const queries = useQueryStore();
 
 const typeChoices = computed(() => {
+  const types = columnTypesFor(props.driverId ?? "");
   const current = props.col.type.trim();
-  if (current && !COMMON_COLUMN_TYPES.includes(current)) {
-    return [current, ...COMMON_COLUMN_TYPES];
+  if (current && !types.includes(current)) {
+    return [current, ...types];
   }
-  return COMMON_COLUMN_TYPES;
+  return types;
 });
 
 const defaultPlaceholder = computed(() => {
@@ -61,6 +63,7 @@ const defaultPlaceholder = computed(() => {
 });
 
 const disabled = computed(() => props.col.dropped || Boolean(props.running));
+const showNullable = computed(() => props.driverId !== "clickhouse");
 
 const orig = computed(() => originalFor(props.col, props.columns));
 const extra = computed(() => orig.value?.extra ?? "");
@@ -164,7 +167,7 @@ function onHandleDragStart(event: DragEvent) {
         </SelectContent>
       </Select>
     </div>
-    <div class="flex w-20 shrink-0 items-center justify-center px-1 py-1" :class="cellClass(fieldDirty('nullable'))">
+    <div v-if="showNullable" class="flex w-20 shrink-0 items-center justify-center px-1 py-1" :class="cellClass(fieldDirty('nullable'))">
       <Checkbox
         :checked="col.nullable"
         :disabled="disabled"

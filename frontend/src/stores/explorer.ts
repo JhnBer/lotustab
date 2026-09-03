@@ -7,6 +7,8 @@ import { ConnectionsService, QueryService, type TableInfo } from "@/lib/wails";
 
 const EXPLORER_KEY = "lotustab.explorer";
 
+export const SEARCH_TABLES_LIMIT = 500;
+
 const SYSTEM_DBS = new Set([
   "mysql",
   "sys",
@@ -14,11 +16,26 @@ const SYSTEM_DBS = new Set([
   "performance_schema",
   "template0",
   "template1",
+  "system",
 ]);
 
 export type ExplorerSlice = {
   databases: string[];
   tablesByDb: Record<string, TableInfo[]>;
+  expanded: Record<string, boolean>;
+  activeDatabase: string;
+};
+
+type SearchSlice = {
+  query: string;
+  results: TableInfo[];
+  truncated: boolean;
+  loading: boolean;
+  error: string;
+};
+
+type PersistedSlice = {
+  databases: string[];
   expanded: Record<string, boolean>;
   activeDatabase: string;
 };
@@ -57,16 +74,16 @@ export function filterTables(tables: TableInfo[], query: string): TableInfo[] {
   return tables.filter((table) => table.name.toLowerCase().includes(q));
 }
 
+export function tableDatabase(table: TableInfo, fallback = ""): string {
+  return table.database || fallback || table.schema;
+}
+
 function emptySlice(): ExplorerSlice {
   return { databases: [], tablesByDb: {}, expanded: {}, activeDatabase: "" };
 }
 
-function isTableInfo(value: unknown): value is TableInfo {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-  const row = value as TableInfo;
-  return typeof row.name === "string" && typeof row.schema === "string";
+function emptySearch(): SearchSlice {
+  return { query: "", results: [], truncated: false, loading: false, error: "" };
 }
 
 function parseSlices(raw: unknown): Record<string, ExplorerSlice> {
@@ -82,15 +99,6 @@ function parseSlices(raw: unknown): Record<string, ExplorerSlice> {
     const databases = Array.isArray(row.databases)
       ? row.databases.filter((name): name is string => typeof name === "string")
       : [];
-    const tablesByDb: Record<string, TableInfo[]> = {};
-    if (row.tablesByDb && typeof row.tablesByDb === "object") {
-      for (const [db, tables] of Object.entries(row.tablesByDb as Record<string, unknown>)) {
-        if (!Array.isArray(tables)) {
-          continue;
-        }
-        tablesByDb[db] = tables.filter(isTableInfo);
-      }
-    }
     const expanded: Record<string, boolean> = {};
     if (row.expanded && typeof row.expanded === "object") {
       for (const [db, open] of Object.entries(row.expanded as Record<string, unknown>)) {
@@ -99,9 +107,21 @@ function parseSlices(raw: unknown): Record<string, ExplorerSlice> {
     }
     out[id] = {
       databases,
-      tablesByDb,
+      tablesByDb: {},
       expanded,
       activeDatabase: typeof row.activeDatabase === "string" ? row.activeDatabase : "",
+    };
+  }
+  return out;
+}
+
+function persistable(slices: Record<string, ExplorerSlice>): Record<string, PersistedSlice> {
+  const out: Record<string, PersistedSlice> = {};
+  for (const [id, slice] of Object.entries(slices)) {
+    out[id] = {
+      databases: slice.databases,
+      expanded: slice.expanded,
+      activeDatabase: slice.activeDatabase,
     };
   }
   return out;
@@ -113,6 +133,7 @@ export const useExplorerStore = defineStore("explorer", () => {
   const loadingDbsById = ref<Record<string, boolean>>({});
   const loadingTablesById = ref<Record<string, Record<string, boolean>>>({});
   const errorById = ref<Record<string, string>>({});
+  const searchById = ref<Record<string, SearchSlice>>({});
   const inflight = new Map<string, { cancel: () => void }>();
 
   const current = computed(() => (profileId.value ? slices.value[profileId.value] : undefined));
@@ -123,9 +144,10 @@ export const useExplorerStore = defineStore("explorer", () => {
   const loadingDbs = computed(() => Boolean(loadingDbsById.value[profileId.value]));
   const loadingTables = computed(() => loadingTablesById.value[profileId.value] ?? {});
   const error = computed(() => errorById.value[profileId.value] ?? "");
+  const search = computed(() => searchById.value[profileId.value] ?? emptySearch());
 
   watchDebounced(
-    slices,
+    () => persistable(slices.value),
     (value) => writeJson(EXPLORER_KEY, value),
     { debounce: 300, deep: true },
   );
@@ -155,6 +177,11 @@ export const useExplorerStore = defineStore("explorer", () => {
     slices.value = next;
     if (profileId.value === id) {
       profileId.value = "";
+    }
+    if (searchById.value[id]) {
+      const nextSearch = { ...searchById.value };
+      delete nextSearch[id];
+      searchById.value = nextSearch;
     }
   }
 
@@ -232,18 +259,55 @@ export const useExplorerStore = defineStore("explorer", () => {
     }
   }
 
-  async function ensureTables(id: string) {
+  async function searchTables(id: string, query: string) {
     if (!id) {
       return;
     }
-    for (const database of sliceOf(id).databases) {
-      if (database in sliceOf(id).tablesByDb) {
-        continue;
+    const key = `search:${id}`;
+    inflight.get(key)?.cancel();
+    const q = query.trim();
+    if (!q) {
+      searchById.value = { ...searchById.value, [id]: emptySearch() };
+      return;
+    }
+    searchById.value = {
+      ...searchById.value,
+      [id]: { ...(searchById.value[id] ?? emptySearch()), query: q, loading: true, error: "" },
+    };
+    const pending = QueryService.SearchTables(id, sliceOf(id).activeDatabase, q, SEARCH_TABLES_LIMIT);
+    inflight.set(key, pending);
+    try {
+      const tables = (await pending) ?? [];
+      if (inflight.get(key) !== pending) {
+        return;
       }
-      try {
-        await loadTables(id, database);
-      } catch {
-        // Cached as [] in loadTables; keep scanning the rest.
+      searchById.value = {
+        ...searchById.value,
+        [id]: {
+          query: q,
+          results: tables,
+          truncated: tables.length >= SEARCH_TABLES_LIMIT,
+          loading: false,
+          error: "",
+        },
+      };
+    } catch (err) {
+      if (isCanceled(err)) {
+        return;
+      }
+      searchById.value = {
+        ...searchById.value,
+        [id]: {
+          query: q,
+          results: [],
+          truncated: false,
+          loading: false,
+          error: errorMessage(err),
+        },
+      };
+    } finally {
+      if (inflight.get(key) === pending) {
+        inflight.delete(key);
       }
     }
   }
@@ -281,6 +345,7 @@ export const useExplorerStore = defineStore("explorer", () => {
     loadingTables,
     error,
     activeDatabase,
+    search,
     hasCatalog,
     activate,
     removeProfile,
@@ -288,7 +353,7 @@ export const useExplorerStore = defineStore("explorer", () => {
     loadTables,
     toggleDatabase,
     setActiveDatabase,
-    ensureTables,
+    searchTables,
     refresh,
   };
 });

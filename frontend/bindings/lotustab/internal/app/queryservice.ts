@@ -57,3 +57,11 @@ export function Execute(profileID: string, sqlText: string, database: string, li
 export function ListTables(profileID: string, database: string): $CancellablePromise<driver$0.TableInfo[] | null> {
     return $Call.ByID(3759006545, profileID, database);
 }
+
+/**
+ * SearchTables finds tables by name substring, capped by limit.
+ * database, when set, restricts the search to that catalog; empty uses the driver default.
+ */
+export function SearchTables(profileID: string, database: string, query: string, limit: number): $CancellablePromise<driver$0.TableInfo[] | null> {
+    return $Call.ByID(2690199989, profileID, database, query, limit);
+}

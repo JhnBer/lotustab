@@ -19,6 +19,7 @@ import {
   type DraftColumn,
 } from "@/features/results/structure";
 import TableStructureRow from "@/features/results/TableStructureRow.vue";
+import { useConnectionsStore } from "@/stores/connections";
 import { type TableTab, useQueryStore } from "@/stores/query";
 
 const ROW_HEIGHT = 36;
@@ -29,10 +30,13 @@ const props = defineProps<{
 }>();
 
 const queries = useQueryStore();
+const connections = useConnectionsStore();
 const query = ref("");
 const confirmRefresh = ref(false);
 const scrollRef = ref<HTMLElement | null>(null);
 const dragKey = ref("");
+
+const driverId = computed(() => connections.profileById(props.tab.profileId)?.driverId ?? "");
 
 const draft = computed(() => props.tab.structureDraft ?? []);
 const visible = computed(() => filterDraftColumns(draft.value, query.value));
@@ -129,7 +133,7 @@ function rowAt(index: number): DraftColumn | undefined {
       >
         <RotateCw class="size-3.5" :class="running ? 'animate-spin' : ''" />
       </Button>
-      <Button size="xs" variant="outline" :disabled="running" @click="queries.addStructureColumn(tab.id)">
+      <Button size="xs" variant="outline" :disabled="running" @click="queries.addStructureColumn(tab.id, driverId)">
         <Plus class="size-3.5" />
         Column
       </Button>
@@ -148,7 +152,7 @@ function rowAt(index: number): DraftColumn | undefined {
             <div class="h-9 w-8 shrink-0" />
             <div class="text-foreground flex h-9 min-w-40 flex-1 items-center px-2 font-medium">Name</div>
             <div class="text-foreground flex h-9 w-48 shrink-0 items-center px-2 font-medium">Type</div>
-            <div class="text-foreground flex h-9 w-20 shrink-0 items-center justify-center px-2 font-medium">Null</div>
+            <div v-if="driverId !== 'clickhouse'" class="text-foreground flex h-9 w-20 shrink-0 items-center justify-center px-2 font-medium">Null</div>
             <div class="text-foreground flex h-9 min-w-36 flex-1 items-center px-2 font-medium">Default</div>
             <div class="text-foreground flex h-9 w-20 shrink-0 items-center justify-center px-2 font-medium">Primary</div>
             <div class="text-foreground flex h-9 w-56 min-w-40 shrink-0 items-center px-2 font-medium">Extra</div>
@@ -173,6 +177,7 @@ function rowAt(index: number): DraftColumn | undefined {
               :columns="tab.structure?.columns"
               :running="running"
               :can-drag="canReorder"
+              :driver-id="driverId"
               @reorderstart="onReorderStart($event, rowAt(item.index)!.key)"
               @reorderend="onReorderEnd"
               @reorderdrop="onReorderDrop($event, rowAt(item.index)!.key)"

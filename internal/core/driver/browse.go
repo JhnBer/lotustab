@@ -6,7 +6,18 @@ const (
 	DefaultBrowseLimit = 100
 	MinBrowseLimit     = 50
 	MaxBrowseLimit     = 10000
+
+	DefaultSearchTablesLimit = 500
+	MaxSearchTablesLimit     = 500
 )
+
+// ClampSearchLimit bounds a catalog search page size.
+func ClampSearchLimit(limit int) int {
+	if limit <= 0 || limit > MaxSearchTablesLimit {
+		return DefaultSearchTablesLimit
+	}
+	return limit
+}
 
 // ClampTableBrowse normalizes paging and sort fields for a table browse request.
 func ClampTableBrowse(req TableBrowseRequest) TableBrowseRequest {

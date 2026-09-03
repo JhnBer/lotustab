@@ -51,6 +51,21 @@ func TestClampTableBrowse(t *testing.T) {
 	}
 }
 
+func TestClampSearchLimit(t *testing.T) {
+	if got := driver.ClampSearchLimit(0); got != driver.DefaultSearchTablesLimit {
+		t.Fatalf("zero: %d", got)
+	}
+	if got := driver.ClampSearchLimit(-1); got != driver.DefaultSearchTablesLimit {
+		t.Fatalf("negative: %d", got)
+	}
+	if got := driver.ClampSearchLimit(50); got != 50 {
+		t.Fatalf("in range: %d", got)
+	}
+	if got := driver.ClampSearchLimit(5000); got != driver.MaxSearchTablesLimit {
+		t.Fatalf("over max: %d", got)
+	}
+}
+
 func TestClampApplyEdits(t *testing.T) {
 	got := driver.ClampApplyEdits(driver.ApplyEditsRequest{
 		Database: " db ",

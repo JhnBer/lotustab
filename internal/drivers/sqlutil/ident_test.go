@@ -21,6 +21,21 @@ func TestQuoteMySQL(t *testing.T) {
 	}
 }
 
+func TestQuoteClickHouse(t *testing.T) {
+	tests := []struct {
+		in, want string
+	}{
+		{"users", "`users`"},
+		{"a`b", "`a``b`"},
+		{"", "``"},
+	}
+	for _, tt := range tests {
+		if got := sqlutil.QuoteClickHouse(tt.in); got != tt.want {
+			t.Fatalf("QuoteClickHouse(%q)=%q want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
 func TestQuotePostgres(t *testing.T) {
 	tests := []struct {
 		in, want string
@@ -73,5 +88,22 @@ func TestOrderClause(t *testing.T) {
 	got = sqlutil.OrderClause(sqlutil.QuotePostgres, "name", "asc")
 	if got != ` ORDER BY "name" ASC` {
 		t.Fatalf("got %q", got)
+	}
+}
+
+func TestLikeContains(t *testing.T) {
+	tests := []struct {
+		in, want string
+	}{
+		{"users", "%users%"},
+		{"a%b", `%a\%b%`},
+		{"a_b", `%a\_b%`},
+		{`a\b`, `%a\\b%`},
+		{"", "%%"},
+	}
+	for _, tt := range tests {
+		if got := sqlutil.LikeContains(tt.in); got != tt.want {
+			t.Fatalf("LikeContains(%q)=%q want %q", tt.in, got, tt.want)
+		}
 	}
 }

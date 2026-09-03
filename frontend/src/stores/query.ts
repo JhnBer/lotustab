@@ -1033,13 +1033,13 @@ export const useQueryStore = defineStore("query", () => {
     tab.structureDraft = draft.map((col, i) => (i === index ? { ...col, ...patch, key: col.key } : col));
   }
 
-  function addStructureColumn(id: string) {
+  function addStructureColumn(id: string, driverId = "") {
     const tab = tableTab(id);
     if (!tab) {
       return;
     }
     const draft = ensureStructureDraft(tab);
-    tab.structureDraft = [...draft, emptyDraftColumn(nextColumnName(draft))];
+    tab.structureDraft = [...draft, emptyDraftColumn(nextColumnName(draft), driverId)];
   }
 
   function toggleDropStructureColumn(id: string, key: string) {

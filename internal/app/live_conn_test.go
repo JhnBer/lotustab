@@ -75,6 +75,9 @@ func (c *stubConn) Databases(context.Context) ([]string, error) { return nil, ni
 func (c *stubConn) ListTables(context.Context, string) ([]driver.TableInfo, error) {
 	return []driver.TableInfo{}, nil
 }
+func (c *stubConn) SearchTables(context.Context, string, string, int) ([]driver.TableInfo, error) {
+	return []driver.TableInfo{}, nil
+}
 func (c *stubConn) BrowseTable(context.Context, driver.TableBrowseRequest) (*driver.TableBrowseResult, error) {
 	return &driver.TableBrowseResult{}, nil
 }

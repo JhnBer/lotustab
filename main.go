@@ -9,6 +9,7 @@ import (
 	"lotustab/internal/app"
 	"lotustab/internal/core/connection"
 	"lotustab/internal/core/driver"
+	"lotustab/internal/drivers/clickhouse"
 	"lotustab/internal/drivers/mysql"
 	"lotustab/internal/drivers/postgres"
 	"lotustab/internal/secrets"
@@ -24,6 +25,9 @@ func main() {
 		log.Fatal(err)
 	}
 	if err := registry.Register(mysql.New()); err != nil {
+		log.Fatal(err)
+	}
+	if err := registry.Register(clickhouse.New()); err != nil {
 		log.Fatal(err)
 	}
 

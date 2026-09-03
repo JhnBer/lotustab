@@ -32,6 +32,21 @@ func TestListTablesRequiresProfile(t *testing.T) {
 	}
 }
 
+func TestSearchTablesValidatesInput(t *testing.T) {
+	s := &QueryService{}
+	_, err := s.SearchTables(context.Background(), "", "", "users", 50)
+	if err == nil || !strings.Contains(err.Error(), "profile") {
+		t.Fatalf("expected profile error, got %v", err)
+	}
+	got, err := s.SearchTables(context.Background(), "abc", "", "  ", 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil || len(got) != 0 {
+		t.Fatalf("empty query should skip the server, got %v", got)
+	}
+}
+
 func TestExecuteValidatesInput(t *testing.T) {
 	s := &QueryService{}
 	_, err := s.Execute(context.Background(), "", "SELECT 1", "", 10, 0, 0)

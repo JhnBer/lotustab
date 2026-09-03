@@ -1,11 +1,23 @@
 package postgres
 
 import (
+	"context"
 	"strings"
 	"testing"
 
 	"lotustab/internal/core/driver"
 )
+
+func TestSearchTablesEmpty(t *testing.T) {
+	c := &conn{}
+	got, err := c.SearchTables(context.Background(), "", "  ", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil || len(got) != 0 {
+		t.Fatalf("empty query should not hit the server, got %v", got)
+	}
+}
 
 func TestPostgresAlterSQL(t *testing.T) {
 	def := "guest"

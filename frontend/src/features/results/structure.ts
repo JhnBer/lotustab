@@ -33,13 +33,55 @@ export const COMMON_COLUMN_TYPES = [
   "blob",
 ];
 
-export function emptyDraftColumn(name = "column"): DraftColumn {
+export const CLICKHOUSE_COLUMN_TYPES = [
+  "String",
+  "FixedString(16)",
+  "Bool",
+  "Int8",
+  "Int16",
+  "Int32",
+  "Int64",
+  "Int128",
+  "Int256",
+  "UInt8",
+  "UInt16",
+  "UInt32",
+  "UInt64",
+  "UInt128",
+  "UInt256",
+  "Float32",
+  "Float64",
+  "Decimal(18,4)",
+  "Date",
+  "Date32",
+  "DateTime",
+  "DateTime64(3)",
+  "UUID",
+  "IPv4",
+  "IPv6",
+  "JSON",
+  "Array(String)",
+  "Map(String, String)",
+  "Tuple(String, Int32)",
+  "LowCardinality(String)",
+  "Enum8('a' = 1, 'b' = 2)",
+];
+
+export function columnTypesFor(driverId: string): string[] {
+  return driverId === "clickhouse" ? CLICKHOUSE_COLUMN_TYPES : COMMON_COLUMN_TYPES;
+}
+
+export function defaultColumnType(driverId: string): string {
+  return driverId === "clickhouse" ? "String" : "varchar(255)";
+}
+
+export function emptyDraftColumn(name = "column", driverId = ""): DraftColumn {
   return {
     key: crypto.randomUUID(),
     originalName: null,
     dropped: false,
     name,
-    type: "varchar(255)",
+    type: defaultColumnType(driverId),
     nullable: true,
     defaultValue: null,
     isPrimaryKey: false,

@@ -4,13 +4,7 @@ import { Play, Plug } from "@lucide/vue";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import DatabaseCombobox from "@/components/DatabaseCombobox.vue";
 import { errorMessage, isCanceled } from "@/lib/errors";
 import {
   ResizableHandle,
@@ -105,13 +99,12 @@ async function connectSelected() {
   }
 }
 
-function onDatabase(value: unknown) {
+function onDatabase(value: string) {
   const tab = queries.activeTab;
   if (!isQueryTab(tab)) {
     return;
   }
-  const name = String(value ?? "");
-  queries.setDatabase(tab.id, name === NONE ? "" : name);
+  queries.setDatabase(tab.id, value === NONE ? "" : value);
 }
 </script>
 
@@ -154,7 +147,7 @@ function onDatabase(value: unknown) {
           v-for="tab in profileTableTabs"
           :key="tab.id"
           class="absolute inset-0"
-          :class="tab.id === queries.activeTabId ? '' : 'invisible pointer-events-none'"
+          :class="tab.id === queries.activeTabId ? 'z-10' : 'invisible pointer-events-none'"
           :tab="tab"
           :active="tab.id === queries.activeTabId"
         />
@@ -163,25 +156,20 @@ function onDatabase(value: unknown) {
           :key="tab.id"
           direction="vertical"
           class="absolute inset-0"
-          :class="tab.id === queries.activeTabId ? '' : 'invisible pointer-events-none'"
+          :class="tab.id === queries.activeTabId ? 'z-10 bg-background' : 'invisible pointer-events-none'"
         >
       <ResizablePanel :default-size="45" :min-size="20">
         <div class="flex h-full min-h-0 flex-col">
           <div class="flex items-center gap-2 border-b px-3 py-2 text-xs" style="--wails-draggable: no-drag">
-            <Select
-              :model-value="tab.database || undefined"
+            <DatabaseCombobox
+              class="h-7 w-44"
+              :model-value="tab.database || NONE"
+              :options="explorer.databases"
+              :none-value="NONE"
+              none-label="None"
+              placeholder="Database"
               @update:model-value="onDatabase"
-            >
-              <SelectTrigger size="sm" class="h-7 w-44">
-                <SelectValue placeholder="Database" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem :value="NONE">None</SelectItem>
-                <SelectItem v-for="database in explorer.databases" :key="database" :value="database">
-                  {{ database }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            />
             <span class="text-muted-foreground min-w-0 flex-1 truncate">
               You can choose a database here or specify it in the query.
             </span>

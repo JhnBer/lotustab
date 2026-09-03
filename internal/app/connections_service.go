@@ -243,6 +243,8 @@ func (s *ConnectionsService) TouchRecent(id string) error {
 func (s *ConnectionsService) Databases(ctx context.Context, id string) ([]string, error) {
 	ctx, done := s.ops.Track(ctx, id)
 	defer done()
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
 	conn, err := s.ensureOpen(ctx, id)
 	if err != nil {
 		return nil, err

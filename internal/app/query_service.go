@@ -83,6 +83,32 @@ func (s *QueryService) ListTables(ctx context.Context, profileID, database strin
 	return tables, nil
 }
 
+// SearchTables finds tables by name substring, capped by limit.
+// database, when set, restricts the search to that catalog; empty uses the driver default.
+func (s *QueryService) SearchTables(ctx context.Context, profileID, database, query string, limit int) ([]driver.TableInfo, error) {
+	if strings.TrimSpace(profileID) == "" {
+		return nil, fmt.Errorf("profile is required")
+	}
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return []driver.TableInfo{}, nil
+	}
+	limit = driver.ClampSearchLimit(limit)
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	tables, err := withLiveConn(s, ctx, profileID, func(ctx context.Context, conn driver.Conn) ([]driver.TableInfo, error) {
+		return conn.SearchTables(ctx, strings.TrimSpace(database), query, limit)
+	})
+	if err != nil {
+		return nil, err
+	}
+	if tables == nil {
+		tables = []driver.TableInfo{}
+	}
+	return tables, nil
+}
+
 // BrowseTable returns a page of rows from a table.
 func (s *QueryService) BrowseTable(ctx context.Context, profileID string, req driver.TableBrowseRequest) (*driver.TableBrowseResult, error) {
 	if strings.TrimSpace(profileID) == "" {

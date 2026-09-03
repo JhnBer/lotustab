@@ -131,7 +131,7 @@ async function remove(profile: Profile) {
             <div class="text-muted-foreground flex flex-col items-center gap-2">
               <span>No connections yet.</span>
               <Button size="sm" variant="outline" @click="openCreate">
-                Add PostgreSQL or MySQL
+                Add PostgreSQL, MySQL, or ClickHouse
               </Button>
             </div>
           </TableEmpty>

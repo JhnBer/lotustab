@@ -75,6 +75,10 @@ export const useConnectionsStore = defineStore("connections", () => {
     return drivers.value.find((d) => d.id === id);
   }
 
+  function profileById(id: string) {
+    return profiles.value.find((p) => p.id === id);
+  }
+
   function specFor(driverId: string): Field[] {
     return driverById(driverId)?.connectionSpec ?? [];
   }
@@ -276,6 +280,7 @@ export const useConnectionsStore = defineStore("connections", () => {
     isConnecting,
     isPinned,
     driverById,
+    profileById,
     specFor,
     asRecord,
     refresh,

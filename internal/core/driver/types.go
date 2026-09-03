@@ -67,9 +67,10 @@ const (
 
 // TableInfo is a catalog entry for a table or view.
 type TableInfo struct {
-	Schema string `json:"schema"`
-	Name   string `json:"name"`
-	Type   string `json:"type"`
+	Database string `json:"database,omitempty"`
+	Schema   string `json:"schema"`
+	Name     string `json:"name"`
+	Type     string `json:"type"`
 }
 
 // TableFilter is one column predicate on a table browse request.

@@ -10,6 +10,11 @@ func QuoteMySQL(ident string) string {
 	return "`" + strings.ReplaceAll(ident, "`", "``") + "`"
 }
 
+// QuoteClickHouse wraps an identifier in backticks, doubling internal backticks.
+func QuoteClickHouse(ident string) string {
+	return QuoteMySQL(ident)
+}
+
 // QuotePostgres wraps an identifier in double quotes, doubling internal quotes.
 func QuotePostgres(ident string) string {
 	return `"` + strings.ReplaceAll(ident, `"`, `""`) + `"`
@@ -45,6 +50,26 @@ func FormatDefault(expr string) string {
 		return s
 	}
 	return QuoteString(s)
+}
+
+// LikeContains returns a LIKE/ILIKE pattern that matches any string containing query.
+// %, _, and \ in query are escaped with a backslash.
+func LikeContains(query string) string {
+	return "%" + EscapeLike(query) + "%"
+}
+
+// EscapeLike escapes LIKE wildcards so they match literally.
+func EscapeLike(query string) string {
+	var b strings.Builder
+	b.Grow(len(query))
+	for i := 0; i < len(query); i++ {
+		c := query[i]
+		if c == '%' || c == '_' || c == '\\' {
+			b.WriteByte('\\')
+		}
+		b.WriteByte(c)
+	}
+	return b.String()
 }
 
 // OrderClause returns a leading ORDER BY fragment, or empty if orderBy is unset.

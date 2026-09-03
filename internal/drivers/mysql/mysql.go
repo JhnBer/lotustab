@@ -223,9 +223,58 @@ func (c *conn) ListTables(ctx context.Context, database string) ([]driver.TableI
 				return err
 			}
 			out = append(out, driver.TableInfo{
-				Schema: schema,
-				Name:   name,
-				Type:   mysqlObjectType(tableType),
+				Database: schema,
+				Schema:   schema,
+				Name:     name,
+				Type:     mysqlObjectType(tableType),
+			})
+		}
+		return rows.Err()
+	})
+	return out, err
+}
+
+func (c *conn) SearchTables(ctx context.Context, database, query string, limit int) ([]driver.TableInfo, error) {
+	query = strings.TrimSpace(query)
+	limit = driver.ClampSearchLimit(limit)
+	if query == "" {
+		return []driver.TableInfo{}, nil
+	}
+	database = strings.TrimSpace(database)
+	if database == "" {
+		database = c.database
+	}
+	// A server-wide information_schema scan is unusable on catalogs with tens of
+	// thousands of schemas (e.g. Ensembl). Require an explicit database.
+	if database == "" {
+		return []driver.TableInfo{}, nil
+	}
+	pattern := sqlutil.LikeContains(query)
+	var out []driver.TableInfo
+	err := c.withSession(ctx, func(session *sql.Conn) error {
+		rows, err := session.QueryContext(ctx, `
+			SELECT table_schema, table_name, table_type
+			FROM information_schema.tables
+			WHERE table_schema = ?
+			  AND table_name LIKE ? ESCAPE '\\'
+			ORDER BY table_name
+			LIMIT ?`, database, pattern, limit)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+
+		out = make([]driver.TableInfo, 0)
+		for rows.Next() {
+			var schema, name, tableType string
+			if err := rows.Scan(&schema, &name, &tableType); err != nil {
+				return err
+			}
+			out = append(out, driver.TableInfo{
+				Database: schema,
+				Schema:   schema,
+				Name:     name,
+				Type:     mysqlObjectType(tableType),
 			})
 		}
 		return rows.Err()

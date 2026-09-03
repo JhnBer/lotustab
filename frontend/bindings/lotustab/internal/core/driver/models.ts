@@ -165,6 +165,7 @@ export interface TableFilter {
  * TableInfo is a catalog entry for a table or view.
  */
 export interface TableInfo {
+    "database"?: string;
     "schema": string;
     "name": string;
     "type": string;
