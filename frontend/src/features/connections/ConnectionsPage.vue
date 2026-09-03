@@ -1,10 +1,18 @@
 <script setup lang="ts">
-import { ref } from "vue";
-import { Pencil, Pin, Plug, Plus, Trash2, Unplug } from "@lucide/vue";
+import { computed, ref } from "vue";
+import { GripVertical, Pencil, Pin, Plug, Plus, Trash2, Unplug } from "@lucide/vue";
+import { VueDraggable } from "vue-draggable-plus";
 import { useRouter } from "vue-router";
 import { toast } from "vue-sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { Spinner } from "@/components/ui/spinner";
 import {
   Table,
@@ -18,6 +26,7 @@ import {
 import ConnectionDialog from "@/features/connections/ConnectionDialog.vue";
 import { errorMessage, isCanceled } from "@/lib/errors";
 import { connBg } from "@/lib/colors";
+import { asRecord } from "@/lib/utils";
 import type { Profile } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
 import { useQueryStore } from "@/stores/query";
@@ -29,8 +38,15 @@ const queries = useQueryStore();
 const dialogOpen = ref(false);
 const editing = ref<Profile | null>(null);
 
+const sortableProfiles = computed({
+  get: () => connections.profiles,
+  set: (next: Profile[]) => {
+    connections.profiles = next;
+  },
+});
+
 function param(profile: Profile, key: string) {
-  return connections.asRecord(profile.params)[key] || "—";
+  return asRecord(profile.params)[key] || "—";
 }
 
 function openCreate() {
@@ -88,10 +104,27 @@ async function togglePin(profile: Profile) {
   }
 }
 
+async function clone(profile: Profile) {
+  try {
+    await connections.clone(profile.id);
+    toast.success(`Cloned ${profile.name}`);
+  } catch (err) {
+    toast.error(errorMessage(err));
+  }
+}
+
 async function remove(profile: Profile) {
   try {
     await connections.remove(profile.id);
     toast.success(`Deleted ${profile.name}`);
+  } catch (err) {
+    toast.error(errorMessage(err));
+  }
+}
+
+async function onReorder() {
+  try {
+    await connections.reorderProfiles(sortableProfiles.value.map((p) => p.id));
   } catch (err) {
     toast.error(errorMessage(err));
   }
@@ -117,6 +150,7 @@ async function remove(profile: Profile) {
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead class="w-8" />
             <TableHead>Name</TableHead>
             <TableHead>Driver</TableHead>
             <TableHead>Host</TableHead>
@@ -126,8 +160,8 @@ async function remove(profile: Profile) {
             <TableHead class="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody>
-          <TableEmpty v-if="connections.profiles.length === 0" :colspan="7">
+        <TableBody v-if="connections.profiles.length === 0">
+          <TableEmpty :colspan="8">
             <div class="text-muted-foreground flex flex-col items-center gap-2">
               <span>No connections yet.</span>
               <Button size="sm" variant="outline" @click="openCreate">
@@ -135,85 +169,138 @@ async function remove(profile: Profile) {
               </Button>
             </div>
           </TableEmpty>
-          <TableRow v-for="profile in connections.profiles" :key="profile.id">
-            <TableCell>
-              <button
-                type="button"
-                class="flex items-center gap-2 font-medium hover:underline"
-                @click="openQuery(profile)"
-              >
-                <span class="size-2.5 shrink-0 rounded-full" :class="connBg(profile.color)" />
-                {{ profile.name }}
-              </button>
-            </TableCell>
-            <TableCell>
-              <Badge variant="secondary">
-                {{ connections.driverById(profile.driverId)?.displayName ?? profile.driverId }}
-              </Badge>
-            </TableCell>
-            <TableCell class="font-mono text-xs">{{ param(profile, "host") }}</TableCell>
-            <TableCell class="font-mono text-xs">{{ param(profile, "port") }}</TableCell>
-            <TableCell class="font-mono text-xs">{{ param(profile, "database") }}</TableCell>
-            <TableCell>
-              <Badge :variant="connections.isConnected(profile.id) ? 'default' : 'secondary'">
-                {{ connections.isConnected(profile.id) ? "Connected" : "Offline" }}
-              </Badge>
-            </TableCell>
-            <TableCell>
-              <div class="flex justify-end gap-1">
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  :title="connections.isPinned(profile.id) ? 'Unpin' : 'Pin'"
-                  @click="togglePin(profile)"
-                >
-                  <Pin
-                    class="size-3.5"
-                    :class="connections.isPinned(profile.id) ? 'fill-current' : ''"
-                  />
-                  <span class="sr-only">{{ connections.isPinned(profile.id) ? "Unpin" : "Pin" }}</span>
-                </Button>
-                <Button
-                  v-if="connections.isConnecting(profile.id)"
-                  size="icon-sm"
-                  variant="ghost"
-                  title="Cancel"
-                  @click="connections.cancelConnect(profile.id)"
-                >
-                  <Spinner class="size-3.5" />
-                  <span class="sr-only">Cancel</span>
-                </Button>
-                <Button
-                  v-else-if="!connections.isConnected(profile.id)"
-                  size="icon-sm"
-                  variant="ghost"
-                  title="Connect"
-                  @click="connect(profile)"
-                >
-                  <Plug class="size-3.5" />
-                  <span class="sr-only">Connect</span>
-                </Button>
-                <Button
-                  v-else
-                  size="icon-sm"
-                  variant="ghost"
-                  @click="disconnect(profile)"
-                >
-                  <Unplug class="size-3.5" />
-                  <span class="sr-only">Disconnect</span>
-                </Button>
-                <Button size="icon-sm" variant="ghost" @click="openEdit(profile)">
-                  <Pencil class="size-3.5" />
-                  <span class="sr-only">Edit</span>
-                </Button>
-                <Button size="icon-sm" variant="ghost" @click="remove(profile)">
-                  <Trash2 class="size-3.5" />
-                  <span class="sr-only">Delete</span>
-                </Button>
-              </div>
-            </TableCell>
-          </TableRow>
         </TableBody>
+        <VueDraggable
+          v-else
+          v-model="sortableProfiles"
+          tag="tbody"
+          :animation="150"
+          handle=".drag-handle"
+          :force-fallback="true"
+          class="[&_tr:last-child]:border-0"
+          @end="onReorder"
+        >
+          <ContextMenu v-for="profile in sortableProfiles" :key="profile.id">
+            <ContextMenuTrigger as-child>
+              <TableRow>
+                <TableCell class="w-8 px-1">
+                  <button
+                    type="button"
+                    class="drag-handle text-muted-foreground hover:text-foreground flex cursor-grab items-center justify-center active:cursor-grabbing"
+                    title="Reorder"
+                    @click.stop
+                  >
+                    <GripVertical class="size-3.5" />
+                    <span class="sr-only">Reorder</span>
+                  </button>
+                </TableCell>
+                <TableCell>
+                  <button
+                    type="button"
+                    class="flex items-center gap-2 font-medium hover:underline"
+                    @click="openQuery(profile)"
+                  >
+                    <span class="size-2.5 shrink-0 rounded-full" :class="connBg(profile.color)" />
+                    {{ profile.name }}
+                  </button>
+                </TableCell>
+                <TableCell>
+                  <Badge variant="secondary">
+                    {{ connections.driverById(profile.driverId)?.displayName ?? profile.driverId }}
+                  </Badge>
+                </TableCell>
+                <TableCell class="font-mono text-xs">{{ param(profile, "host") }}</TableCell>
+                <TableCell class="font-mono text-xs">{{ param(profile, "port") }}</TableCell>
+                <TableCell class="font-mono text-xs">{{ param(profile, "database") }}</TableCell>
+                <TableCell>
+                  <Badge :variant="connections.isConnected(profile.id) ? 'default' : 'secondary'">
+                    {{ connections.isConnected(profile.id) ? "Connected" : "Offline" }}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <div class="flex justify-end gap-1">
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      :title="connections.isPinned(profile.id) ? 'Unpin' : 'Pin'"
+                      @click="togglePin(profile)"
+                    >
+                      <Pin
+                        class="size-3.5"
+                        :class="connections.isPinned(profile.id) ? 'fill-current' : ''"
+                      />
+                      <span class="sr-only">{{ connections.isPinned(profile.id) ? "Unpin" : "Pin" }}</span>
+                    </Button>
+                    <Button
+                      v-if="connections.isConnecting(profile.id)"
+                      size="icon-sm"
+                      variant="ghost"
+                      title="Cancel"
+                      @click="connections.cancelConnect(profile.id)"
+                    >
+                      <Spinner class="size-3.5" />
+                      <span class="sr-only">Cancel</span>
+                    </Button>
+                    <Button
+                      v-else-if="!connections.isConnected(profile.id)"
+                      size="icon-sm"
+                      variant="ghost"
+                      title="Connect"
+                      @click="connect(profile)"
+                    >
+                      <Plug class="size-3.5" />
+                      <span class="sr-only">Connect</span>
+                    </Button>
+                    <Button
+                      v-else
+                      size="icon-sm"
+                      variant="ghost"
+                      @click="disconnect(profile)"
+                    >
+                      <Unplug class="size-3.5" />
+                      <span class="sr-only">Disconnect</span>
+                    </Button>
+                    <Button size="icon-sm" variant="ghost" @click="openEdit(profile)">
+                      <Pencil class="size-3.5" />
+                      <span class="sr-only">Edit</span>
+                    </Button>
+                    <Button size="icon-sm" variant="ghost" @click="remove(profile)">
+                      <Trash2 class="size-3.5" />
+                      <span class="sr-only">Delete</span>
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+              <ContextMenuItem v-if="connections.isConnected(profile.id)" @select="disconnect(profile)">
+                Disconnect
+              </ContextMenuItem>
+              <ContextMenuItem
+                v-else-if="connections.isConnecting(profile.id)"
+                @select="connections.cancelConnect(profile.id)"
+              >
+                Cancel connecting
+              </ContextMenuItem>
+              <ContextMenuItem v-else @select="connect(profile)">
+                Connect
+              </ContextMenuItem>
+              <ContextMenuItem @select="togglePin(profile)">
+                {{ connections.isPinned(profile.id) ? "Unpin" : "Pin" }}
+              </ContextMenuItem>
+              <ContextMenuItem @select="openEdit(profile)">
+                Edit
+              </ContextMenuItem>
+              <ContextMenuItem @select="clone(profile)">
+                Clone
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem variant="destructive" @select="remove(profile)">
+                Delete
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
+        </VueDraggable>
       </Table>
     </div>
 

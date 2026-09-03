@@ -122,3 +122,60 @@ func TestRecentCap(t *testing.T) {
 		t.Fatalf("most recent=%q", recent[0])
 	}
 }
+
+func TestReorderProfilesAndPinned(t *testing.T) {
+	dir := t.TempDir()
+	store := storage.NewAt(filepath.Join(dir, "connections.json"))
+	for _, p := range []connection.Profile{
+		sample("a", "Alpha", "blue"),
+		sample("b", "Beta", "green"),
+		sample("c", "Gamma", "red"),
+	} {
+		if err := store.Upsert(p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := store.SetPinned("a", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetPinned("c", true); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := store.ReorderProfiles([]string{"c", "a", "b"}); err != nil {
+		t.Fatal(err)
+	}
+	profiles, err := store.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(profiles) != 3 || profiles[0].ID != "c" || profiles[1].ID != "a" || profiles[2].ID != "b" {
+		t.Fatalf("profiles=%v", idsOf(profiles))
+	}
+
+	if err := store.ReorderPinned([]string{"c", "a"}); err != nil {
+		t.Fatal(err)
+	}
+	_, pinned, _, err := store.ListState()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pinned) != 2 || pinned[0] != "c" || pinned[1] != "a" {
+		t.Fatalf("pinned=%v", pinned)
+	}
+
+	if err := store.ReorderProfiles([]string{"a", "b"}); err == nil {
+		t.Fatal("expected mismatch")
+	}
+	if err := store.ReorderPinned([]string{"a", "b"}); err == nil {
+		t.Fatal("expected not-pinned error")
+	}
+}
+
+func idsOf(profiles []connection.Profile) []string {
+	out := make([]string, len(profiles))
+	for i, p := range profiles {
+		out[i] = p.ID
+	}
+	return out
+}

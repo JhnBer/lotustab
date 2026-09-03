@@ -39,6 +39,7 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Spinner } from "@/components/ui/spinner";
@@ -417,6 +418,24 @@ function openEdit(profile: Profile) {
   dialogOpen.value = true;
 }
 
+async function cloneRecent(profile: Profile) {
+  try {
+    await connections.clone(profile.id);
+    toast.success(`Cloned ${profile.name}`);
+  } catch (err) {
+    toast.error(errorMessage(err));
+  }
+}
+
+async function removeRecent(profile: Profile) {
+  try {
+    await connections.remove(profile.id);
+    toast.success(`Deleted ${profile.name}`);
+  } catch (err) {
+    toast.error(errorMessage(err));
+  }
+}
+
 async function openInNewWindow() {
   if (!selected.value) {
     return;
@@ -546,66 +565,100 @@ function openTable(database: string, table: TableInfo, view: "data" | "structure
           </p>
           <SidebarMenu v-else>
             <SidebarMenuItem v-for="profile in recentProfiles" :key="profile.id">
-              <div class="flex items-center gap-0.5">
-                <SidebarMenuButton class="min-w-0 flex-1" @click="activateProfile(profile)">
-                  <span
-                    class="size-2 shrink-0 rounded-full"
-                    :class="connBg(profile.color)"
-                  />
-                  <span class="truncate">{{ profile.name }}</span>
-                </SidebarMenuButton>
-                <Button
-                  size="icon-xs"
-                  variant="ghost"
-                  class="shrink-0"
-                  :title="connections.isPinned(profile.id) ? 'Unpin' : 'Pin'"
-                  @click.stop="togglePin(profile)"
-                >
-                  <Pin
-                    class="size-3.5"
-                    :class="connections.isPinned(profile.id) ? 'fill-current' : ''"
-                  />
-                </Button>
-                <Button
-                  v-if="connections.isConnecting(profile.id)"
-                  size="icon-xs"
-                  variant="ghost"
-                  class="shrink-0"
-                  title="Cancel"
-                  @click.stop="connections.cancelConnect(profile.id)"
-                >
-                  <Spinner class="size-3.5" />
-                </Button>
-                <Button
-                  v-else-if="!connections.isConnected(profile.id)"
-                  size="icon-xs"
-                  variant="ghost"
-                  class="shrink-0"
-                  title="Connect"
-                  @click.stop="connectRecent(profile)"
-                >
-                  <Plug class="size-3.5" />
-                </Button>
-                <Button
-                  v-else
-                  size="icon-xs"
-                  variant="ghost"
-                  class="shrink-0"
-                  title="Disconnect"
-                  @click.stop="disconnectRecent(profile)"
-                >
-                  <Unplug class="size-3.5" />
-                </Button>
-                <Button
-                  size="icon-xs"
-                  variant="ghost"
-                  class="shrink-0"
-                  title="Edit"
-                  @click.stop="openEdit(profile)"
-                >
-                  <Pencil class="size-3.5" />
-                </Button>
-              </div>
+              <ContextMenu>
+                <ContextMenuTrigger as-child>
+                  <div class="flex items-center gap-0.5">
+                    <SidebarMenuButton class="min-w-0 flex-1" @click="activateProfile(profile)">
+                      <span
+                        class="size-2 shrink-0 rounded-full"
+                        :class="connBg(profile.color)"
+                      />
+                      <span class="truncate">{{ profile.name }}</span>
+                    </SidebarMenuButton>
+                    <Button
+                      size="icon-xs"
+                      variant="ghost"
+                      class="shrink-0"
+                      :title="connections.isPinned(profile.id) ? 'Unpin' : 'Pin'"
+                      @click.stop="togglePin(profile)"
+                    >
+                      <Pin
+                        class="size-3.5"
+                        :class="connections.isPinned(profile.id) ? 'fill-current' : ''"
+                      />
+                    </Button>
+                    <Button
+                      v-if="connections.isConnecting(profile.id)"
+                      size="icon-xs"
+                      variant="ghost"
+                      class="shrink-0"
+                      title="Cancel"
+                      @click.stop="connections.cancelConnect(profile.id)"
+                    >
+                      <Spinner class="size-3.5" />
+                    </Button>
+                    <Button
+                      v-else-if="!connections.isConnected(profile.id)"
+                      size="icon-xs"
+                      variant="ghost"
+                      class="shrink-0"
+                      title="Connect"
+                      @click.stop="connectRecent(profile)"
+                    >
+                      <Plug class="size-3.5" />
+                    </Button>
+                    <Button
+                      v-else
+                      size="icon-xs"
+                      variant="ghost"
+                      class="shrink-0"
+                      title="Disconnect"
+                      @click.stop="disconnectRecent(profile)"
+                    >
+                      <Unplug class="size-3.5" />
+                    </Button>
+                    <Button
+                      size="icon-xs"
+                      variant="ghost"
+                      class="shrink-0"
+                      title="Edit"
+                      @click.stop="openEdit(profile)"
+                    >
+                      <Pencil class="size-3.5" />
+                    </Button>
+                  </div>
+                </ContextMenuTrigger>
+                <ContextMenuContent>
+                  <ContextMenuItem
+                    v-if="connections.isConnected(profile.id)"
+                    @select="disconnectRecent(profile)"
+                  >
+                    Disconnect
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    v-else-if="connections.isConnecting(profile.id)"
+                    @select="connections.cancelConnect(profile.id)"
+                  >
+                    Cancel connecting
+                  </ContextMenuItem>
+                  <ContextMenuItem v-else @select="connectRecent(profile)">
+                    Connect
+                  </ContextMenuItem>
+                  <ContextMenuItem @select="togglePin(profile)">
+                    {{ connections.isPinned(profile.id) ? "Unpin" : "Pin" }}
+                  </ContextMenuItem>
+                  <ContextMenuItem @select="openEdit(profile)">
+                    Edit
+                  </ContextMenuItem>
+                  <ContextMenuItem @select="cloneRecent(profile)">
+                    Clone
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem variant="destructive" @select="removeRecent(profile)">
+                    Delete
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroupContent>

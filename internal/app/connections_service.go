@@ -165,6 +165,33 @@ func (s *ConnectionsService) Save(input SaveProfileInput) (connection.Profile, e
 	return profile, nil
 }
 
+// Clone duplicates a saved profile, including keychain secrets, under a new ID.
+func (s *ConnectionsService) Clone(id string) (connection.Profile, error) {
+	profile, err := s.store.Get(id)
+	if err != nil {
+		return connection.Profile{}, err
+	}
+	secretVals, err := s.fillSecrets(id, nil)
+	if err != nil {
+		return connection.Profile{}, err
+	}
+	params := map[string]string{}
+	for k, v := range profile.Params {
+		params[k] = v
+	}
+	for kind, v := range secretVals {
+		if strings.TrimSpace(v) != "" {
+			params[kind] = v
+		}
+	}
+	return s.Save(SaveProfileInput{
+		Name:     "Copy of " + profile.Name,
+		DriverID: profile.DriverID,
+		Params:   params,
+		Color:    profile.Color,
+	})
+}
+
 // Delete removes a profile, its secret, and any open session.
 func (s *ConnectionsService) Delete(id string) error {
 	s.ops.CancelAll(id)
@@ -223,6 +250,16 @@ func (s *ConnectionsService) ConnectedIDs() []string {
 // SetPinned pins or unpins a profile in the sidebar rail.
 func (s *ConnectionsService) SetPinned(id string, pinned bool) error {
 	return s.afterChange(s.store.SetPinned(id, pinned))
+}
+
+// ReorderPinned replaces the pinned list order.
+func (s *ConnectionsService) ReorderPinned(ids []string) error {
+	return s.afterChange(s.store.ReorderPinned(ids))
+}
+
+// ReorderProfiles reorders the saved profile list.
+func (s *ConnectionsService) ReorderProfiles(ids []string) error {
+	return s.afterChange(s.store.ReorderProfiles(ids))
 }
 
 // SetColor updates a profile's palette color.

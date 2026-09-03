@@ -17,18 +17,6 @@ import { useQueryStore } from "@/stores/query";
 
 const SELECTED_KEY = "lotustab.selectedId";
 
-function asRecord(params: Profile["params"]): Record<string, string> {
-  const out: Record<string, string> = {};
-  if (!params) {
-    return out;
-  }
-  for (const [key, value] of Object.entries(params)) {
-    if (typeof value === "string") {
-      out[key] = value;
-    }
-  }
-  return out;
-}
 
 export const useConnectionsStore = defineStore("connections", () => {
   const profiles = ref<Profile[]>([]);
@@ -185,6 +173,12 @@ export const useConnectionsStore = defineStore("connections", () => {
     await refresh();
   }
 
+  async function clone(id: string) {
+    const profile = await ConnectionsService.Clone(id);
+    await refresh();
+    return profile;
+  }
+
   async function connect(id: string) {
     if (connectedIds.value.includes(id)) {
       return;
@@ -246,6 +240,29 @@ export const useConnectionsStore = defineStore("connections", () => {
     await refreshNav();
   }
 
+  async function reorderPinned(ids: string[]) {
+    const prev = pinnedIds.value;
+    pinnedIds.value = ids;
+    try {
+      await ConnectionsService.ReorderPinned(ids);
+    } catch (err) {
+      pinnedIds.value = prev;
+      throw err;
+    }
+  }
+
+  async function reorderProfiles(ids: string[]) {
+    const prev = profiles.value;
+    const byId = new Map(profiles.value.map((p) => [p.id, p]));
+    profiles.value = ids.map((id) => byId.get(id)).filter((p): p is Profile => Boolean(p));
+    try {
+      await ConnectionsService.ReorderProfiles(ids);
+    } catch (err) {
+      profiles.value = prev;
+      throw err;
+    }
+  }
+
   async function setColor(id: string, color: string) {
     await ConnectionsService.SetColor(id, color);
     await refreshNav();
@@ -282,18 +299,20 @@ export const useConnectionsStore = defineStore("connections", () => {
     driverById,
     profileById,
     specFor,
-    asRecord,
     refresh,
     save,
     test,
     fetchDatabases,
     remove,
+    clone,
     connect,
     cancelConnect,
     disconnect,
     select,
     openInNewWindow,
     setPinned,
+    reorderPinned,
+    reorderProfiles,
     setColor,
     touchRecent,
   };

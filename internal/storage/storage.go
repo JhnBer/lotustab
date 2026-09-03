@@ -152,6 +152,67 @@ func (s *Store) SetPinned(id string, pinned bool) error {
 	return s.write(payload)
 }
 
+// ReorderPinned replaces the pinned list order. ids must be the current pinned set, reordered.
+func (s *Store) ReorderPinned(ids []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	payload, err := s.read()
+	if err != nil {
+		return err
+	}
+	if len(ids) != len(payload.PinnedIDs) {
+		return fmt.Errorf("reorder pinned: id count mismatch")
+	}
+	current := make(map[string]struct{}, len(payload.PinnedIDs))
+	for _, id := range payload.PinnedIDs {
+		current[id] = struct{}{}
+	}
+	seen := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		if _, ok := current[id]; !ok {
+			return fmt.Errorf("not pinned: %s", id)
+		}
+		if _, dup := seen[id]; dup {
+			return fmt.Errorf("reorder pinned: duplicate id %s", id)
+		}
+		seen[id] = struct{}{}
+	}
+	payload.PinnedIDs = cloneIDs(ids)
+	return s.write(payload)
+}
+
+// ReorderProfiles reorders the saved profile list. ids must be the complete current set, reordered.
+func (s *Store) ReorderProfiles(ids []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	payload, err := s.read()
+	if err != nil {
+		return err
+	}
+	if len(ids) != len(payload.Profiles) {
+		return fmt.Errorf("reorder profiles: id count mismatch")
+	}
+	byID := make(map[string]connection.Profile, len(payload.Profiles))
+	for _, p := range payload.Profiles {
+		byID[p.ID] = p
+	}
+	seen := make(map[string]struct{}, len(ids))
+	next := make([]connection.Profile, 0, len(ids))
+	for _, id := range ids {
+		if _, dup := seen[id]; dup {
+			return fmt.Errorf("reorder profiles: duplicate id %s", id)
+		}
+		p, ok := byID[id]
+		if !ok {
+			return fmt.Errorf("profile not found: %s", id)
+		}
+		seen[id] = struct{}{}
+		next = append(next, p)
+	}
+	payload.Profiles = next
+	return s.write(payload)
+}
+
 // SetColor updates a profile's palette color.
 func (s *Store) SetColor(id, color string) error {
 	s.mu.Lock()

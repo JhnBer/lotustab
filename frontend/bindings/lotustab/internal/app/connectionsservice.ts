@@ -22,6 +22,13 @@ import * as connection$0 from "../core/connection/models.js";
 import * as $models from "./models.js";
 
 /**
+ * Clone duplicates a saved profile, including keychain secrets, under a new ID.
+ */
+export function Clone(id: string): $CancellablePromise<connection$0.Profile> {
+    return $Call.ByID(4178432810, id);
+}
+
+/**
  * Connect opens (or replaces) a live session for a saved profile.
  */
 export function Connect(id: string): $CancellablePromise<void> {
@@ -68,6 +75,20 @@ export function FetchDatabases(input: $models.SaveProfileInput): $CancellablePro
  */
 export function List(): $CancellablePromise<$models.ConnectionsState> {
     return $Call.ByID(448953289);
+}
+
+/**
+ * ReorderPinned replaces the pinned list order.
+ */
+export function ReorderPinned(ids: string[] | null): $CancellablePromise<void> {
+    return $Call.ByID(2205887522, ids);
+}
+
+/**
+ * ReorderProfiles reorders the saved profile list.
+ */
+export function ReorderProfiles(ids: string[] | null): $CancellablePromise<void> {
+    return $Call.ByID(2893525842, ids);
 }
 
 /**

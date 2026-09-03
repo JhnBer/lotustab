@@ -24,6 +24,7 @@ import SshTunnelFields from "@/features/connections/SshTunnelFields.vue";
 import { copySshParams } from "@/features/connections/ssh";
 import { errorMessage } from "@/lib/errors";
 import { CONNECTION_COLORS, connBg, connColor } from "@/lib/colors";
+import { asRecord } from "@/lib/utils";
 import type { Field, Profile, SaveProfileInput } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
 
@@ -98,7 +99,7 @@ watch(
     const fallbackDriver = connections.drivers[0]?.id ?? "";
     name.value = props.profile?.name ?? "";
     color.value = connColor(props.profile?.color);
-    applyDriver(props.profile?.driverId || fallbackDriver, connections.asRecord(props.profile?.params ?? null));
+    applyDriver(props.profile?.driverId || fallbackDriver, asRecord(props.profile?.params ?? null));
   },
   { immediate: true },
 );

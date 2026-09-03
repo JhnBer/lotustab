@@ -153,3 +153,20 @@
 .cm-scroller {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
+
+.sortable-fallback {
+  position: fixed !important;
+  z-index: 9999 !important;
+  transition: none !important;
+}
+
+.sortable-fallback * {
+  pointer-events: none !important;
+  transition: none !important;
+}
+
+.sortable-chosen,
+.sortable-drag,
+.sortable-ghost {
+  transition: none !important;
+}
