@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { isTabLayout, PAGE_SIZES, QUERY_TIMEOUTS, queryTimeoutLabel, useSettingsStore } from "@/stores/settings";
 
 const settings = useSettingsStore();
-const mode = useColorMode({ initialValue: "dark" });
+const mode = useColorMode({ initialValue: "auto" });
 
 function onTheme(value: unknown) {
   if (value === "light" || value === "dark" || value === "auto") {

@@ -174,7 +174,7 @@ onBeforeUnmount(() => {
 <template>
   <Sidebar
     collapsible="none"
-    class="h-full w-[calc(var(--sidebar-width-icon)+1px)]! shrink-0 border-r"
+    class="h-full w-[calc(var(--sidebar-width-icon)+1px)]! shrink-0 border-r bg-background"
   >
     <SidebarContent class="relative">
       <SidebarGroup class="h-12" :class="connectionsTint">
