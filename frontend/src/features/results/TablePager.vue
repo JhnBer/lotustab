@@ -108,7 +108,7 @@ function onPageSize(value: unknown) {
     </div>
     <template v-if="!compact">
       <Select :model-value="String(pageSize)" @update:model-value="onPageSize">
-        <SelectTrigger size="sm" class="h-7 w-36">
+        <SelectTrigger size="xs" class="h-7 w-36">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
