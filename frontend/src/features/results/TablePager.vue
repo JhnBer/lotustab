@@ -86,8 +86,7 @@ function onPageSize(value: unknown) {
 
 <template>
   <div
-    class="flex shrink-0 items-center justify-end gap-2 border-t px-3 py-2"
-    :class="compact ? 'h-11' : ''"
+    class="flex h-11 shrink-0 items-center justify-end gap-2 border-t px-3"
   >
     <Button
       v-if="switchLabel"
