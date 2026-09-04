@@ -117,8 +117,9 @@ function rowAt(index: number): DraftColumn | undefined {
   <div class="flex min-h-0 flex-1 flex-col">
     <div class="flex items-center gap-2 border-b px-3 py-2">
       <Input
+        size="xs"
         v-model="query"
-        class="h-7 max-w-64"
+        class="max-w-64"
         placeholder="Search columns…"
       />
       <span class="text-muted-foreground min-w-0 flex-1 truncate text-xs">
