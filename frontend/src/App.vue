@@ -5,7 +5,7 @@ import { useRoute, useRouter } from "vue-router";
 import { toast } from "vue-sonner";
 import { Events, Window } from "@wailsio/runtime";
 import AppResizableLayout from "@/components/AppResizableLayout.vue";
-import AppSidebarRail from "@/components/AppSidebarRail.vue";
+import AppSidebarRail from "@/components/app-sidebar/AppSidebarRail.vue";
 import {
   Breadcrumb,
   BreadcrumbItem,

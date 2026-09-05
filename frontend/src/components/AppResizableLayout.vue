@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from "vue";
 import { useRoute } from "vue-router";
-import AppSidebar from "@/components/AppSidebar.vue";
+import AppSidebar from "@/components/app-sidebar/AppSidebar.vue";
 import { SidebarInset, useSidebar } from "@/components/ui/sidebar";
 import SettingsSidebar from "@/features/settings/SettingsSidebar.vue";
 
