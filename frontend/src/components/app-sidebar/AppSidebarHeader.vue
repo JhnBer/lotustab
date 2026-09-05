@@ -1,26 +1,20 @@
 <script setup lang="ts">
 import { Pin, SquareArrowOutUpRight } from "@lucide/vue";
-import { toast } from "vue-sonner";
 import { storeToRefs } from "pinia";
-import { computed, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { onMounted, ref } from "vue";
 import { Window } from "@wailsio/runtime";
 import { SidebarHeader } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { errorMessage } from "@/lib/errors";
-import { connBg, connTint } from "@/lib/colors";
+import { useConnectionTint } from "@/composables/useConnectionTint";
+import { useProfileActions } from "@/composables/useProfileActions";
+import { connBg } from "@/lib/colors";
 import { useConnectionsStore } from "@/stores/connections";
-import { useSettingsStore } from "@/stores/settings";
 
-const router = useRouter();
 const connections = useConnectionsStore();
-const settings = useSettingsStore();
 const { selected } = storeToRefs(connections);
+const { togglePin, openInNewWindow } = useProfileActions();
+const { tintClass: headerTint } = useConnectionTint();
 const isMainWindow = ref(true);
-
-const headerTint = computed(() =>
-  settings.connectionTint && selected.value ? connTint(selected.value.color) : "",
-);
 
 onMounted(async () => {
   try {
@@ -29,29 +23,6 @@ onMounted(async () => {
     // Preview / non-Wails: keep the pop-out control visible.
   }
 });
-
-async function togglePin() {
-  if (!selected.value) {
-    return;
-  }
-  try {
-    await connections.setPinned(selected.value.id, !connections.isPinned(selected.value.id));
-  } catch (err) {
-    toast.error(errorMessage(err));
-  }
-}
-
-async function openInNewWindow() {
-  if (!selected.value) {
-    return;
-  }
-  try {
-    await connections.openInNewWindow(selected.value);
-    await router.push("/connections");
-  } catch (err) {
-    toast.error(errorMessage(err));
-  }
-}
 </script>
 
 <template>
@@ -70,7 +41,7 @@ async function openInNewWindow() {
               variant="ghost"
               class="shrink-0"
               :title="connections.isPinned(selected.id) ? 'Unpin' : 'Pin'"
-              @click="togglePin"
+              @click="togglePin(selected)"
             >
               <Pin
                 class="size-3.5"
@@ -83,7 +54,7 @@ async function openInNewWindow() {
               variant="ghost"
               class="shrink-0"
               title="Open in new window"
-              @click="openInNewWindow"
+              @click="openInNewWindow(selected)"
             >
               <SquareArrowOutUpRight class="size-3.5" />
             </Button>

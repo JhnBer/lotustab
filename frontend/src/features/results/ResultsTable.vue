@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "@lucide/vue";
 import { Spinner } from "@/components/ui/spinner";
@@ -10,6 +10,8 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { useClipboardText } from "@/composables/useClipboardText";
+import { usePointerResize } from "@/composables/usePointerResize";
 import {
   draftLookup,
   editInputText,
@@ -162,41 +164,18 @@ const draftMap = computed(() => {
   return map;
 });
 
-let drag: { name: string; startX: number; startWidth: number } | null = null;
+const { writeClipboard } = useClipboardText();
 
-function onResizeMove(event: PointerEvent) {
-  if (!drag) {
-    return;
-  }
-  const next = Math.max(MIN_COL_WIDTH, drag.startWidth + (event.clientX - drag.startX));
-  widths.value = { ...widths.value, [drag.name]: next };
-}
-
-function onResizeUp() {
-  drag = null;
-  document.body.style.cursor = "";
-  document.body.style.userSelect = "";
-  window.removeEventListener("pointermove", onResizeMove);
-  window.removeEventListener("pointerup", onResizeUp);
-}
-
-function startResize(event: PointerEvent, name: string) {
-  event.preventDefault();
-  event.stopPropagation();
-  drag = {
-    name,
-    startX: event.clientX,
-    startWidth: colWidth(name),
-  };
-  document.body.style.cursor = "col-resize";
-  document.body.style.userSelect = "none";
-  window.addEventListener("pointermove", onResizeMove);
-  window.addEventListener("pointerup", onResizeUp);
-}
-
-onBeforeUnmount(() => {
-  onResizeUp();
+const { start: startResize } = usePointerResize<{ name: string; startWidth: number }>({
+  onMove(event, drag) {
+    const next = Math.max(MIN_COL_WIDTH, drag.startWidth + (event.clientX - drag.startX));
+    widths.value = { ...widths.value, [drag.name]: next };
+  },
 });
+
+function onStartResize(event: PointerEvent, name: string) {
+  startResize(event, { name, startWidth: colWidth(name) });
+}
 
 function cellText(value: unknown): string {
   if (isNull(value)) {
@@ -323,11 +302,7 @@ async function copyCell() {
   if (!contextCell.value) {
     return;
   }
-  try {
-    await navigator.clipboard.writeText(editInputText(contextValue()));
-  } catch {
-    // clipboard may be denied in the webview
-  }
+  await writeClipboard(editInputText(contextValue()));
 }
 
 function setNull() {
@@ -434,7 +409,7 @@ async function pasteCell() {
                     </div>
                     <span
                       class="hover:bg-border absolute inset-y-0 right-0 z-10 w-1.5 cursor-col-resize"
-                      @pointerdown="startResize($event, columns[col.index]?.name ?? '')"
+                      @pointerdown="onStartResize($event, columns[col.index]?.name ?? '')"
                       @click.stop
                     />
                   </div>

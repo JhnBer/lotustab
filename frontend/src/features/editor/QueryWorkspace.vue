@@ -5,6 +5,7 @@ import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import DatabaseCombobox from "@/components/DatabaseCombobox.vue";
+import { useProfileActions } from "@/composables/useProfileActions";
 import { errorMessage, isCanceled } from "@/lib/errors";
 import {
   ResizableHandle,
@@ -25,6 +26,7 @@ const NONE = "__none__";
 const connections = useConnectionsStore();
 const queries = useQueryStore();
 const explorer = useExplorerStore();
+const { connect } = useProfileActions();
 
 const connecting = computed(() => {
   const id = connections.selectedId;
@@ -78,25 +80,11 @@ async function run() {
 }
 
 async function connectSelected() {
-  const id = connections.selectedId;
-  if (!id) {
+  const profile = connections.selected;
+  if (!profile) {
     return;
   }
-  try {
-    await connections.connect(id);
-    if (!connections.isConnected(id)) {
-      return;
-    }
-    const profile = connections.selected;
-    if (profile) {
-      toast.success(`Connected to ${profile.name}`);
-    }
-  } catch (err) {
-    if (isCanceled(err)) {
-      return;
-    }
-    toast.error(errorMessage(err));
-  }
+  await connect(profile);
 }
 
 function onDatabase(value: string) {

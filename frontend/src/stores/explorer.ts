@@ -4,20 +4,11 @@ import { watchDebounced } from "@vueuse/core";
 import { errorMessage, isCanceled } from "@/lib/errors";
 import { readJson, writeJson } from "@/lib/persist";
 import { ConnectionsService, QueryService, type TableInfo } from "@/lib/wails";
+import { SEARCH_TABLES_LIMIT, sortDatabases } from "@/features/explorer/catalogRows";
+
+export { filterTables, groupTables, SEARCH_TABLES_LIMIT, tableDatabase } from "@/features/explorer/catalogRows";
 
 const EXPLORER_KEY = "lotustab.explorer";
-
-export const SEARCH_TABLES_LIMIT = 500;
-
-const SYSTEM_DBS = new Set([
-  "mysql",
-  "sys",
-  "information_schema",
-  "performance_schema",
-  "template0",
-  "template1",
-  "system",
-]);
 
 export type ExplorerSlice = {
   databases: string[];
@@ -39,44 +30,6 @@ type PersistedSlice = {
   expanded: Record<string, boolean>;
   activeDatabase: string;
 };
-
-function sortDatabases(names: string[]): string[] {
-  const user: string[] = [];
-  const system: string[] = [];
-  for (const name of names) {
-    if (SYSTEM_DBS.has(name.toLowerCase())) {
-      system.push(name);
-    } else {
-      user.push(name);
-    }
-  }
-  user.sort((a, b) => a.localeCompare(b));
-  system.sort((a, b) => a.localeCompare(b));
-  return [...user, ...system];
-}
-
-export function groupTables(tables: TableInfo[]): { schema: string; tables: TableInfo[] }[] | null {
-  const schemas = [...new Set(tables.map((t) => t.schema).filter(Boolean))];
-  if (schemas.length <= 1) {
-    return null;
-  }
-  return schemas.sort((a, b) => a.localeCompare(b)).map((schema) => ({
-    schema,
-    tables: tables.filter((t) => t.schema === schema),
-  }));
-}
-
-export function filterTables(tables: TableInfo[], query: string): TableInfo[] {
-  const q = query.trim().toLowerCase();
-  if (!q) {
-    return tables;
-  }
-  return tables.filter((table) => table.name.toLowerCase().includes(q));
-}
-
-export function tableDatabase(table: TableInfo, fallback = ""): string {
-  return table.database || fallback || table.schema;
-}
 
 function emptySlice(): ExplorerSlice {
   return { databases: [], tablesByDb: {}, expanded: {}, activeDatabase: "" };

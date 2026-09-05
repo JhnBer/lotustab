@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from "vue";
+import { computed, ref } from "vue";
 import { useRoute } from "vue-router";
 import AppSidebar from "@/components/app-sidebar/AppSidebar.vue";
 import { SidebarInset, useSidebar } from "@/components/ui/sidebar";
+import { usePointerResize } from "@/composables/usePointerResize";
 import SettingsSidebar from "@/features/settings/SettingsSidebar.vue";
 
 const route = useRoute();
@@ -13,53 +14,26 @@ const MIN_WIDTH = 220;
 
 const { open } = useSidebar();
 const explorerPx = ref(DEFAULT_WIDTH);
-const dragging = ref(false);
 
 const clipWidth = computed(() => (open.value ? explorerPx.value : 0));
-
-let drag: { startX: number; startWidth: number } | null = null;
 
 function clampWidth(value: number) {
   const max = Math.max(MIN_WIDTH, Math.round(window.innerWidth * 0.4));
   return Math.min(Math.max(value, MIN_WIDTH), max);
 }
 
-function onResizeMove(event: PointerEvent) {
-  if (!drag) {
-    return;
-  }
-  explorerPx.value = clampWidth(drag.startWidth + (event.clientX - drag.startX));
-}
-
-function onResizeUp() {
-  drag = null;
-  dragging.value = false;
-  document.body.style.cursor = "";
-  document.body.style.userSelect = "";
-  window.removeEventListener("pointermove", onResizeMove);
-  window.removeEventListener("pointerup", onResizeUp);
-}
+const { start, dragging } = usePointerResize<{ startWidth: number }>({
+  onMove(event, drag) {
+    explorerPx.value = clampWidth(drag.startWidth + (event.clientX - drag.startX));
+  },
+});
 
 function startResize(event: PointerEvent) {
   if (!open.value) {
     return;
   }
-  event.preventDefault();
-  event.stopPropagation();
-  dragging.value = true;
-  drag = {
-    startX: event.clientX,
-    startWidth: explorerPx.value,
-  };
-  document.body.style.cursor = "col-resize";
-  document.body.style.userSelect = "none";
-  window.addEventListener("pointermove", onResizeMove);
-  window.addEventListener("pointerup", onResizeUp);
+  start(event, { startWidth: explorerPx.value });
 }
-
-onBeforeUnmount(() => {
-  onResizeUp();
-});
 </script>
 
 <template>

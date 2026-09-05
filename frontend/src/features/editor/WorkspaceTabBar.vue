@@ -10,6 +10,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { useClipboardText } from "@/composables/useClipboardText";
 import { useConnectionsStore } from "@/stores/connections";
 import { useQueryStore, type WorkspaceTab } from "@/stores/query";
 import { useSettingsStore } from "@/stores/settings";
@@ -17,6 +18,7 @@ import { useSettingsStore } from "@/stores/settings";
 const connections = useConnectionsStore();
 const queries = useQueryStore();
 const settings = useSettingsStore();
+const { writeClipboard } = useClipboardText();
 
 const wrapTabs = computed(() => settings.tabLayout === "wrap");
 
@@ -42,11 +44,7 @@ function addTab() {
 }
 
 async function copyName(title: string) {
-  try {
-    await navigator.clipboard.writeText(title);
-  } catch {
-    // clipboard may be denied in the webview
-  }
+  await writeClipboard(title);
 }
 </script>
 

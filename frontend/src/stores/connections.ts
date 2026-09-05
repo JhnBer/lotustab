@@ -240,6 +240,10 @@ export const useConnectionsStore = defineStore("connections", () => {
     await refreshNav();
   }
 
+  async function togglePinned(id: string) {
+    await setPinned(id, !isPinned(id));
+  }
+
   async function reorderPinned(ids: string[]) {
     const prev = pinnedIds.value;
     pinnedIds.value = ids;
@@ -311,6 +315,7 @@ export const useConnectionsStore = defineStore("connections", () => {
     select,
     openInNewWindow,
     setPinned,
+    togglePinned,
     reorderPinned,
     reorderProfiles,
     setColor,

@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { GripVertical, Pencil, Pin, Plug, Plus, Trash2, Unplug } from "@lucide/vue";
 import { VueDraggable } from "vue-draggable-plus";
-import { useRouter } from "vue-router";
 import { toast } from "vue-sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,19 +23,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import ConnectionDialog from "@/features/connections/ConnectionDialog.vue";
-import { errorMessage, isCanceled } from "@/lib/errors";
+import { useConnectionDialog } from "@/composables/useConnectionDialog";
+import { useProfileActions } from "@/composables/useProfileActions";
+import { errorMessage } from "@/lib/errors";
 import { connBg } from "@/lib/colors";
 import { asRecord } from "@/lib/utils";
 import type { Profile } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
-import { useQueryStore } from "@/stores/query";
 
-const router = useRouter();
 const connections = useConnectionsStore();
-const queries = useQueryStore();
-
-const dialogOpen = ref(false);
-const editing = ref<Profile | null>(null);
+const { dialogOpen, editing, openCreate, openEdit } = useConnectionDialog();
+const { activateProfile, connect, disconnect, togglePin, clone, remove } = useProfileActions();
 
 const sortableProfiles = computed({
   get: () => connections.profiles,
@@ -49,77 +46,12 @@ function param(profile: Profile, key: string) {
   return asRecord(profile.params)[key] || "—";
 }
 
-function openCreate() {
-  editing.value = null;
-  dialogOpen.value = true;
-}
-
-function openEdit(profile: Profile) {
-  editing.value = profile;
-  dialogOpen.value = true;
-}
-
 function openQuery(profile: Profile) {
-  connections.select(profile.id);
-  queries.openForProfile(profile.id, profile.name);
-  router.push("/query");
+  activateProfile(profile, { openTab: true });
 }
 
-async function connect(profile: Profile) {
-  if (connections.isConnecting(profile.id)) {
-    connections.cancelConnect(profile.id);
-    return;
-  }
-  try {
-    await connections.connect(profile.id);
-    if (!connections.isConnected(profile.id)) {
-      return;
-    }
-    connections.select(profile.id);
-    queries.openForProfile(profile.id, profile.name);
-    toast.success(`Connected to ${profile.name}`);
-    router.push("/query");
-  } catch (err) {
-    if (isCanceled(err)) {
-      return;
-    }
-    toast.error(errorMessage(err));
-  }
-}
-
-async function disconnect(profile: Profile) {
-  try {
-    await connections.disconnect(profile.id);
-    toast.success(`Disconnected ${profile.name}`);
-  } catch (err) {
-    toast.error(errorMessage(err));
-  }
-}
-
-async function togglePin(profile: Profile) {
-  try {
-    await connections.setPinned(profile.id, !connections.isPinned(profile.id));
-  } catch (err) {
-    toast.error(errorMessage(err));
-  }
-}
-
-async function clone(profile: Profile) {
-  try {
-    await connections.clone(profile.id);
-    toast.success(`Cloned ${profile.name}`);
-  } catch (err) {
-    toast.error(errorMessage(err));
-  }
-}
-
-async function remove(profile: Profile) {
-  try {
-    await connections.remove(profile.id);
-    toast.success(`Deleted ${profile.name}`);
-  } catch (err) {
-    toast.error(errorMessage(err));
-  }
+async function connectAndOpen(profile: Profile) {
+  await connect(profile, { openQuery: true });
 }
 
 async function onReorder() {
@@ -246,7 +178,7 @@ async function onReorder() {
                       size="icon-sm"
                       variant="ghost"
                       title="Connect"
-                      @click="connect(profile)"
+                      @click="connectAndOpen(profile)"
                     >
                       <Plug class="size-3.5" />
                       <span class="sr-only">Connect</span>
@@ -282,7 +214,7 @@ async function onReorder() {
               >
                 Cancel connecting
               </ContextMenuItem>
-              <ContextMenuItem v-else @select="connect(profile)">
+              <ContextMenuItem v-else @select="connectAndOpen(profile)">
                 Connect
               </ContextMenuItem>
               <ContextMenuItem @select="togglePin(profile)">

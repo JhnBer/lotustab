@@ -33,16 +33,19 @@ import {
 } from "@/components/ui/context-menu";
 import { Spinner } from "@/components/ui/spinner";
 import DatabaseCombobox from "@/components/DatabaseCombobox.vue";
-import { errorMessage, isCanceled } from "@/lib/errors";
+import { useProfileActions } from "@/composables/useProfileActions";
+import {
+  buildExplorerRows,
+  nextActiveDatabase,
+  preferredDatabase,
+  ROW_TABLE,
+  tableDatabase,
+  tableLabel,
+} from "@/features/explorer/catalogRows";
+import { errorMessage } from "@/lib/errors";
 import type { TableInfo } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
-import {
-  filterTables,
-  groupTables,
-  SEARCH_TABLES_LIMIT,
-  tableDatabase,
-  useExplorerStore,
-} from "@/stores/explorer";
+import { useExplorerStore } from "@/stores/explorer";
 import { useQueryStore } from "@/stores/query";
 import { useSettingsStore } from "@/stores/settings";
 
@@ -51,6 +54,7 @@ const connections = useConnectionsStore();
 const explorer = useExplorerStore();
 const queries = useQueryStore();
 const settings = useSettingsStore();
+const { connect, disconnect } = useProfileActions();
 const { selected } = storeToRefs(connections);
 const disconnecting = ref(false);
 
@@ -62,158 +66,18 @@ const tableQuery = ref("");
 const filtering = computed(() => tableQuery.value.trim().length > 0);
 const catalogScrollRef = ref<HTMLElement | null>(null);
 
-const ROW_DB = 32;
-const ROW_TABLE = 28;
-const ROW_META = 24;
-
-type ExplorerRow =
-  | { key: string; kind: "db"; name: string; open: boolean; height: number }
-  | { key: string; kind: "schema"; schema: string; height: number }
-  | { key: string; kind: "table"; database: string; table: TableInfo; indent: number; qualify: boolean; height: number }
-  | { key: string; kind: "status"; text: string; height: number };
-
-function pushTables(rows: ExplorerRow[], database: string, tables: TableInfo[], indent: number, qualify: boolean) {
-  const groups = groupTables(tables);
-  if (groups) {
-    for (const group of groups) {
-      rows.push({
-        key: `schema:${database}.${group.schema}`,
-        kind: "schema",
-        schema: group.schema,
-        height: ROW_META,
-      });
-      for (const table of group.tables) {
-        rows.push({
-          key: `table:${database}.${table.schema}.${table.name}`,
-          kind: "table",
-          database,
-          table,
-          indent: indent + 1,
-          qualify,
-          height: ROW_TABLE,
-        });
-      }
-    }
-    return;
-  }
-  if (tables.length === 0) {
-    rows.push({ key: `empty:${database}`, kind: "status", text: "No tables", height: ROW_META });
-    return;
-  }
-  for (const table of tables) {
-    rows.push({
-      key: `table:${database}.${table.schema}.${table.name}`,
-      kind: "table",
-      database,
-      table,
-      indent,
-      qualify,
-      height: ROW_TABLE,
-    });
-  }
-}
-
-const explorerRows = computed((): ExplorerRow[] => {
-  const rows: ExplorerRow[] = [];
-  const query = tableQuery.value.trim();
-  const q = query.toLowerCase();
-
-  if (q) {
-    const seen = new Set<string>();
-    for (const name of explorer.databases) {
-      if (!name.toLowerCase().includes(q)) {
-        continue;
-      }
-      rows.push({
-        key: `db:${name}`,
-        kind: "db",
-        name,
-        open: Boolean(explorer.expanded[name]),
-        height: ROW_DB,
-      });
-    }
-    const scanDbs = settings.showAllDatabases
-      ? Object.keys(explorer.tablesByDb)
-      : explorer.activeDatabase
-        ? [explorer.activeDatabase]
-        : [];
-    for (const database of scanDbs) {
-      for (const table of filterTables(explorer.tablesByDb[database] ?? [], query)) {
-        const id = `${database}\0${table.schema}\0${table.name}`;
-        if (seen.has(id)) {
-          continue;
-        }
-        seen.add(id);
-        rows.push({
-          key: `table:${id}`,
-          kind: "table",
-          database,
-          table,
-          indent: 0,
-          qualify: true,
-          height: ROW_TABLE,
-        });
-      }
-    }
-    for (const table of explorer.search.results) {
-      const database = tableDatabase(table);
-      const id = `${database}\0${table.schema}\0${table.name}`;
-      if (seen.has(id)) {
-        continue;
-      }
-      seen.add(id);
-      rows.push({
-        key: `search:${id}`,
-        kind: "table",
-        database,
-        table,
-        indent: 0,
-        qualify: true,
-        height: ROW_TABLE,
-      });
-    }
-    if (explorer.search.loading || explorer.search.query !== q) {
-      rows.push({ key: "search-loading", kind: "status", text: "Searching…", height: ROW_META });
-    } else if (explorer.search.error) {
-      rows.push({ key: "search-error", kind: "status", text: explorer.search.error, height: ROW_META });
-    } else if (explorer.search.truncated) {
-      rows.push({
-        key: "search-truncated",
-        kind: "status",
-        text: `Showing first ${SEARCH_TABLES_LIMIT} table matches. Refine your search.`,
-        height: ROW_META,
-      });
-    }
-    return rows;
-  }
-
-  if (!settings.showAllDatabases) {
-    const name = explorer.activeDatabase;
-    if (!name) {
-      return rows;
-    }
-    if (explorer.loadingTables[name] && !(name in explorer.tablesByDb)) {
-      rows.push({ key: `loading:${name}`, kind: "status", text: "Loading…", height: ROW_META });
-      return rows;
-    }
-    pushTables(rows, name, explorer.tablesByDb[name] ?? [], 0, false);
-    return rows;
-  }
-
-  for (const name of explorer.databases) {
-    const open = Boolean(explorer.expanded[name]);
-    rows.push({ key: `db:${name}`, kind: "db", name, open, height: ROW_DB });
-    if (!open) {
-      continue;
-    }
-    if (explorer.loadingTables[name] && !(name in explorer.tablesByDb)) {
-      rows.push({ key: `loading:${name}`, kind: "status", text: "Loading…", height: ROW_META });
-      continue;
-    }
-    pushTables(rows, name, explorer.tablesByDb[name] ?? [], 1, false);
-  }
-  return rows;
-});
+const explorerRows = computed(() =>
+  buildExplorerRows({
+    query: tableQuery.value,
+    databases: explorer.databases,
+    tablesByDb: explorer.tablesByDb,
+    expanded: explorer.expanded,
+    activeDatabase: explorer.activeDatabase,
+    showAllDatabases: settings.showAllDatabases,
+    loadingTables: explorer.loadingTables,
+    search: explorer.search,
+  }),
+);
 
 const rowVirtualizer = useVirtualizer(
   computed(() => ({
@@ -232,38 +96,23 @@ const visibleVirtual = computed(() =>
   }),
 );
 
-function tableLabel(row: ExplorerRow): string {
-  if (row.kind !== "table") {
-    return "";
-  }
-  if (!row.qualify) {
-    return row.table.name;
-  }
-  if (row.table.schema && row.table.schema !== row.database) {
-    return `${row.database}.${row.table.schema} › ${row.table.name}`;
-  }
-  return `${row.database} › ${row.table.name}`;
-}
-
-function preferredDatabase(): string {
-  const name = selected.value?.params?.database ?? "";
-  return name && explorer.databases.includes(name) ? name : "";
-}
-
 function syncActiveDatabase() {
-  if (settings.showAllDatabases || !selected.value || !currentConnected.value) {
+  if (!selected.value) {
     return;
   }
   const current = explorer.activeDatabase;
-  if (current && explorer.databases.includes(current)) {
-    if (!(current in explorer.tablesByDb)) {
-      void explorer.setActiveDatabase(selected.value.id, current).catch((err) => {
-        toast.error(errorMessage(err));
-      });
-    }
+  const next = nextActiveDatabase({
+    showAllDatabases: settings.showAllDatabases,
+    connected: currentConnected.value,
+    current,
+    databases: explorer.databases,
+    tablesLoaded: current in explorer.tablesByDb,
+    preferred: preferredDatabase(selected.value.params?.database, explorer.databases),
+  });
+  if ("skip" in next || next.alreadyLoaded) {
     return;
   }
-  void explorer.setActiveDatabase(selected.value.id, preferredDatabase()).catch((err) => {
+  void explorer.setActiveDatabase(selected.value.id, next.database).catch((err) => {
     toast.error(errorMessage(err));
   });
 }
@@ -328,23 +177,7 @@ async function connectSelected() {
   if (!selected.value) {
     return;
   }
-  if (connections.isConnecting(selected.value.id)) {
-    connections.cancelConnect(selected.value.id);
-    return;
-  }
-  try {
-    await connections.connect(selected.value.id);
-    if (!connections.isConnected(selected.value.id)) {
-      return;
-    }
-    toast.success(`Connected to ${selected.value.name}`);
-    router.push("/query");
-  } catch (err) {
-    if (isCanceled(err)) {
-      return;
-    }
-    toast.error(errorMessage(err));
-  }
+  await connect(selected.value, { navigate: true });
 }
 
 async function disconnectSelected() {
@@ -353,10 +186,7 @@ async function disconnectSelected() {
   }
   disconnecting.value = true;
   try {
-    await connections.disconnect(selected.value.id);
-    toast.info(`Disconnected from ${selected.value.name}`);
-  } catch (err) {
-    toast.error(errorMessage(err));
+    await disconnect(selected.value);
   } finally {
     disconnecting.value = false;
   }

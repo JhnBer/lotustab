@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { onBeforeUnmount, ref, watch } from "vue";
 import { Database, Server, Settings } from "@lucide/vue";
 import { storeToRefs } from "pinia";
 import { VueDraggable } from "vue-draggable-plus";
@@ -27,21 +27,23 @@ import {
 } from "@/components/ui/context-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import ConnectionDialog from "@/features/connections/ConnectionDialog.vue";
-import { connBg, connTint } from "@/lib/colors";
-import { errorMessage, isCanceled } from "@/lib/errors";
+import { useConnectionDialog } from "@/composables/useConnectionDialog";
+import { useConnectionTint } from "@/composables/useConnectionTint";
+import { useProfileActions } from "@/composables/useProfileActions";
+import { connBg } from "@/lib/colors";
+import { errorMessage } from "@/lib/errors";
 import type { Profile } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
-import { useSettingsStore } from "@/stores/settings";
 
 const route = useRoute();
 const router = useRouter();
 const connections = useConnectionsStore();
-const settings = useSettingsStore();
 const { setOpen } = useSidebar();
 const { pinnedProfiles } = storeToRefs(connections);
+const { dialogOpen, editing, openEdit } = useConnectionDialog();
+const { activateProfile, connect, disconnect, unpin, openInNewWindow } = useProfileActions();
+const { tintClass: connectionsTint } = useConnectionTint();
 const menuOpenId = ref("");
-const dialogOpen = ref(false);
-const editing = ref<Profile | null>(null);
 const sortedPinned = ref<Profile[]>([]);
 const pinDragging = ref(false);
 
@@ -54,12 +56,6 @@ watch(
     sortedPinned.value = [...next];
   },
   { immediate: true },
-);
-
-const connectionsTint = computed(() =>
-  settings.connectionTint && connections.selected && !route.path.startsWith("/settings")
-    ? connTint(connections.selected.color)
-    : "",
 );
 
 function goConnections() {
@@ -79,11 +75,6 @@ function goSettings() {
   }
   router.push("/settings");
   setOpen(true);
-}
-
-function openEdit(profile: Profile) {
-  editing.value = profile;
-  dialogOpen.value = true;
 }
 
 function onPinDragStart() {
@@ -117,52 +108,11 @@ function onPinMenuOpen(id: string, open: boolean) {
   menuOpenId.value = open ? id : "";
 }
 
-function activateProfile(profile: Profile) {
+function onActivateProfile(profile: Profile) {
   if (pinDragging.value) {
     return;
   }
-  connections.select(profile.id);
-  router.push("/query");
-}
-
-async function openInNewWindow(profile: Profile) {
-  try {
-    await connections.openInNewWindow(profile);
-    if (!connections.selectedId) {
-      await router.push("/connections");
-    }
-  } catch (err) {
-    handleErr(err);
-  }
-}
-
-async function unpin(profile: Profile) {
-  try {
-    await connections.setPinned(profile.id, false);
-  } catch (err) {
-    handleErr(err);
-  }
-}
-
-async function disconnect(profile: Profile) {
-  try {
-    await connections.disconnect(profile.id);
-    toast.info(`Disconnected from ${profile.name}`);
-  } catch (err) {
-    handleErr(err);
-  }
-}
-
-async function connect(profile: Profile) {
-  try {
-    await connections.connect(profile.id);
-    toast.success(`Connected to ${profile.name}`);
-  } catch (err) {
-    if (isCanceled(err)) {
-      return;
-    }
-    handleErr(err);
-  }
+  activateProfile(profile);
 }
 
 onBeforeUnmount(() => {
@@ -232,7 +182,7 @@ onBeforeUnmount(() => {
                           type="button"
                           class="flex size-8 cursor-grab items-center justify-center rounded-md text-foreground ring-offset-background focus-visible:ring-2 focus-visible:outline-none active:cursor-grabbing dark:text-white"
                           :class="connBg(profile.color) + (connections.selectedId === profile.id ? '/60' : '/20')"
-                          @click="activateProfile(profile)"
+                          @click="onActivateProfile(profile)"
                         >
                           <Database class="size-4" />
                           <span class="sr-only">{{ profile.name }}</span>

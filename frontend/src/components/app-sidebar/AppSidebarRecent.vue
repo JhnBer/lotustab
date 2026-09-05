@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import { Pencil, Pin, Plug, Unplug } from "@lucide/vue";
-import { toast } from "vue-sonner";
 import { storeToRefs } from "pinia";
-import { ref } from "vue";
-import { useRouter } from "vue-router";
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -22,80 +19,15 @@ import {
 } from "@/components/ui/context-menu";
 import { Spinner } from "@/components/ui/spinner";
 import ConnectionDialog from "@/features/connections/ConnectionDialog.vue";
-import { errorMessage, isCanceled } from "@/lib/errors";
+import { useConnectionDialog } from "@/composables/useConnectionDialog";
+import { useProfileActions } from "@/composables/useProfileActions";
 import { connBg } from "@/lib/colors";
-import type { Profile } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
 
-const router = useRouter();
 const connections = useConnectionsStore();
 const { recentProfiles } = storeToRefs(connections);
-const dialogOpen = ref(false);
-const editing = ref<Profile | null>(null);
-
-function activateProfile(profile: Profile) {
-  connections.select(profile.id);
-  router.push("/query");
-}
-
-async function togglePin(profile: Profile) {
-  try {
-    await connections.setPinned(profile.id, !connections.isPinned(profile.id));
-  } catch (err) {
-    toast.error(errorMessage(err));
-  }
-}
-
-async function connectRecent(profile: Profile) {
-  if (connections.isConnecting(profile.id)) {
-    connections.cancelConnect(profile.id);
-    return;
-  }
-  try {
-    await connections.connect(profile.id);
-    if (!connections.isConnected(profile.id)) {
-      return;
-    }
-    toast.success(`Connected to ${profile.name}`);
-  } catch (err) {
-    if (isCanceled(err)) {
-      return;
-    }
-    toast.error(errorMessage(err));
-  }
-}
-
-async function disconnectRecent(profile: Profile) {
-  try {
-    await connections.disconnect(profile.id);
-    toast.info(`Disconnected from ${profile.name}`);
-  } catch (err) {
-    toast.error(errorMessage(err));
-  }
-}
-
-function openEdit(profile: Profile) {
-  editing.value = profile;
-  dialogOpen.value = true;
-}
-
-async function cloneRecent(profile: Profile) {
-  try {
-    await connections.clone(profile.id);
-    toast.success(`Cloned ${profile.name}`);
-  } catch (err) {
-    toast.error(errorMessage(err));
-  }
-}
-
-async function removeRecent(profile: Profile) {
-  try {
-    await connections.remove(profile.id);
-    toast.success(`Deleted ${profile.name}`);
-  } catch (err) {
-    toast.error(errorMessage(err));
-  }
-}
+const { dialogOpen, editing, openEdit } = useConnectionDialog();
+const { activateProfile, togglePin, connect, disconnect, clone, remove } = useProfileActions();
 </script>
 
 <template>
@@ -145,7 +77,7 @@ async function removeRecent(profile: Profile) {
                   variant="ghost"
                   class="shrink-0"
                   title="Connect"
-                  @click.stop="connectRecent(profile)"
+                  @click.stop="connect(profile)"
                 >
                   <Plug class="size-3.5" />
                 </Button>
@@ -155,7 +87,7 @@ async function removeRecent(profile: Profile) {
                   variant="ghost"
                   class="shrink-0"
                   title="Disconnect"
-                  @click.stop="disconnectRecent(profile)"
+                  @click.stop="disconnect(profile)"
                 >
                   <Unplug class="size-3.5" />
                 </Button>
@@ -173,7 +105,7 @@ async function removeRecent(profile: Profile) {
             <ContextMenuContent>
               <ContextMenuItem
                 v-if="connections.isConnected(profile.id)"
-                @select="disconnectRecent(profile)"
+                @select="disconnect(profile)"
               >
                 Disconnect
               </ContextMenuItem>
@@ -183,7 +115,7 @@ async function removeRecent(profile: Profile) {
               >
                 Cancel connecting
               </ContextMenuItem>
-              <ContextMenuItem v-else @select="connectRecent(profile)">
+              <ContextMenuItem v-else @select="connect(profile)">
                 Connect
               </ContextMenuItem>
               <ContextMenuItem @select="togglePin(profile)">
@@ -192,11 +124,11 @@ async function removeRecent(profile: Profile) {
               <ContextMenuItem @select="openEdit(profile)">
                 Edit
               </ContextMenuItem>
-              <ContextMenuItem @select="cloneRecent(profile)">
+              <ContextMenuItem @select="clone(profile)">
                 Clone
               </ContextMenuItem>
               <ContextMenuSeparator />
-              <ContextMenuItem variant="destructive" @select="removeRecent(profile)">
+              <ContextMenuItem variant="destructive" @select="remove(profile)">
                 Delete
               </ContextMenuItem>
             </ContextMenuContent>
