@@ -20,7 +20,7 @@ import {
 
 const DEFAULT_COL_WIDTH = 160;
 const MIN_COL_WIDTH = 72;
-const ROW_HEIGHT = 36;
+const ROW_HEIGHT = 28;
 const ROW_NUM_WIDTH = 56;
 
 const props = withDefaults(
@@ -489,7 +489,7 @@ async function pasteCell() {
                       data-cell
                       :data-row="item.index"
                       :data-col="col.index"
-                      class="box-border flex-none truncate px-2 font-mono text-xs leading-9"
+                      class="box-border flex-none truncate px-2 font-mono text-xs leading-7"
                       :class="[
                         editable ? 'cursor-text' : '',
                         isDirty(item.index, col.index)

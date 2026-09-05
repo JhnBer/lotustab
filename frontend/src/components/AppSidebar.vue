@@ -665,7 +665,7 @@ function openTable(database: string, table: TableInfo, view: "data" | "structure
       </SidebarGroup>
 
       <SidebarGroup v-else-if="!currentConnected">
-        <SidebarGroupContent class="px-2 py-2">
+        <SidebarGroupContent class="px-2 py-0.5">
           <Button
             v-if="connections.isConnecting(selected.id)"
             size="sm"
