@@ -74,6 +74,7 @@ export interface TableTab extends TabBase {
   structure: TableStructure | null;
   structureDraft: DraftColumn[] | null;
   structureError: string;
+  manuallyCancelled: boolean;
 }
 
 export type WorkspaceTab = QueryTab | TableTab;
@@ -248,6 +249,7 @@ function restoreTableTab(tab: PersistedTableTab): TableTab {
     structure: null,
     structureDraft: null,
     structureError: "",
+    manuallyCancelled: false,
   };
 }
 
@@ -476,7 +478,7 @@ export const useQueryStore = defineStore("query", () => {
         }
         existing.running = true;
         afterPaint(() => void loadStructure(existing.id));
-      } else if (!existing.result) {
+      } else if (!existing.result && !existing.manuallyCancelled) {
         existing.running = true;
         afterPaint(() => void loadTable(existing.id));
       }
@@ -507,6 +509,7 @@ export const useQueryStore = defineStore("query", () => {
       structure: null,
       structureDraft: null,
       structureError: "",
+      manuallyCancelled: false,
     };
     tabs.value.push(tab);
     selectTab(tab.id);
@@ -518,6 +521,14 @@ export const useQueryStore = defineStore("query", () => {
 
   function cancel(id: string) {
     inflight.get(id)?.cancel();
+    inflight.delete(id);
+    const tab = tabs.value.find((t) => t.id === id);
+    if (tab) {
+      tab.running = false;
+      if (tab.kind === "table") {
+        tab.manuallyCancelled = true;
+      }
+    }
   }
 
   function close(id: string) {
@@ -700,9 +711,13 @@ export const useQueryStore = defineStore("query", () => {
     );
     inflight.set(id, pending);
     try {
-      tab.result = await pending;
+      const result = await pending;
+      if (inflight.get(id) !== pending) {
+        return;
+      }
+      tab.result = result;
     } catch (err) {
-      if (isCanceled(err)) {
+      if (isCanceled(err) || inflight.get(id) !== pending) {
         return;
       }
       tab.result = null;
@@ -741,6 +756,7 @@ export const useQueryStore = defineStore("query", () => {
     }
     cancel(id);
     tab.running = true;
+    tab.manuallyCancelled = false;
     tab.error = "";
     const pending = QueryService.BrowseTable(tab.profileId, {
       database: tab.database,
@@ -755,11 +771,14 @@ export const useQueryStore = defineStore("query", () => {
     inflight.set(id, pending);
     try {
       const result = await pending;
+      if (inflight.get(id) !== pending) {
+        return;
+      }
       tab.result = asQueryResult(result);
       tab.total = result?.total ?? 0;
       tab.primaryKey = result?.primaryKey ?? [];
     } catch (err) {
-      if (isCanceled(err)) {
+      if (isCanceled(err) || inflight.get(id) !== pending) {
         return;
       }
       tab.result = null;
@@ -990,6 +1009,9 @@ export const useQueryStore = defineStore("query", () => {
     inflight.set(id, pending);
     try {
       const result = await pending;
+      if (inflight.get(id) !== pending) {
+        return;
+      }
       tab.structure = result
         ? { columns: result.columns ?? [], canReorder: Boolean(result.canReorder) }
         : { columns: [], canReorder: false };
@@ -997,7 +1019,7 @@ export const useQueryStore = defineStore("query", () => {
         tab.structureDraft = columnsToDraft(tab.structure.columns);
       }
     } catch (err) {
-      if (isCanceled(err)) {
+      if (isCanceled(err) || inflight.get(id) !== pending) {
         return;
       }
       tab.structure = null;

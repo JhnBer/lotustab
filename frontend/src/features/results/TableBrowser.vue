@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { ChevronDown, ChevronRight, Filter, Plus, RotateCw } from "@lucide/vue";
+import { ChevronDown, ChevronRight, Filter, Plus, RotateCw, X } from "@lucide/vue";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Dialog,
   DialogContent,
@@ -54,7 +55,7 @@ watch(
       }
       return;
     }
-    if (!props.tab.result && !props.tab.running) {
+    if (!props.tab.result && !props.tab.running && !props.tab.manuallyCancelled) {
       void queries.loadTable(props.tab.id);
     }
   },
@@ -112,21 +113,23 @@ async function applyStructure() {
 <template>
   <div class="flex min-h-0 flex-1 flex-col bg-background">
     <div v-if="!structureView" class="flex items-center gap-2 border-b px-3 py-2 text-xs">
+      <Button
+        size="icon-xs"
+        variant="outline"
+        :disabled="!tab.running && loading"
+        :aria-label="tab.running ? 'Cancel' : 'Refresh table'"
+        @click="tab.running ? queries.cancel(tab.id) : queries.loadTable(tab.id)"
+      >
+        <X v-if="tab.running" class="size-3.5" />
+        <RotateCw v-else class="size-3.5" />
+      </Button>
       <div class="text-muted-foreground min-w-0 flex-1 truncate">
         <span class="text-foreground font-medium">{{ tab.title }}</span>
         <span v-if="tab.database" class="ml-1">· {{ tab.database }}</span>
-        <span v-if="tab.result && !tab.running"> · {{ tab.result.durationMs }} ms</span>
+        <Spinner v-if="tab.running" class="size-3 ml-1 inline-block" />
+        <span v-else-if="tab.result"> · {{ tab.result.durationMs }} ms</span>
       </div>
       <div class="flex shrink-0 items-center gap-1">
-        <Button
-          size="icon-xs"
-          variant="outline"
-          :disabled="loading"
-          aria-label="Refresh table"
-          @click="queries.loadTable(tab.id)"
-        >
-          <RotateCw class="size-3.5" :class="tab.running ? 'animate-spin' : ''" />
-        </Button>
         <Button
           size="icon-xs"
           variant="outline"
@@ -177,7 +180,18 @@ async function applyStructure() {
         @update:filters="queries.setFilters(tab.id, $event)"
         @apply="queries.applyFilters(tab.id)"
       />
+      <div
+        v-if="!loading && !tab.result && !tab.error && tab.manuallyCancelled"
+        class="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-3 p-4"
+      >
+        <span class="text-sm">Load cancelled.</span>
+        <Button size="sm" variant="outline" @click="queries.loadTable(tab.id)">
+          <RotateCw class="mr-1.5 size-3.5" />
+          Click to reload
+        </Button>
+      </div>
       <ResultsTable
+        v-else
         class="min-h-0 flex-1"
         :result="tab.result"
         :error="tab.error"

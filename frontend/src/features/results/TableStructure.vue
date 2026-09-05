@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
-import { Plus, RotateCw } from "@lucide/vue";
+import { Plus, RotateCw, X } from "@lucide/vue";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -116,24 +116,25 @@ function rowAt(index: number): DraftColumn | undefined {
 <template>
   <div class="flex min-h-0 flex-1 flex-col">
     <div class="flex items-center gap-2 border-b px-3 py-2">
+      <Button
+        size="icon-xs"
+        variant="outline"
+        :aria-label="running ? 'Cancel' : 'Refresh structure'"
+        @click="running ? queries.cancel(tab.id) : onRefresh()"
+      >
+        <X v-if="running" class="size-3.5" />
+        <RotateCw v-else class="size-3.5" />
+      </Button>
       <Input
         size="xs"
         v-model="query"
         class="max-w-64"
         placeholder="Search columns…"
       />
+      <Spinner v-if="running" class="size-3.5 shrink-0" />
       <span class="text-muted-foreground min-w-0 flex-1 truncate text-xs">
         <template v-if="!tab.structure?.canReorder">Column order cannot be changed on this database.</template>
       </span>
-      <Button
-        size="icon-xs"
-        variant="outline"
-        :disabled="running"
-        aria-label="Refresh structure"
-        @click="onRefresh"
-      >
-        <RotateCw class="size-3.5" :class="running ? 'animate-spin' : ''" />
-      </Button>
       <Button size="xs" variant="outline" :disabled="running" @click="queries.addStructureColumn(tab.id, driverId)">
         <Plus class="size-3.5" />
         Column
