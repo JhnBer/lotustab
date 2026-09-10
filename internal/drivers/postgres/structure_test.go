@@ -72,3 +72,25 @@ func TestPostgresExtra(t *testing.T) {
 		}
 	}
 }
+
+func TestPostgresCreateSQL(t *testing.T) {
+	def := "now()"
+	got, err := postgresCreateSQL(`"public"."users"`, []driver.ColumnInfo{
+		{Name: "id", Type: "integer", Nullable: false, AutoIncrement: true, Extra: "GENERATED ALWAYS AS IDENTITY"},
+		{Name: "name", Type: "text", Nullable: true, Default: &def},
+	}, []string{"id"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		`CREATE TABLE "public"."users" (`,
+		`"id" integer GENERATED ALWAYS AS IDENTITY NOT NULL`,
+		`"name" text DEFAULT now()`,
+		`PRIMARY KEY ("id")`,
+	}
+	for _, part := range want {
+		if !strings.Contains(got, part) {
+			t.Fatalf("missing %q in %s", part, got)
+		}
+	}
+}

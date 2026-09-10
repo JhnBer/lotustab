@@ -1,11 +1,15 @@
 export {
   ConnectionsService,
   DriversService,
+  ExportService,
   QueryService,
   WindowsService,
 } from "../../bindings/lotustab/internal/app";
 export type {
   ConnectionsState,
+  ExportPathResult,
+  ExportResult,
+  ExportTableRequest,
   SaveProfileInput,
 } from "../../bindings/lotustab/internal/app/models";
 export type { Profile } from "../../bindings/lotustab/internal/core/connection/models";

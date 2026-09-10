@@ -99,6 +99,25 @@ func TestClickhouseMutationSQL(t *testing.T) {
 	}
 }
 
+func TestClickhouseDeleteAndInsertSQL(t *testing.T) {
+	del, err := clickhouseDeleteSQL("`t`", []string{"id"}, map[string]any{"id": int64(1)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantDel := "ALTER TABLE `t` DELETE WHERE `id` = 1 SETTINGS mutations_sync = 1"
+	if del != wantDel {
+		t.Fatalf("delete=%q want %q", del, wantDel)
+	}
+	ins, err := clickhouseInsertSQL("`t`", map[string]any{"n": int64(2), "name": "a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantIns := "INSERT INTO `t` (`n`, `name`) VALUES (2, 'a')"
+	if ins != wantIns {
+		t.Fatalf("insert=%q want %q", ins, wantIns)
+	}
+}
+
 func TestClickhouseMutationSQLRejectsEmpty(t *testing.T) {
 	if _, err := clickhouseMutationSQL("`t`", nil, []string{"id"}, map[string]any{"id": 1}); err == nil {
 		t.Fatal("expected error")

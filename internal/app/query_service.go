@@ -186,10 +186,14 @@ func (s *QueryService) AlterTable(ctx context.Context, profileID string, req dri
 }
 
 func withLiveConn[T any](s *QueryService, ctx context.Context, profileID string, fn func(context.Context, driver.Conn) (T, error)) (T, error) {
+	return withTrackedConn(s.connections, ctx, profileID, fn)
+}
+
+func withTrackedConn[T any](connections *ConnectionsService, ctx context.Context, profileID string, fn func(context.Context, driver.Conn) (T, error)) (T, error) {
 	var zero T
-	ctx, done := s.connections.Track(ctx, profileID)
+	ctx, done := connections.Track(ctx, profileID)
 	defer done()
-	conn, err := s.connections.ensureOpen(ctx, profileID)
+	conn, err := connections.ensureOpen(ctx, profileID)
 	if err != nil {
 		return zero, err
 	}
@@ -197,7 +201,7 @@ func withLiveConn[T any](s *QueryService, ctx context.Context, profileID string,
 	if err == nil || ctx.Err() != nil || !isStaleConn(err) {
 		return out, err
 	}
-	conn, err = s.connections.reconnect(ctx, profileID)
+	conn, err = connections.reconnect(ctx, profileID)
 	if err != nil {
 		return zero, err
 	}

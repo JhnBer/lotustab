@@ -78,6 +78,13 @@ func ClampTableRef(ref TableRef) TableRef {
 	return ref
 }
 
+// ClampStreamTable trims table identity and optional WHERE clause.
+func ClampStreamTable(req StreamTableRequest) StreamTableRequest {
+	req.TableRef = ClampTableRef(req.TableRef)
+	req.WhereSQL = strings.TrimSpace(req.WhereSQL)
+	return req
+}
+
 // ClampAlterTable trims table identity and operation fields.
 func ClampAlterTable(req AlterTableRequest) AlterTableRequest {
 	req.Database = strings.TrimSpace(req.Database)

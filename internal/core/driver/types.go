@@ -105,9 +105,12 @@ type TableBrowseResult struct {
 }
 
 // RowEdit is a set of cell changes for one row, addressed by its original primary key.
+// Deleted and Inserted are mutually exclusive with a regular UPDATE.
 type RowEdit struct {
-	Key   map[string]any `json:"key"`
-	Cells map[string]any `json:"cells"`
+	Key      map[string]any `json:"key"`
+	Cells    map[string]any `json:"cells"`
+	Deleted  bool           `json:"deleted,omitempty"`
+	Inserted bool           `json:"inserted,omitempty"`
 }
 
 // ApplyEditsRequest applies accumulated cell edits to a single table.
@@ -130,6 +133,12 @@ type TableRef struct {
 	Database string `json:"database"`
 	Schema   string `json:"schema"`
 	Name     string `json:"name"`
+}
+
+// StreamTableRequest streams rows from a table, optionally filtered by a WHERE clause.
+type StreamTableRequest struct {
+	TableRef
+	WhereSQL string `json:"whereSQL"`
 }
 
 // ColumnInfo is catalog metadata for one table column.

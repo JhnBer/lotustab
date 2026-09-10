@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from "vue";
-import { Database, Server, Settings } from "@lucide/vue";
+import { ArrowUpDown, Database, Server, Settings } from "@lucide/vue";
 import { storeToRefs } from "pinia";
 import { VueDraggable } from "vue-draggable-plus";
 import { useRoute, useRouter } from "vue-router";
@@ -34,10 +34,12 @@ import { connBg } from "@/lib/colors";
 import { errorMessage } from "@/lib/errors";
 import type { Profile } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
+import { useTransfersStore } from "@/stores/transfers";
 
 const route = useRoute();
 const router = useRouter();
 const connections = useConnectionsStore();
+const transfers = useTransfersStore();
 const { setOpen } = useSidebar();
 const { pinnedProfiles } = storeToRefs(connections);
 const { dialogOpen, editing, openEdit } = useConnectionDialog();
@@ -74,6 +76,19 @@ function goSettings() {
     return;
   }
   router.push("/settings");
+  setOpen(true);
+}
+
+function goTransfers() {
+  if (route.path.startsWith("/transfers")) {
+    if (connections.selectedId) {
+      router.push("/query");
+    } else {
+      router.push("/connections");
+    }
+    return;
+  }
+  router.push("/transfers");
   setOpen(true);
 }
 
@@ -231,6 +246,31 @@ onBeforeUnmount(() => {
     </SidebarContent>
     <SidebarFooter>
       <SidebarMenu>
+        <SidebarMenuItem>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <div class="w-full">
+                <SidebarMenuButton
+                  :is-active="route.path.startsWith('/transfers')"
+                  class="relative px-2.5 md:px-2"
+                  @click="goTransfers"
+                >
+                  <ArrowUpDown />
+                  <span>Transfers</span>
+                  <span
+                    v-if="transfers.runningCount > 0"
+                    class="bg-primary text-primary-foreground absolute top-0.5 right-0.5 flex size-3.5 items-center justify-center rounded-full text-[9px] font-medium"
+                  >
+                    {{ transfers.runningCount }}
+                  </span>
+                </SidebarMenuButton>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="right" align="center">
+              Transfers
+            </TooltipContent>
+          </Tooltip>
+        </SidebarMenuItem>
         <SidebarMenuItem>
           <Tooltip>
             <TooltipTrigger as-child>

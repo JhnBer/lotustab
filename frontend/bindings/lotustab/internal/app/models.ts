@@ -15,6 +15,48 @@ export interface ConnectionsState {
 }
 
 /**
+ * ExportPathResult is the file or folder chosen for a dump.
+ */
+export interface ExportPathResult {
+    "path": string;
+    "dir": string;
+    "canceled": boolean;
+}
+
+/**
+ * ExportResult is returned after a dump finishes or is canceled.
+ */
+export interface ExportResult {
+    "files": string[] | null;
+    "rows": number;
+    "bytes": number;
+    "durationMs": number;
+    "canceled": boolean;
+}
+
+/**
+ * ExportTableRequest is the payload for a table dump.
+ */
+export interface ExportTableRequest {
+    "profileId": string;
+    "database": string;
+    "schema": string;
+    "table": string;
+    "format": string;
+    "gzip": boolean;
+    "chunkSize": number;
+    "whereSQL": string;
+    "includeCreate": boolean;
+    "includeDrop": boolean;
+    "insertBatchSize": number;
+    "wrapTransaction": boolean;
+    "outputPath": string;
+    "outputDir": string;
+    "fileName": string;
+    "deleteOnAbort": boolean;
+}
+
+/**
  * SaveProfileInput is the payload used to create, update, or test a profile.
  */
 export interface SaveProfileInput {

@@ -308,10 +308,21 @@ func (c *conn) ApplyEdits(ctx context.Context, req driver.ApplyEditsRequest) err
 		qualified := clickhouseQualified(dbName, req.Name)
 		applied := 0
 		for i, row := range req.Rows {
-			if len(row.Cells) == 0 {
-				continue
+			var (
+				q   string
+				err error
+			)
+			switch {
+			case row.Deleted:
+				q, err = clickhouseDeleteSQL(qualified, pk, row.Key)
+			case row.Inserted:
+				q, err = clickhouseInsertSQL(qualified, row.Cells)
+			default:
+				if len(row.Cells) == 0 {
+					continue
+				}
+				q, err = clickhouseMutationSQL(qualified, row.Cells, pk, row.Key)
 			}
-			q, err := clickhouseMutationSQL(qualified, row.Cells, pk, row.Key)
 			if err != nil {
 				return err
 			}
@@ -401,6 +412,68 @@ func clickhouseMutationSQL(qualified string, cells map[string]any, pk []string, 
 		b.WriteString(clickhouseLiteral(cells[col]))
 	}
 	b.WriteString(" WHERE ")
+	where, err := clickhouseWhere(pk, key)
+	if err != nil {
+		return "", err
+	}
+	b.WriteString(where)
+	b.WriteString(" SETTINGS mutations_sync = 1")
+	return b.String(), nil
+}
+
+func clickhouseDeleteSQL(qualified string, pk []string, key map[string]any) (string, error) {
+	if strings.TrimSpace(qualified) == "" {
+		return "", fmt.Errorf("table name is required")
+	}
+	where, err := clickhouseWhere(pk, key)
+	if err != nil {
+		return "", err
+	}
+	return "ALTER TABLE " + qualified + " DELETE WHERE " + where + " SETTINGS mutations_sync = 1", nil
+}
+
+func clickhouseInsertSQL(qualified string, cells map[string]any) (string, error) {
+	if strings.TrimSpace(qualified) == "" {
+		return "", fmt.Errorf("table name is required")
+	}
+	if len(cells) == 0 {
+		return "", fmt.Errorf("no columns to insert")
+	}
+	cols := make([]string, 0, len(cells))
+	for col := range cells {
+		if strings.TrimSpace(col) == "" {
+			return "", fmt.Errorf("column name is required")
+		}
+		cols = append(cols, col)
+	}
+	sort.Strings(cols)
+
+	var b strings.Builder
+	b.WriteString("INSERT INTO ")
+	b.WriteString(qualified)
+	b.WriteString(" (")
+	for i, col := range cols {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(sqlutil.QuoteClickHouse(col))
+	}
+	b.WriteString(") VALUES (")
+	for i, col := range cols {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(clickhouseLiteral(cells[col]))
+	}
+	b.WriteByte(')')
+	return b.String(), nil
+}
+
+func clickhouseWhere(pk []string, key map[string]any) (string, error) {
+	if len(pk) == 0 {
+		return "", fmt.Errorf("table has no sorting key to identify rows")
+	}
+	var b strings.Builder
 	for i, col := range pk {
 		if strings.TrimSpace(col) == "" {
 			return "", fmt.Errorf("key column name is required")
@@ -416,7 +489,6 @@ func clickhouseMutationSQL(qualified string, cells map[string]any, pk []string, 
 		b.WriteString(" = ")
 		b.WriteString(clickhouseLiteral(v))
 	}
-	b.WriteString(" SETTINGS mutations_sync = 1")
 	return b.String(), nil
 }
 

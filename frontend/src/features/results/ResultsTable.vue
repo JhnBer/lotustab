@@ -1,24 +1,41 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "@lucide/vue";
 import { Spinner } from "@/components/ui/spinner";
 import type { QueryResult } from "@/lib/wails";
+import { Button } from "@/components/ui/button";
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { useClipboardText } from "@/composables/useClipboardText";
 import { usePointerResize } from "@/composables/usePointerResize";
 import {
+  cellRangeToJson,
   draftLookup,
   editInputText,
+  insertIdOf,
   isNull,
+  isRowDeleted,
+  layoutVisualRows,
+  rowsClipboardText,
   rowKey,
   type CellDraft,
 } from "@/features/results/edits";
+import { useTableSelection } from "@/features/results/useTableSelection";
+import SelectionBorder from "@/features/results/SelectionBorder.vue";
 
 const DEFAULT_COL_WIDTH = 160;
 const MIN_COL_WIDTH = 72;
@@ -56,15 +73,33 @@ const props = withDefaults(
 const emit = defineEmits<{
   sort: [column: string];
   edit: [rowIndex: number, column: string, value: unknown];
+  editInsert: [insertId: string, column: string, value: unknown];
+  deleteRow: [rowIndex: number];
+  cloneRow: [rowIndex: number, afterIndex: number];
 }>();
+
+type ContextTarget =
+  | { type: "row"; row: number }
+  | { type: "cell"; row: number; col: number };
 
 const columns = computed(() => props.result?.columns ?? []);
 const rows = computed(() => props.result?.rows ?? []);
+const visualList = computed(() =>
+  layoutVisualRows(rows.value, columns.value, props.edits, props.primaryKey),
+);
+const allRows = computed(() => visualList.value.map((row) => row.values));
 const widths = ref<Record<string, number>>({});
 const scrollRef = ref<HTMLElement | null>(null);
+const bodyRef = ref<HTMLElement | null>(null);
 const editing = ref<{ row: number; col: number; start: string } | null>(null);
 const editInput = ref("");
-const contextCell = ref<{ row: number; col: number } | null>(null);
+const selection = useTableSelection();
+const dragging = ref<"rows" | "cells" | null>(null);
+const contextTarget = ref<ContextTarget | null>(null);
+const selectedRowCount = computed(() => selection.selectedRows.value.size);
+const setValueOpen = ref(false);
+const setValueInput = ref("");
+const selectedCellCount = computed(() => selection.cellSelectionList.value.length);
 
 watch(
   columns,
@@ -84,7 +119,7 @@ function colWidth(name: string) {
 
 const rowVirtualizer = useVirtualizer(
   computed(() => ({
-    count: rows.value.length,
+    count: allRows.value.length,
     getScrollElement: () => scrollRef.value,
     estimateSize: () => ROW_HEIGHT,
     overscan: 10,
@@ -108,6 +143,7 @@ watch(
   () => props.result,
   () => {
     rowNumOffset.value = props.rowOffset;
+    selection.clear();
   },
 );
 
@@ -156,6 +192,9 @@ const padRight = computed(() => {
 const draftMap = computed(() => {
   const map = new Map<string, Record<string, unknown>>();
   for (const edit of props.edits) {
+    if (edit.kind === "delete" || edit.kind === "insert") {
+      continue;
+    }
     if (!edit.key) {
       continue;
     }
@@ -198,16 +237,30 @@ function isPlaceholderValue(value: unknown) {
   return isNull(value) || isEmptyStringValue(value);
 }
 
+function isInsertIndex(rowIndex: number) {
+  return Boolean(visualList.value[rowIndex]?.draft);
+}
+
 function originalValue(rowIndex: number, colIndex: number) {
-  return rows.value[rowIndex]?.[colIndex];
+  const liveIndex = visualList.value[rowIndex]?.liveIndex;
+  if (liveIndex == null) {
+    return undefined;
+  }
+  return rows.value[liveIndex]?.[colIndex];
 }
 
 function cellValue(rowIndex: number, colIndex: number) {
   const name = columns.value[colIndex]?.name;
+  const visual = visualList.value[rowIndex];
+  if (visual?.draft) {
+    return visual.draft.cells[name ?? ""] ?? null;
+  }
   if (!name) {
     return originalValue(rowIndex, colIndex);
   }
-  const key = rowKey(rows.value[rowIndex], columns.value, props.primaryKey);
+  const liveIndex = visual?.liveIndex;
+  const liveRow = liveIndex != null ? rows.value[liveIndex] : undefined;
+  const key = rowKey(liveRow, columns.value, props.primaryKey);
   if (!key) {
     return originalValue(rowIndex, colIndex);
   }
@@ -219,11 +272,16 @@ function cellValue(rowIndex: number, colIndex: number) {
 }
 
 function isDirty(rowIndex: number, colIndex: number) {
+  if (isInsertIndex(rowIndex)) {
+    return false;
+  }
   const name = columns.value[colIndex]?.name;
   if (!name) {
     return false;
   }
-  const key = rowKey(rows.value[rowIndex], columns.value, props.primaryKey);
+  const liveIndex = visualList.value[rowIndex]?.liveIndex;
+  const liveRow = liveIndex != null ? rows.value[liveIndex] : undefined;
+  const key = rowKey(liveRow, columns.value, props.primaryKey);
   if (!key) {
     return false;
   }
@@ -231,10 +289,217 @@ function isDirty(rowIndex: number, colIndex: number) {
   return Boolean(cells && Object.prototype.hasOwnProperty.call(cells, name));
 }
 
+function isDeletedIndex(rowIndex: number) {
+  if (isInsertIndex(rowIndex)) {
+    return false;
+  }
+  const liveIndex = visualList.value[rowIndex]?.liveIndex;
+  const liveRow = liveIndex != null ? rows.value[liveIndex] : undefined;
+  const key = rowKey(liveRow, columns.value, props.primaryKey);
+  return isRowDeleted(props.edits, key);
+}
+
+function rowStateClass(rowIndex: number) {
+  if (isInsertIndex(rowIndex)) {
+    return "bg-emerald-500/10";
+  }
+  if (isDeletedIndex(rowIndex)) {
+    return "bg-destructive/10 opacity-60";
+  }
+  return "";
+}
+
+function isSingleCellSelected() {
+  return selection.cellSelectionList.value.length === 1;
+}
+
+function cellHighlightClass(rowIndex: number, colIndex: number) {
+  if (selection.isCellSelected(rowIndex, colIndex)) {
+    return "bg-primary/10";
+  }
+  return isDirty(rowIndex, colIndex)
+    ? "bg-yellow-500/15 ring-yellow-500 hover:bg-yellow-500/25 ring-1 ring-inset"
+    : "hover:bg-muted/50";
+}
+
+function isRowsMode() {
+  return selection.mode.value === "rows";
+}
+
+function hasToggleModifier(event: PointerEvent | KeyboardEvent | MouseEvent) {
+  return event.metaKey || event.ctrlKey || event.getModifierState("Meta") || event.getModifierState("Control");
+}
+
+const toggleModifierHeld = ref(false);
+
+function syncToggleModifier(event: KeyboardEvent) {
+  toggleModifierHeld.value = hasToggleModifier(event);
+}
+
+function clearToggleModifier() {
+  toggleModifierHeld.value = false;
+}
+
+onMounted(() => {
+  window.addEventListener("keydown", syncToggleModifier);
+  window.addEventListener("keyup", syncToggleModifier);
+  window.addEventListener("blur", clearToggleModifier);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("keydown", syncToggleModifier);
+  window.removeEventListener("keyup", syncToggleModifier);
+  window.removeEventListener("blur", clearToggleModifier);
+});
+
+function selectionEdges(row: number, col: number) {
+  const lastCol = columns.value.length - 1;
+
+  const rr = selection.selectedRowRange.value;
+  if (rr && row >= rr.lo && row <= rr.hi) {
+    const isGutter = col === -1;
+    return {
+      top: row === rr.lo,
+      bottom: row === rr.hi,
+      left: isGutter,
+      right: !isGutter && col === lastCol,
+    };
+  }
+
+  if (col === -1) {
+    return null;
+  }
+  return selection.cellBorders(row, col);
+}
+
+function rowInSelection(row: number) {
+  if (selection.isRowSelected(row)) {
+    return true;
+  }
+  return virtualColumns.value.some((col) => selection.isCellSelected(row, col.index));
+}
+
 function onHeaderClick(name: string) {
   if (props.sortable) {
     emit("sort", name);
   }
+}
+
+function rowIndexAtClientY(y: number) {
+  const body = bodyRef.value;
+  const count = allRows.value.length;
+  if (!body || count === 0) {
+    return null;
+  }
+  const index = Math.floor((y - body.getBoundingClientRect().top) / ROW_HEIGHT);
+  return Math.max(0, Math.min(count - 1, index));
+}
+
+function colIndexAtClientX(x: number) {
+  const scroller = scrollRef.value;
+  const cols = columns.value;
+  if (!scroller || cols.length === 0) {
+    return null;
+  }
+  let offset = scroller.scrollLeft + (x - scroller.getBoundingClientRect().left) - ROW_NUM_WIDTH;
+  if (offset < 0) {
+    return 0;
+  }
+  for (let i = 0; i < cols.length; i++) {
+    offset -= colWidth(cols[i]?.name ?? "");
+    if (offset < 0) {
+      return i;
+    }
+  }
+  return cols.length - 1;
+}
+
+function stopDrag() {
+  if (!dragging.value) {
+    return;
+  }
+  if (dragging.value === "cells") {
+    selection.commitCellDrag();
+  }
+  dragging.value = null;
+  document.body.style.userSelect = "";
+  window.removeEventListener("pointermove", onDragMove);
+  window.removeEventListener("pointerup", stopDrag);
+  window.removeEventListener("pointercancel", stopDrag);
+}
+
+function startDrag(kind: "rows" | "cells") {
+  if (!dragging.value) {
+    document.body.style.userSelect = "none";
+    window.addEventListener("pointermove", onDragMove);
+    window.addEventListener("pointerup", stopDrag);
+    window.addEventListener("pointercancel", stopDrag);
+  }
+  dragging.value = kind;
+}
+
+function onDragMove(event: PointerEvent) {
+  if (dragging.value === "rows") {
+    const row = rowIndexAtClientY(event.clientY);
+    if (row != null) {
+      selection.extendRowTo(row);
+    }
+    return;
+  }
+  if (dragging.value === "cells") {
+    const row = rowIndexAtClientY(event.clientY);
+    const col = colIndexAtClientX(event.clientX);
+    if (row != null && col != null) {
+      selection.extendCellDragTo(row, col);
+    }
+  }
+}
+
+function onRowPointerDown(event: PointerEvent, rowIndex: number) {
+  if (event.button !== 0) {
+    return;
+  }
+  event.preventDefault();
+  if (event.shiftKey) {
+    selection.extendRowTo(rowIndex);
+  } else {
+    selection.selectRow(rowIndex);
+  }
+  startDrag("rows");
+}
+
+function onCellPointerDown(event: PointerEvent, rowIndex: number, colIndex: number) {
+  if (event.button !== 0) {
+    return;
+  }
+  if ((event.target as HTMLElement | null)?.closest("input")) {
+    return;
+  }
+  event.preventDefault();
+  if (hasToggleModifier(event) || toggleModifierHeld.value) {
+    selection.toggleCell(rowIndex, colIndex);
+    return;
+  }
+  if (event.shiftKey) {
+    selection.beginAdditionalCellRange(rowIndex, colIndex);
+  } else {
+    selection.selectCell(rowIndex, colIndex);
+  }
+  startDrag("cells");
+}
+
+onBeforeUnmount(stopDrag);
+
+function emitCellChange(rowIndex: number, column: string, value: unknown) {
+  const visual = visualList.value[rowIndex];
+  if (visual?.draft) {
+    emit("editInsert", insertIdOf(visual.draft), column, value);
+    return;
+  }
+  if (visual?.liveIndex == null) {
+    return;
+  }
+  emit("edit", visual.liveIndex, column, value);
 }
 
 function commitEdit() {
@@ -247,7 +512,7 @@ function commitEdit() {
   if (!name || editInput.value === session.start) {
     return;
   }
-  emit("edit", session.row, name, editInput.value);
+  emitCellChange(session.row, name, editInput.value);
 }
 
 function cancelEdit() {
@@ -255,7 +520,7 @@ function cancelEdit() {
 }
 
 function startEdit(row: number, col: number) {
-  if (!props.editable) {
+  if (!props.editable || isDeletedIndex(row)) {
     return;
   }
   if (editing.value) {
@@ -279,53 +544,192 @@ watch(virtualRows, (items) => {
   }
 });
 
+function selectedRowIndexes() {
+  return [...selection.selectedRows.value].sort((a, b) => a - b);
+}
+
+function extractGrid(r1: number, r2: number, c1: number, c2: number, maskUnselected = false) {
+  const names: string[] = [];
+  for (let c = c1; c <= c2; c++) {
+    names.push(columns.value[c]?.name ?? "");
+  }
+  const grid: unknown[][] = [];
+  for (let r = r1; r <= r2; r++) {
+    const row: unknown[] = [];
+    for (let c = c1; c <= c2; c++) {
+      row.push(maskUnselected && !selection.isCellSelected(r, c) ? null : cellValue(r, c));
+    }
+    grid.push(row);
+  }
+  return { names, grid };
+}
+
+function extractCellSelection() {
+  const cells = selection.cellSelectionList.value;
+  if (cells.length === 0) {
+    return null;
+  }
+  let r1 = cells[0]!.row;
+  let r2 = r1;
+  let c1 = cells[0]!.col;
+  let c2 = c1;
+  for (const cell of cells) {
+    r1 = Math.min(r1, cell.row);
+    r2 = Math.max(r2, cell.row);
+    c1 = Math.min(c1, cell.col);
+    c2 = Math.max(c2, cell.col);
+  }
+  return extractGrid(r1, r2, c1, c2, true);
+}
+
 function onContextMenu(event: MouseEvent) {
-  const el = (event.target as HTMLElement | null)?.closest("[data-cell]");
-  if (!(el instanceof HTMLElement)) {
-    contextCell.value = null;
+  const rowEl = (event.target as HTMLElement | null)?.closest("[data-row-num]");
+  if (rowEl instanceof HTMLElement) {
+    const row = Number(rowEl.dataset.row);
+    contextTarget.value = { type: "row", row };
+    if (!selection.isRowSelected(row)) {
+      selection.selectRow(row);
+    }
     return;
   }
-  contextCell.value = {
-    row: Number(el.dataset.row),
-    col: Number(el.dataset.col),
-  };
+  const cellEl = (event.target as HTMLElement | null)?.closest("[data-cell]");
+  if (cellEl instanceof HTMLElement) {
+    const row = Number(cellEl.dataset.row);
+    const col = Number(cellEl.dataset.col);
+    contextTarget.value = { type: "cell", row, col };
+    if (!selection.isCellSelected(row, col)) {
+      selection.selectCell(row, col);
+    }
+    return;
+  }
+  contextTarget.value = null;
 }
 
-function contextValue() {
-  if (!contextCell.value) {
-    return undefined;
+async function copySelection(asJson: boolean) {
+  let extracted: { names: string[]; grid: unknown[][] } | null = null;
+  if (selection.mode.value === "rows") {
+    const indexes = selectedRowIndexes();
+    const last = indexes.at(-1);
+    if (indexes[0] != null && last != null) {
+      extracted = extractGrid(indexes[0], last, 0, columns.value.length - 1);
+    }
+  } else {
+    extracted = extractCellSelection();
   }
-  return cellValue(contextCell.value.row, contextCell.value.col);
+  if (!extracted) {
+    return;
+  }
+  await writeClipboard(asJson ? cellRangeToJson(extracted.names, extracted.grid) : rowsClipboardText(extracted.grid));
 }
 
-async function copyCell() {
-  if (!contextCell.value) {
+function cloneContextRows() {
+  const indexes = selectedRowIndexes();
+  const after = indexes.at(-1);
+  if (after == null) {
     return;
   }
-  await writeClipboard(editInputText(contextValue()));
+  for (const row of indexes) {
+    emit("cloneRow", row, after);
+  }
 }
 
-function setNull() {
-  if (!props.editable || !contextCell.value) {
+type RowDeleteState = "all-live" | "all-deleted" | "mixed";
+
+function selectedRowDeleteState(): RowDeleteState {
+  const applicable = selectedRowIndexes().filter((row) => !isInsertIndex(row));
+  if (applicable.length === 0) {
+    return "all-live";
+  }
+  const deletedCount = applicable.filter(isDeletedIndex).length;
+  if (deletedCount === 0) {
+    return "all-live";
+  }
+  if (deletedCount === applicable.length) {
+    return "all-deleted";
+  }
+  return "mixed";
+}
+
+function deleteSelectedLiveRows() {
+  for (const row of selectedRowIndexes().toReversed()) {
+    if (!isDeletedIndex(row)) {
+      emit("deleteRow", row);
+    }
+  }
+}
+
+function restoreSelectedDeletedRows() {
+  for (const row of selectedRowIndexes().toReversed()) {
+    if (isDeletedIndex(row)) {
+      emit("deleteRow", row);
+    }
+  }
+}
+
+function applyValueToSelection(value: unknown) {
+  if (!props.editable) {
     return;
   }
-  const name = columns.value[contextCell.value.col]?.name;
-  if (!name) {
+  if (selection.mode.value === "rows") {
+    for (const row of selectedRowIndexes()) {
+      if (isDeletedIndex(row)) {
+        continue;
+      }
+      for (const column of columns.value) {
+        emitCellChange(row, column.name, value);
+      }
+    }
     return;
   }
-  emit("edit", contextCell.value.row, name, null);
+  for (const cell of selection.cellSelectionList.value) {
+    if (isDeletedIndex(cell.row)) {
+      continue;
+    }
+    const name = columns.value[cell.col]?.name;
+    if (name) {
+      emitCellChange(cell.row, name, value);
+    }
+  }
+}
+
+function setNullSelection() {
+  applyValueToSelection(null);
+}
+
+function openSetValue() {
+  setValueInput.value = "";
+  void nextTick(() => {
+    setValueOpen.value = true;
+  });
+}
+
+function setValueSelection() {
+  applyValueToSelection(setValueInput.value);
+  setValueOpen.value = false;
+  setValueInput.value = "";
+}
+
+function selectionEditable() {
+  if (!props.editable) {
+    return false;
+  }
+  if (selection.mode.value === "rows") {
+    return selectedRowIndexes().some((row) => !isDeletedIndex(row));
+  }
+  return selection.cellSelectionList.value.some((cell) => !isDeletedIndex(cell.row));
 }
 
 async function pasteCell() {
-  if (!props.editable || !contextCell.value) {
+  const cell = selection.cellSelectionList.value[0];
+  if (!props.editable || !cell || !isSingleCellSelected() || isDeletedIndex(cell.row)) {
     return;
   }
-  const name = columns.value[contextCell.value.col]?.name;
+  const name = columns.value[cell.col]?.name;
   if (!name) {
     return;
   }
   try {
-    emit("edit", contextCell.value.row, name, await navigator.clipboard.readText());
+    emitCellChange(cell.row, name, await navigator.clipboard.readText());
   } catch {
     // clipboard may be denied in the webview
   }
@@ -360,7 +764,7 @@ async function pasteCell() {
             <ContextMenuTrigger as-child>
               <div
                 role="table"
-                class="text-sm"
+                class="text-sm select-none"
                 :style="{ width: `${colTotalSize}px` }"
               >
                 <div
@@ -421,6 +825,7 @@ async function pasteCell() {
                   />
                 </div>
                 <div
+                  ref="bodyRef"
                   class="relative"
                   :style="{ height: `${totalSize}px` }"
                 >
@@ -432,13 +837,24 @@ async function pasteCell() {
                       v-for="item in virtualRows"
                       :key="item.index"
                       role="cell"
-                      class="text-muted-foreground absolute top-0 left-0 box-border flex items-center justify-center px-1 font-mono text-xs"
+                      data-row-num
+                      :data-row="item.index"
+                      class="text-muted-foreground absolute top-0 left-0 box-border flex cursor-pointer items-center justify-center border-b px-1 font-mono text-xs"
+                      :class="[
+                        rowStateClass(item.index),
+                        selection.isRowSelected(item.index) ? 'text-foreground' : '',
+                        rowInSelection(item.index) ? 'z-10' : '',
+                      ]"
                       :style="{
                         width: `${ROW_NUM_WIDTH}px`,
                         height: `${item.size}px`,
                         transform: `translateY(${item.start}px)`,
                       }"
+                      @pointerdown="onRowPointerDown($event, item.index)"
                     >
+                      <template v-for="e in [selectionEdges(item.index, -1)]" :key="0">
+                        <SelectionBorder v-if="e" v-bind="e" />
+                      </template>
                       {{ rowNumOffset + item.index + 1 }}
                     </div>
                   </div>
@@ -447,6 +863,7 @@ async function pasteCell() {
                     :key="item.index"
                     role="row"
                     class="absolute top-0 left-0 flex w-full border-b"
+                    :class="[rowStateClass(item.index), rowInSelection(item.index) ? 'z-10' : '']"
                     :style="{
                       height: `${item.size}px`,
                       transform: `translateY(${item.start}px)`,
@@ -464,29 +881,39 @@ async function pasteCell() {
                       data-cell
                       :data-row="item.index"
                       :data-col="col.index"
-                      class="box-border flex-none truncate px-2 font-mono text-xs leading-7"
+                      class="relative box-border flex-none px-2 font-mono text-xs leading-7"
                       :class="[
-                        editable ? 'cursor-text' : '',
-                        isDirty(item.index, col.index)
-                          ? 'bg-yellow-500/15 ring-yellow-500 hover:bg-yellow-500/25 ring-1 ring-inset'
-                          : 'hover:bg-muted/50',
+                        editable ? 'cursor-text' : 'cursor-pointer',
+                        cellHighlightClass(item.index, col.index),
                         isPlaceholderValue(cellValue(item.index, col.index)) ? 'text-muted-foreground italic' : '',
                       ]"
                       :style="{ width: `${col.size}px` }"
                       :title="isEditing(item.index, col.index) ? undefined : cellText(cellValue(item.index, col.index))"
+                      @pointerdown="onCellPointerDown($event, item.index, col.index)"
                       @dblclick="startEdit(item.index, col.index)"
                     >
+                      <template v-if="isRowsMode()">
+                        <template v-for="e in [selectionEdges(item.index, col.index)]" :key="0">
+                          <SelectionBorder v-if="e" v-bind="e" />
+                        </template>
+                      </template>
+                      <SelectionBorder
+                        v-else
+                        :row="item.index"
+                        :col="col.index"
+                        :selected-keys="selection.selectedKeys.value"
+                      />
                       <input
                         v-if="isEditing(item.index, col.index)"
                         v-model="editInput"
-                        class="h-full w-full bg-transparent px-0 font-mono text-xs not-italic outline-none"
+                        class="h-full w-full truncate bg-transparent px-0 font-mono text-xs not-italic outline-none select-text"
                         @keydown.enter.prevent="commitEdit"
                         @keydown.escape.prevent="cancelEdit"
                         @blur="commitEdit"
                       >
-                      <template v-else>
+                      <span v-else class="block truncate">
                         {{ cellText(cellValue(item.index, col.index)) }}
-                      </template>
+                      </span>
                     </div>
                     <div
                       v-if="padRight"
@@ -500,17 +927,78 @@ async function pasteCell() {
             </ContextMenuTrigger>
           </div>
           <ContextMenuContent>
-            <ContextMenuItem :disabled="!contextCell" @select="copyCell">
-              Copy
-            </ContextMenuItem>
-            <ContextMenuItem :disabled="!editable || !contextCell" @select="setNull">
-              Set NULL
-            </ContextMenuItem>
-            <ContextMenuItem :disabled="!editable || !contextCell" @select="pasteCell">
-              Paste
-            </ContextMenuItem>
+            <template v-if="contextTarget?.type === 'row'">
+              <ContextMenuItem @select="copySelection(false)">
+                Copy {{ selectedRowCount === 1 ? "row" : "rows" }}
+              </ContextMenuItem>
+              <ContextMenuItem @select="copySelection(true)">
+                Copy as JSON
+              </ContextMenuItem>
+              <ContextMenuItem :disabled="!editable" @select="cloneContextRows">
+                Clone {{ selectedRowCount === 1 ? "row" : "rows" }}
+              </ContextMenuItem>
+              <ContextMenuItem
+                v-if="selectedRowDeleteState() !== 'all-deleted'"
+                variant="destructive"
+                :disabled="!editable"
+                @select="deleteSelectedLiveRows"
+              >
+                Delete {{ selectedRowCount === 1 ? "row" : "rows" }}
+              </ContextMenuItem>
+              <ContextMenuItem
+                v-if="selectedRowDeleteState() !== 'all-live'"
+                :disabled="!editable"
+                @select="restoreSelectedDeletedRows"
+              >
+                Restore {{ selectedRowCount === 1 ? "row" : "rows" }}
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem :disabled="!selectionEditable()" @select="setNullSelection">
+                Set NULL
+              </ContextMenuItem>
+            </template>
+            <template v-else-if="contextTarget?.type === 'cell'">
+              <ContextMenuItem @select="copySelection(false)">
+                Copy
+              </ContextMenuItem>
+              <ContextMenuItem @select="copySelection(true)">
+                Copy as JSON
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem :disabled="!selectionEditable()" @select="setNullSelection">
+                Set NULL
+              </ContextMenuItem>
+              <ContextMenuItem :disabled="!selectionEditable()" @select="openSetValue">
+                Set value for selected
+              </ContextMenuItem>
+              <ContextMenuItem
+                v-if="isSingleCellSelected()"
+                :disabled="!selectionEditable()"
+                @select="pasteCell"
+              >
+                Paste
+              </ContextMenuItem>
+            </template>
           </ContextMenuContent>
         </ContextMenu>
+        <Dialog :open="setValueOpen" @update:open="setValueOpen = $event">
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                Set value for {{ selectedCellCount }} {{ selectedCellCount === 1 ? "cell" : "cells" }}
+              </DialogTitle>
+            </DialogHeader>
+            <Input
+              v-model="setValueInput"
+              autofocus
+              @keydown.enter.prevent="setValueSelection"
+            />
+            <DialogFooter>
+              <Button variant="outline" @click="setValueOpen = false">Cancel</Button>
+              <Button @click="setValueSelection">Confirm</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </template>
   </div>

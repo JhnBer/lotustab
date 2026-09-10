@@ -207,6 +207,9 @@ async function applyStructure() {
         :empty-hint="connected ? 'Loading table…' : 'Connect to view this table.'"
         @sort="queries.cycleSort(tab.id, $event)"
         @edit="onEdit"
+        @edit-insert="(insertId, column, value) => queries.setInsertCell(tab.id, insertId, column, value)"
+        @delete-row="queries.setRowDeleted(tab.id, $event)"
+        @clone-row="(row, after) => queries.cloneRow(tab.id, row, after)"
       />
     </template>
     <TablePager

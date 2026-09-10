@@ -165,3 +165,71 @@ func ListStrings(ctx context.Context, db Querier, query string) ([]string, error
 	}
 	return out, nil
 }
+
+const streamBatchSize = 1000
+
+// StreamQuery runs a parameterized SELECT and delivers rows in batches.
+func StreamQuery(ctx context.Context, db Querier, query string, args []any, fn func(cols []driver.Column, rows [][]any) error) error {
+	if fn == nil {
+		return fmt.Errorf("stream callback is required")
+	}
+	rows, err := db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	colNames, err := rows.Columns()
+	if err != nil {
+		return err
+	}
+	colTypes, _ := rows.ColumnTypes()
+	columns := make([]driver.Column, len(colNames))
+	for i, name := range colNames {
+		colType := ""
+		if i < len(colTypes) && colTypes[i] != nil {
+			colType = colTypes[i].DatabaseTypeName()
+		}
+		columns[i] = driver.Column{Name: name, Type: colType}
+	}
+
+	batch := make([][]any, 0, streamBatchSize)
+	sent := false
+	flush := func() error {
+		if len(batch) == 0 {
+			return nil
+		}
+		sent = true
+		err := fn(columns, batch)
+		batch = make([][]any, 0, streamBatchSize)
+		return err
+	}
+	for rows.Next() {
+		holders := make([]any, len(colNames))
+		ptrs := make([]any, len(colNames))
+		for i := range holders {
+			ptrs[i] = &holders[i]
+		}
+		if err := rows.Scan(ptrs...); err != nil {
+			return fmt.Errorf("scan row: %w", err)
+		}
+		row := make([]any, len(holders))
+		copy(row, holders)
+		batch = append(batch, row)
+		if len(batch) >= streamBatchSize {
+			if err := flush(); err != nil {
+				return err
+			}
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if err := flush(); err != nil {
+		return err
+	}
+	if !sent {
+		return fn(columns, nil)
+	}
+	return nil
+}
