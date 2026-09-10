@@ -13,3 +13,4 @@ build/android/overlay.json
 build/android/gen/
 AGENTS.md
 .idea
+.cursor
