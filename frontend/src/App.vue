@@ -20,6 +20,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
+import { useBlockHistoryBackspace } from "@/composables/useBlockHistoryBackspace";
 import { useConnectionTint } from "@/composables/useConnectionTint";
 import { useWorkspaceShortcuts } from "@/composables/useWorkspaceShortcuts";
 import { errorMessage } from "@/lib/errors";
@@ -35,6 +36,7 @@ const connections = useConnectionsStore();
 const queries = useQueryStore();
 const { tintClass: headerTint } = useConnectionTint();
 useWorkspaceShortcuts();
+useBlockHistoryBackspace();
 
 const pageTitle = computed(() => {
   const title = route.meta.title;
