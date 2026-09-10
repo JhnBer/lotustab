@@ -1,0 +1,123 @@
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"D","location":"query.ts:selectTab","message":"selectTab","data":{"id":"a79f7f00-212c-4906-b7c4-bc38f2780418","prev":"e8d03915-5ca2-4d12-9d94-baa7e21f9c04"},"timestamp":1788366874060}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"D","location":"query.ts:selectTab","message":"selectTab","data":{"id":"8d27672a-a66c-4e13-bdc5-62e7a72693be","prev":"a79f7f00-212c-4906-b7c4-bc38f2780418"},"timestamp":1788366874535}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"D","location":"query.ts:selectTab","message":"selectTab","data":{"id":"a79f7f00-212c-4906-b7c4-bc38f2780418","prev":"8d27672a-a66c-4e13-bdc5-62e7a72693be"},"timestamp":1788366875249}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"D","location":"query.ts:selectTab","message":"selectTab","data":{"id":"8172764b-1854-41a0-8e58-48ad387ef5cb","prev":"a79f7f00-212c-4906-b7c4-bc38f2780418"},"timestamp":1788366875515}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"D","location":"query.ts:selectTab","message":"selectTab","data":{"id":"932e9517-e4ce-497d-bfe5-f49a3dfc46ab","prev":"8172764b-1854-41a0-8e58-48ad387ef5cb"},"timestamp":1788366875826}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"D","location":"query.ts:selectTab","message":"selectTab","data":{"id":"ae5d2f82-6080-4cf7-9597-c5910cb1b12d","prev":"932e9517-e4ce-497d-bfe5-f49a3dfc46ab"},"timestamp":1788366876040}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"D","location":"query.ts:selectTab","message":"selectTab","data":{"id":"4820914f-ec3f-4b4d-975f-de79e59e6c00","prev":"ae5d2f82-6080-4cf7-9597-c5910cb1b12d"},"timestamp":1788366876231}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"D","location":"query.ts:selectTab","message":"selectTab","data":{"id":"9b5fc3df-8258-4e15-964c-01793cfc6351","prev":"4820914f-ec3f-4b4d-975f-de79e59e6c00"},"timestamp":1788366876410}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"D","location":"query.ts:selectTab","message":"selectTab","data":{"id":"6d1d01d2-6d55-4d1c-8601-9f3797058d1d","prev":"9b5fc3df-8258-4e15-964c-01793cfc6351"},"timestamp":1788366876569}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"D","location":"query.ts:selectTab","message":"selectTab","data":{"id":"9b5fc3df-8258-4e15-964c-01793cfc6351","prev":"6d1d01d2-6d55-4d1c-8601-9f3797058d1d"},"timestamp":1788366876971}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"D","location":"query.ts:selectTab","message":"selectTab","data":{"id":"4820914f-ec3f-4b4d-975f-de79e59e6c00","prev":"9b5fc3df-8258-4e15-964c-01793cfc6351"},"timestamp":1788366877209}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"D","location":"query.ts:selectTab","message":"selectTab","data":{"id":"ae5d2f82-6080-4cf7-9597-c5910cb1b12d","prev":"4820914f-ec3f-4b4d-975f-de79e59e6c00"},"timestamp":1788366877341}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"D","location":"query.ts:selectTab","message":"selectTab","data":{"id":"ae5d2f82-6080-4cf7-9597-c5910cb1b12d","prev":"ae5d2f82-6080-4cf7-9597-c5910cb1b12d"},"timestamp":1788367176934}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableBrowser.vue:onMounted","message":"TableBrowser mounted","data":{"id":"8d27672a-a66c-4e13-bdc5-62e7a72693be","view":"data","name":"preview_jobs","hasResult":true,"draftLen":0,"running":false},"timestamp":1788367178839}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableBrowser.vue:onMounted","message":"TableBrowser mounted","data":{"id":"b9f1c602-51dc-45f3-b128-f30550b31f07","view":"data","name":"affiliate_login_history","hasResult":true,"draftLen":0,"running":false},"timestamp":1788367178841}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableBrowser.vue:onMounted","message":"TableBrowser mounted","data":{"id":"bad2a445-b1c0-47c6-bed1-1f9b39704da6","view":"data","name":"affiliate_reviews","hasResult":true,"draftLen":0,"running":false},"timestamp":1788367178851}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableStructure.vue:onMounted","message":"TableStructure mounted","data":{"id":"e8d03915-5ca2-4d12-9d94-baa7e21f9c04","draftLen":138},"timestamp":1788367178855}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableBrowser.vue:onMounted","message":"TableBrowser mounted","data":{"id":"e8d03915-5ca2-4d12-9d94-baa7e21f9c04","view":"structure","name":"users","hasResult":false,"draftLen":138,"running":false},"timestamp":1788367178857}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableBrowser.vue:onMounted","message":"TableBrowser mounted","data":{"id":"22ef8a3d-86db-4f2f-b0fe-62351b2bbcb9","view":"data","name":"users","hasResult":true,"draftLen":0,"running":false},"timestamp":1788367178858}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367179121}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367179366}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367179749}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367179857}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367179996}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367180240}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367180346}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367180497}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367180656}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367180774}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367180924}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367181072}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367181193}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367181302}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367181411}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"D","location":"query.ts:selectTab","message":"selectTab","data":{"id":"ae5d2f82-6080-4cf7-9597-c5910cb1b12d","prev":"ae5d2f82-6080-4cf7-9597-c5910cb1b12d"},"timestamp":1788367184074}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableBrowser.vue:onMounted","message":"TableBrowser mounted","data":{"id":"8d27672a-a66c-4e13-bdc5-62e7a72693be","view":"data","name":"preview_jobs","hasResult":true,"draftLen":0,"running":false},"timestamp":1788367186925}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableBrowser.vue:onMounted","message":"TableBrowser mounted","data":{"id":"b9f1c602-51dc-45f3-b128-f30550b31f07","view":"data","name":"affiliate_login_history","hasResult":true,"draftLen":0,"running":false},"timestamp":1788367186926}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableBrowser.vue:onMounted","message":"TableBrowser mounted","data":{"id":"bad2a445-b1c0-47c6-bed1-1f9b39704da6","view":"data","name":"affiliate_reviews","hasResult":true,"draftLen":0,"running":false},"timestamp":1788367186926}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableStructure.vue:onMounted","message":"TableStructure mounted","data":{"id":"e8d03915-5ca2-4d12-9d94-baa7e21f9c04","draftLen":138},"timestamp":1788367186926}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableBrowser.vue:onMounted","message":"TableBrowser mounted","data":{"id":"e8d03915-5ca2-4d12-9d94-baa7e21f9c04","view":"structure","name":"users","hasResult":false,"draftLen":138,"running":false},"timestamp":1788367186926}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableBrowser.vue:onMounted","message":"TableBrowser mounted","data":{"id":"22ef8a3d-86db-4f2f-b0fe-62351b2bbcb9","view":"data","name":"users","hasResult":true,"draftLen":0,"running":false},"timestamp":1788367186927}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367187034}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367187126}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367187234}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367187372}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367187494}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367187620}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367187777}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367187884}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367188020}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367188151}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367188265}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367188395}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367188502}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367188631}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367189553}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"D","location":"query.ts:selectTab","message":"selectTab","data":{"id":"ae5d2f82-6080-4cf7-9597-c5910cb1b12d","prev":"ae5d2f82-6080-4cf7-9597-c5910cb1b12d"},"timestamp":1788367196842}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableBrowser.vue:onMounted","message":"TableBrowser mounted","data":{"id":"8d27672a-a66c-4e13-bdc5-62e7a72693be","view":"data","name":"preview_jobs","hasResult":true,"draftLen":0,"running":false},"timestamp":1788367197464}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableBrowser.vue:onMounted","message":"TableBrowser mounted","data":{"id":"b9f1c602-51dc-45f3-b128-f30550b31f07","view":"data","name":"affiliate_login_history","hasResult":true,"draftLen":0,"running":false},"timestamp":1788367197466}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableBrowser.vue:onMounted","message":"TableBrowser mounted","data":{"id":"bad2a445-b1c0-47c6-bed1-1f9b39704da6","view":"data","name":"affiliate_reviews","hasResult":true,"draftLen":0,"running":false},"timestamp":1788367197467}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableStructure.vue:onMounted","message":"TableStructure mounted","data":{"id":"e8d03915-5ca2-4d12-9d94-baa7e21f9c04","draftLen":138},"timestamp":1788367197467}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableBrowser.vue:onMounted","message":"TableBrowser mounted","data":{"id":"e8d03915-5ca2-4d12-9d94-baa7e21f9c04","view":"structure","name":"users","hasResult":false,"draftLen":138,"running":false},"timestamp":1788367197467}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableBrowser.vue:onMounted","message":"TableBrowser mounted","data":{"id":"22ef8a3d-86db-4f2f-b0fe-62351b2bbcb9","view":"data","name":"users","hasResult":true,"draftLen":0,"running":false},"timestamp":1788367197467}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367197667}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367197768}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367197961}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367198059}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367198197}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367198285}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367198373}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367198467}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367198562}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367198662}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367198759}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367198859}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367198962}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367199058}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367199160}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"D","location":"query.ts:selectTab","message":"selectTab","data":{"id":"ae5d2f82-6080-4cf7-9597-c5910cb1b12d","prev":"ae5d2f82-6080-4cf7-9597-c5910cb1b12d"},"timestamp":1788367202136}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableBrowser.vue:onMounted","message":"TableBrowser mounted","data":{"id":"8d27672a-a66c-4e13-bdc5-62e7a72693be","view":"data","name":"preview_jobs","hasResult":true,"draftLen":0,"running":false},"timestamp":1788367205093}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableBrowser.vue:onMounted","message":"TableBrowser mounted","data":{"id":"b9f1c602-51dc-45f3-b128-f30550b31f07","view":"data","name":"affiliate_login_history","hasResult":true,"draftLen":0,"running":false},"timestamp":1788367205094}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableStructure.vue:onMounted","message":"TableStructure mounted","data":{"id":"e8d03915-5ca2-4d12-9d94-baa7e21f9c04","draftLen":138},"timestamp":1788367205096}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableBrowser.vue:onMounted","message":"TableBrowser mounted","data":{"id":"bad2a445-b1c0-47c6-bed1-1f9b39704da6","view":"data","name":"affiliate_reviews","hasResult":true,"draftLen":0,"running":false},"timestamp":1788367205095}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableBrowser.vue:onMounted","message":"TableBrowser mounted","data":{"id":"e8d03915-5ca2-4d12-9d94-baa7e21f9c04","view":"structure","name":"users","hasResult":false,"draftLen":138,"running":false},"timestamp":1788367205097}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableBrowser.vue:onMounted","message":"TableBrowser mounted","data":{"id":"22ef8a3d-86db-4f2f-b0fe-62351b2bbcb9","view":"data","name":"users","hasResult":true,"draftLen":0,"running":false},"timestamp":1788367205098}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367205259}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367205439}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367205586}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367205721}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367205869}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367205991}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367206100}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367206232}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367206363}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367206485}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367206629}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367206827}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367206950}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367207093}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367207225}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"D","location":"query.ts:selectTab","message":"selectTab","data":{"id":"ae5d2f82-6080-4cf7-9597-c5910cb1b12d","prev":"ae5d2f82-6080-4cf7-9597-c5910cb1b12d"},"timestamp":1788367213445}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableBrowser.vue:onMounted","message":"TableBrowser mounted","data":{"id":"8d27672a-a66c-4e13-bdc5-62e7a72693be","view":"data","name":"preview_jobs","hasResult":true,"draftLen":0,"running":false},"timestamp":1788367214064}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableBrowser.vue:onMounted","message":"TableBrowser mounted","data":{"id":"b9f1c602-51dc-45f3-b128-f30550b31f07","view":"data","name":"affiliate_login_history","hasResult":true,"draftLen":0,"running":false},"timestamp":1788367214065}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableBrowser.vue:onMounted","message":"TableBrowser mounted","data":{"id":"bad2a445-b1c0-47c6-bed1-1f9b39704da6","view":"data","name":"affiliate_reviews","hasResult":true,"draftLen":0,"running":false},"timestamp":1788367214066}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableStructure.vue:onMounted","message":"TableStructure mounted","data":{"id":"e8d03915-5ca2-4d12-9d94-baa7e21f9c04","draftLen":138},"timestamp":1788367214066}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableBrowser.vue:onMounted","message":"TableBrowser mounted","data":{"id":"e8d03915-5ca2-4d12-9d94-baa7e21f9c04","view":"structure","name":"users","hasResult":false,"draftLen":138,"running":false},"timestamp":1788367214068}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"A","location":"TableBrowser.vue:onMounted","message":"TableBrowser mounted","data":{"id":"22ef8a3d-86db-4f2f-b0fe-62351b2bbcb9","view":"data","name":"users","hasResult":true,"draftLen":0,"running":false},"timestamp":1788367214068}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367214262}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367214388}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367214539}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367214660}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367214797}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367214916}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367215041}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367215171}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367215318}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367215429}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367215541}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367215693}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367215834}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367215958}
+{"sessionId":"8002e0","runId":"post-fix","hypothesisId":"G","location":"SqlEditor.vue:onMounted","message":"SqlEditor mounted","timestamp":1788367216085}
+{"sessionId":"8002e0","runId":"run1","hypothesisId":"D","location":"query.ts:selectTab","message":"selectTab","data":{"id":"ae5d2f82-6080-4cf7-9597-c5910cb1b12d","prev":"ae5d2f82-6080-4cf7-9597-c5910cb1b12d"},"timestamp":1788367217950}

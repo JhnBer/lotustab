@@ -86,6 +86,12 @@ func (c *stubConn) DescribeTable(context.Context, driver.TableRef) (*driver.Tabl
 	return &driver.TableStructure{Columns: []driver.ColumnInfo{}}, nil
 }
 func (c *stubConn) AlterTable(context.Context, driver.AlterTableRequest) error { return nil }
+func (c *stubConn) StreamTable(context.Context, driver.StreamTableRequest, func([]driver.Column, [][]any) error) error {
+	return nil
+}
+func (c *stubConn) TableDDL(context.Context, driver.TableRef) (string, error) {
+	return "", nil
+}
 func (c *stubConn) Close() error {
 	c.closed = true
 	return nil

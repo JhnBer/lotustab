@@ -3,16 +3,21 @@
 
 import * as ConnectionsService from "./connectionsservice.js";
 import * as DriversService from "./driversservice.js";
+import * as ExportService from "./exportservice.js";
 import * as QueryService from "./queryservice.js";
 import * as WindowsService from "./windowsservice.js";
 export {
     ConnectionsService,
     DriversService,
+    ExportService,
     QueryService,
     WindowsService
 };
 
 export type {
     ConnectionsState,
+    ExportPathResult,
+    ExportResult,
+    ExportTableRequest,
     SaveProfileInput
 } from "./models.js";

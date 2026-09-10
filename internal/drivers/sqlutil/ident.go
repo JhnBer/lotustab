@@ -3,7 +3,49 @@ package sqlutil
 import (
 	"strconv"
 	"strings"
+	"unicode"
 )
+
+// ValidIdent reports whether s is a safe unquoted SQL identifier.
+func ValidIdent(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i, r := range s {
+		if unicode.IsLetter(r) || r == '_' {
+			continue
+		}
+		if i > 0 && (unicode.IsDigit(r) || r == '$') {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+// NormalizeWhere trims a user-supplied predicate: surrounding space, a trailing
+// semicolon, and an optional leading WHERE keyword.
+func NormalizeWhere(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.TrimRight(s, "; \t\n\r")
+	s = strings.TrimSpace(s)
+	if len(s) >= 5 && strings.EqualFold(s[:5], "where") {
+		rest := s[5:]
+		if rest == "" || rest[0] == ' ' || rest[0] == '\t' || rest[0] == '\n' || rest[0] == '\r' {
+			s = strings.TrimSpace(rest)
+		}
+	}
+	return s
+}
+
+// SelectStar builds SELECT * FROM <qualified> with an optional WHERE clause.
+func SelectStar(qualified, where string) string {
+	q := "SELECT * FROM " + qualified
+	if where = NormalizeWhere(where); where != "" {
+		q += " WHERE " + where
+	}
+	return q
+}
 
 // QuoteMySQL wraps an identifier in backticks, doubling internal backticks.
 func QuoteMySQL(ident string) string {

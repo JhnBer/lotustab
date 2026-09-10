@@ -107,3 +107,39 @@ func TestLikeContains(t *testing.T) {
 		}
 	}
 }
+
+func TestNormalizeWhere(t *testing.T) {
+	tests := []struct {
+		in, want string
+	}{
+		{"", ""},
+		{"  created_at > 1  ", "created_at > 1"},
+		{"created_at > 1;", "created_at > 1"},
+		{"WHERE created_at > 1", "created_at > 1"},
+		{"where created_at > 1;", "created_at > 1"},
+		{"wherever = 1", "wherever = 1"},
+	}
+	for _, tt := range tests {
+		if got := sqlutil.NormalizeWhere(tt.in); got != tt.want {
+			t.Errorf("NormalizeWhere(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
+func TestSelectStar(t *testing.T) {
+	if got := sqlutil.SelectStar("`db`.`t`", ""); got != "SELECT * FROM `db`.`t`" {
+		t.Fatalf("unfiltered: %q", got)
+	}
+	if got := sqlutil.SelectStar("`db`.`t`", "WHERE id = 1;"); got != "SELECT * FROM `db`.`t` WHERE id = 1" {
+		t.Fatalf("filtered: %q", got)
+	}
+}
+
+func TestValidIdent(t *testing.T) {
+	if !sqlutil.ValidIdent("created_at") || !sqlutil.ValidIdent("_id") || !sqlutil.ValidIdent("col$1") {
+		t.Fatal("expected valid identifiers")
+	}
+	if sqlutil.ValidIdent("") || sqlutil.ValidIdent("1col") || sqlutil.ValidIdent("a;b") || sqlutil.ValidIdent("a b") {
+		t.Fatal("expected invalid identifiers")
+	}
+}

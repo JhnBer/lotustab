@@ -58,14 +58,80 @@ func PrepareUpdate(quote func(string) string, ph Placeholder, table string, cell
 		args = append(args, cells[col])
 	}
 
+	args, err := appendWhere(&b, quote, ph, pk, key, args)
+	if err != nil {
+		return "", nil, err
+	}
+	return b.String(), args, nil
+}
+
+// PrepareDelete builds a parameterized DELETE ... WHERE pk.
+func PrepareDelete(quote func(string) string, ph Placeholder, table string, pk []string, key map[string]any) (string, []any, error) {
+	if strings.TrimSpace(table) == "" {
+		return "", nil, fmt.Errorf("table name is required")
+	}
+	var b strings.Builder
+	b.WriteString("DELETE FROM ")
+	b.WriteString(table)
+	args, err := appendWhere(&b, quote, ph, pk, key, nil)
+	if err != nil {
+		return "", nil, err
+	}
+	return b.String(), args, nil
+}
+
+// PrepareInsert builds a parameterized INSERT. Column names are sorted for stable SQL.
+func PrepareInsert(quote func(string) string, ph Placeholder, table string, cells map[string]any) (string, []any, error) {
+	if strings.TrimSpace(table) == "" {
+		return "", nil, fmt.Errorf("table name is required")
+	}
+	if len(cells) == 0 {
+		return "", nil, fmt.Errorf("no columns to insert")
+	}
+	cols := make([]string, 0, len(cells))
+	for col := range cells {
+		if strings.TrimSpace(col) == "" {
+			return "", nil, fmt.Errorf("column name is required")
+		}
+		cols = append(cols, col)
+	}
+	sort.Strings(cols)
+
+	var b strings.Builder
+	b.WriteString("INSERT INTO ")
+	b.WriteString(table)
+	b.WriteString(" (")
+	args := make([]any, 0, len(cols))
+	for i, col := range cols {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(quote(col))
+	}
+	b.WriteString(") VALUES (")
+	for i, col := range cols {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(ph(len(args) + 1))
+		args = append(args, cells[col])
+	}
+	b.WriteByte(')')
+	return b.String(), args, nil
+}
+
+func appendWhere(b *strings.Builder, quote func(string) string, ph Placeholder, pk []string, key map[string]any, args []any) ([]any, error) {
+	if len(pk) == 0 {
+		return nil, fmt.Errorf("table has no primary key")
+	}
 	b.WriteString(" WHERE ")
 	for i, col := range pk {
 		if strings.TrimSpace(col) == "" {
-			return "", nil, fmt.Errorf("key column name is required")
+			return nil, fmt.Errorf("key column name is required")
 		}
 		v, ok := key[col]
 		if !ok {
-			return "", nil, fmt.Errorf("missing key column %s", col)
+			return nil, fmt.Errorf("missing key column %s", col)
 		}
 		if i > 0 {
 			b.WriteString(" AND ")
@@ -75,20 +141,35 @@ func PrepareUpdate(quote func(string) string, ph Placeholder, table string, cell
 		b.WriteString(ph(len(args) + 1))
 		args = append(args, v)
 	}
-	return b.String(), args, nil
+	return args, nil
 }
 
-// ApplyRowEdits runs one UPDATE per changed row. Callers wrap this in a transaction.
+// ApplyRowEdits runs one INSERT/UPDATE/DELETE per row. Callers wrap this in a transaction.
 func ApplyRowEdits(ctx context.Context, exec ExecAffected, quote func(string) string, ph Placeholder, table string, pk []string, rows []driver.RowEdit) error {
 	if len(pk) == 0 {
 		return fmt.Errorf("table has no primary key")
 	}
 	applied := 0
 	for i, row := range rows {
-		if len(row.Cells) == 0 {
-			continue
+		var (
+			q    string
+			args []any
+			err  error
+			verb = "updated"
+		)
+		switch {
+		case row.Deleted:
+			q, args, err = PrepareDelete(quote, ph, table, pk, row.Key)
+			verb = "deleted"
+		case row.Inserted:
+			q, args, err = PrepareInsert(quote, ph, table, row.Cells)
+			verb = "inserted"
+		default:
+			if len(row.Cells) == 0 {
+				continue
+			}
+			q, args, err = PrepareUpdate(quote, ph, table, row.Cells, pk, row.Key)
 		}
-		q, args, err := PrepareUpdate(quote, ph, table, row.Cells, pk, row.Key)
 		if err != nil {
 			return err
 		}
@@ -97,7 +178,7 @@ func ApplyRowEdits(ctx context.Context, exec ExecAffected, quote func(string) st
 			return err
 		}
 		if n != 1 {
-			return fmt.Errorf("row %d: expected 1 row updated, got %d", i, n)
+			return fmt.Errorf("row %d: expected 1 row %s, got %d", i, verb, n)
 		}
 		applied++
 	}

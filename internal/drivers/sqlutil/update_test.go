@@ -3,6 +3,7 @@ package sqlutil_test
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"lotustab/internal/core/driver"
@@ -117,11 +118,65 @@ func TestApplyRowEditsRejectsWrongAffected(t *testing.T) {
 	}
 }
 
-func TestApplyRowEditsNoPrimaryKey(t *testing.T) {
-	err := sqlutil.ApplyRowEdits(context.Background(), nil, sqlutil.QuotePostgres, sqlutil.Dollar, `"t"`, nil, []driver.RowEdit{
-		{Key: map[string]any{"id": 1}, Cells: map[string]any{"n": "a"}},
+func TestPrepareDelete(t *testing.T) {
+	sql, args, err := sqlutil.PrepareDelete(
+		sqlutil.QuotePostgres,
+		sqlutil.Dollar,
+		`"public"."users"`,
+		[]string{"id"},
+		map[string]any{"id": 7},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `DELETE FROM "public"."users" WHERE "id"=$1`
+	if sql != want {
+		t.Fatalf("sql=%q want %q", sql, want)
+	}
+	if len(args) != 1 || args[0] != 7 {
+		t.Fatalf("args=%v", args)
+	}
+}
+
+func TestPrepareInsert(t *testing.T) {
+	sql, args, err := sqlutil.PrepareInsert(
+		sqlutil.QuoteMySQL,
+		sqlutil.Question,
+		"`t`",
+		map[string]any{"name": "ada", "age": 36},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "INSERT INTO `t` (`age`, `name`) VALUES (?, ?)"
+	if sql != want {
+		t.Fatalf("sql=%q want %q", sql, want)
+	}
+	if len(args) != 2 || args[0] != 36 || args[1] != "ada" {
+		t.Fatalf("args=%v", args)
+	}
+}
+
+func TestApplyRowEditsDeleteAndInsert(t *testing.T) {
+	var got []string
+	exec := func(_ context.Context, q string, args ...any) (int64, error) {
+		got = append(got, fmt.Sprintf("%s %v", q, args))
+		return 1, nil
+	}
+	err := sqlutil.ApplyRowEdits(context.Background(), exec, sqlutil.QuoteMySQL, sqlutil.Question, "`t`", []string{"id"}, []driver.RowEdit{
+		{Key: map[string]any{"id": 1}, Deleted: true},
+		{Cells: map[string]any{"n": "x"}, Inserted: true},
 	})
-	if err == nil {
-		t.Fatal("expected pk error")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("got %d statements: %v", len(got), got)
+	}
+	if !strings.Contains(got[0], "DELETE FROM") {
+		t.Fatalf("first=%q", got[0])
+	}
+	if !strings.Contains(got[1], "INSERT INTO") {
+		t.Fatalf("second=%q", got[1])
 	}
 }

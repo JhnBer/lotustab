@@ -49,6 +49,10 @@ function onQueryTimeout(value: unknown) {
   }
   settings.setQueryTimeout(seconds);
 }
+
+function onDeleteOnAbort(value: unknown) {
+  settings.setDeleteOnAbortExport(Boolean(value));
+}
 </script>
 
 <template>
@@ -129,6 +133,20 @@ function onQueryTimeout(value: unknown) {
           </SelectItem>
         </SelectContent>
       </Select>
+    </div>
+
+    <div class="flex items-center justify-between gap-4">
+      <div class="min-w-0">
+        <Label for="settings-delete-on-abort">Delete partial files on abort/error</Label>
+        <p class="text-muted-foreground mt-1 text-xs">
+          Removes export files if a dump is canceled or fails.
+        </p>
+      </div>
+      <Switch
+        id="settings-delete-on-abort"
+        :model-value="settings.deleteOnAbortExport"
+        @update:model-value="onDeleteOnAbort"
+      />
     </div>
   </section>
 </template>

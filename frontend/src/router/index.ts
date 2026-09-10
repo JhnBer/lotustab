@@ -3,6 +3,7 @@ import ConnectionsPage from "@/features/connections/ConnectionsPage.vue";
 import QueryWorkspace from "@/features/editor/QueryWorkspace.vue";
 import SettingsPage from "@/features/settings/SettingsPage.vue";
 import ShortcutsPage from "@/features/settings/ShortcutsPage.vue";
+import TransfersPage from "@/features/transfers/TransfersPage.vue";
 
 export const router = createRouter({
   history: createWebHashHistory(),
@@ -19,6 +20,12 @@ export const router = createRouter({
       name: "query",
       component: QueryWorkspace,
       meta: { title: "Query" },
+    },
+    {
+      path: "/transfers",
+      name: "transfers",
+      component: TransfersPage,
+      meta: { title: "Transfers" },
     },
     {
       path: "/settings",

@@ -40,6 +40,7 @@ func main() {
 
 	connections := app.NewConnectionsService(registry, store, secretStore, manager)
 	queries := app.NewQueryServiceFromConnections(connections)
+	exports := app.NewExportService(connections)
 	drivers := app.NewDriversService(registry)
 	windows := app.NewWindowsService()
 
@@ -50,6 +51,7 @@ func main() {
 			application.NewService(drivers),
 			application.NewService(connections),
 			application.NewService(queries),
+			application.NewService(exports),
 			application.NewService(windows),
 		},
 		Assets: application.AssetOptions{

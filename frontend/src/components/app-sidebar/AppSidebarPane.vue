@@ -29,11 +29,13 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Spinner } from "@/components/ui/spinner";
 import DatabaseCombobox from "@/components/DatabaseCombobox.vue";
 import { useProfileActions } from "@/composables/useProfileActions";
+import ExportDialog, { type ExportTarget } from "@/features/export/ExportDialog.vue";
 import {
   buildExplorerRows,
   nextActiveDatabase,
@@ -250,6 +252,22 @@ function openTable(database: string, table: TableInfo, view: "data" | "structure
   });
   router.push("/query");
 }
+
+const exportOpen = ref(false);
+const exportTarget = ref<ExportTarget | null>(null);
+
+function openExport(database: string, table: TableInfo) {
+  if (!selected.value) {
+    return;
+  }
+  exportTarget.value = {
+    profileId: selected.value.id,
+    database: tableDatabase(table, database),
+    schema: table.schema,
+    name: table.name,
+  };
+  exportOpen.value = true;
+}
 </script>
 
 <template>
@@ -373,6 +391,10 @@ function openTable(database: string, table: TableInfo, view: "data" | "structure
                 <ContextMenuItem @select="openTable(item.row.database, item.row.table, 'structure')">
                   Open structure
                 </ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem @select="openExport(item.row.database, item.row.table)">
+                  Export…
+                </ContextMenuItem>
               </ContextMenuContent>
             </ContextMenu>
             <span
@@ -386,4 +408,6 @@ function openTable(database: string, table: TableInfo, view: "data" | "structure
       </div>
     </SidebarGroupContent>
   </SidebarGroup>
+
+  <ExportDialog v-model:open="exportOpen" :target="exportTarget" />
 </template>

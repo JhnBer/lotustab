@@ -13,5 +13,7 @@ type Conn interface {
 	ApplyEdits(ctx context.Context, req ApplyEditsRequest) error
 	DescribeTable(ctx context.Context, ref TableRef) (*TableStructure, error)
 	AlterTable(ctx context.Context, req AlterTableRequest) error
+	StreamTable(ctx context.Context, req StreamTableRequest, fn func(cols []Column, rows [][]any) error) error
+	TableDDL(ctx context.Context, ref TableRef) (string, error)
 	Close() error
 }

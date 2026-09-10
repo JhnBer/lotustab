@@ -10,7 +10,10 @@ export function useConnectionTint() {
   const settings = useSettingsStore();
 
   const tintClass = computed(() =>
-    settings.connectionTint && connections.selected && !route.path.startsWith("/settings")
+    settings.connectionTint &&
+      connections.selected &&
+      !route.path.startsWith("/settings") &&
+      !route.path.startsWith("/transfers")
       ? connTint(connections.selected.color)
       : "",
   );

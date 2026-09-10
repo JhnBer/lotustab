@@ -16,3 +16,22 @@ wails3 dev
 - `internal/app` — Wails services bound to the Vue UI
 - `internal/storage` — JSON profiles in the user config directory
 - `internal/secrets` — keychain via `go-keyring`
+
+
+## Signing
+
+```shell
+security find-identity -v -p codesigning
+```
+
+```shell
+wails3 tool sign --input bin/lotustab.app --identity "-"
+```
+
+```shell
+wails3 task darwin:sign -- 'CLI_ARGS=--identity "-"'
+```
+
+```shell
+sudo xattr -cr ./lotustab.app
+```

@@ -1,6 +1,17 @@
 import { errorMessage, isCanceled } from "@/lib/errors";
 import { QueryService } from "@/lib/wails";
-import { draftLookup, rowKey, valuesEqual } from "@/features/results/edits";
+import {
+  draftKind,
+  draftLookup,
+  INSERT_ID_KEY,
+  insertIdOf,
+  isInsertDraft,
+  layoutVisualRows,
+  rowKey,
+  valuesEqual,
+  visualRowIdentity,
+  type CellDraft,
+} from "@/features/results/edits";
 import { completeFilters, emptyFilter, type TableFilter } from "@/features/results/filters";
 import { asQueryResult } from "@/features/results/browse";
 import { useConnectionsStore } from "@/stores/connections";
@@ -223,6 +234,131 @@ export function createTableBrowse(ctx: QueryStoreCtx, exec: QueryExecApi) {
     tab.edits = edits;
   }
 
+  function visualList(tab: NonNullable<ReturnType<typeof ctx.tableTab>>) {
+    return layoutVisualRows(tab.result?.rows ?? [], tab.result?.columns ?? [], tab.edits ?? [], tab.primaryKey);
+  }
+
+  function rowCellsAt(tab: NonNullable<ReturnType<typeof ctx.tableTab>>, rowIndex: number): Record<string, unknown> | null {
+    const visual = visualList(tab)[rowIndex];
+    if (!visual) {
+      return null;
+    }
+    if (visual.draft) {
+      return { ...visual.draft.cells };
+    }
+    const columns = tab.result?.columns ?? [];
+    const row = visual.liveIndex != null ? tab.result?.rows?.[visual.liveIndex] : undefined;
+    if (!row) {
+      return null;
+    }
+    const key = rowKey(row, columns, tab.primaryKey);
+    const existing = key
+      ? (tab.edits ?? []).find((edit) => draftKind(edit) === "update" && draftLookup(edit.key) === draftLookup(key))
+      : undefined;
+    const cells: Record<string, unknown> = {};
+    for (let i = 0; i < columns.length; i++) {
+      const name = columns[i]?.name;
+      if (!name) {
+        continue;
+      }
+      if (existing && Object.prototype.hasOwnProperty.call(existing.cells, name)) {
+        cells[name] = existing.cells[name];
+      } else {
+        cells[name] = row[i] ?? null;
+      }
+    }
+    return cells;
+  }
+
+  function setRowDeleted(id: string, rowIndex: number) {
+    const tab = ctx.tableTab(id);
+    if (!tab || !tab.primaryKey?.length) {
+      return;
+    }
+    if (!tab.edits) {
+      tab.edits = [];
+    }
+    const visual = visualList(tab)[rowIndex];
+    if (!visual) {
+      return;
+    }
+    const edits = tab.edits.slice();
+    if (visual.draft) {
+      const insertId = insertIdOf(visual.draft);
+      tab.edits = edits.filter((edit) => !(isInsertDraft(edit) && insertIdOf(edit) === insertId));
+      return;
+    }
+    const columns = tab.result?.columns ?? [];
+    const row = visual.liveIndex != null ? tab.result?.rows?.[visual.liveIndex] : undefined;
+    const key = rowKey(row, columns, tab.primaryKey);
+    if (!key) {
+      return;
+    }
+    const lookup = draftLookup(key);
+    const index = edits.findIndex((edit) => !isInsertDraft(edit) && draftLookup(edit.key) === lookup);
+    if (index >= 0 && draftKind(edits[index]!) === "delete") {
+      edits.splice(index, 1);
+      tab.edits = edits;
+      return;
+    }
+    const next: CellDraft = { key, cells: {}, kind: "delete" };
+    if (index >= 0) {
+      edits[index] = next;
+    } else {
+      edits.push(next);
+    }
+    tab.edits = edits;
+  }
+
+  function cloneRow(id: string, rowIndex: number, afterIndex = rowIndex) {
+    const tab = ctx.tableTab(id);
+    if (!tab || !tab.primaryKey?.length) {
+      return;
+    }
+    const source = rowCellsAt(tab, rowIndex);
+    if (!source) {
+      return;
+    }
+    const pk = new Set(tab.primaryKey);
+    const cells: Record<string, unknown> = {};
+    for (const [name, value] of Object.entries(source)) {
+      if (pk.has(name)) {
+        continue;
+      }
+      cells[name] = value;
+    }
+    if (!tab.edits) {
+      tab.edits = [];
+    }
+    const layout = visualList(tab);
+    const afterRow = layout[afterIndex];
+    const after = afterRow ? visualRowIdentity(afterRow, tab.result?.columns ?? [], tab.primaryKey) : null;
+    tab.edits = [
+      ...tab.edits,
+      {
+        key: { [INSERT_ID_KEY]: crypto.randomUUID() },
+        cells,
+        kind: "insert",
+        ...(after ? { after } : {}),
+      },
+    ];
+  }
+
+  function setInsertCell(id: string, insertId: string, column: string, value: unknown) {
+    const tab = ctx.tableTab(id);
+    if (!tab || !insertId) {
+      return;
+    }
+    const edits = (tab.edits ?? []).slice();
+    const index = edits.findIndex((edit) => isInsertDraft(edit) && insertIdOf(edit) === insertId);
+    if (index < 0) {
+      return;
+    }
+    const current = edits[index]!;
+    edits[index] = { ...current, cells: { ...current.cells, [column]: value } };
+    tab.edits = edits;
+  }
+
   function clearEdits(id: string) {
     const tab = ctx.tableTab(id);
     if (!tab) {
@@ -240,7 +376,12 @@ export function createTableBrowse(ctx: QueryStoreCtx, exec: QueryExecApi) {
       database: tab.database,
       schema: tab.schema,
       name: tab.name,
-      rows: tab.edits,
+      rows: tab.edits.map((edit) => ({
+        key: isInsertDraft(edit) ? null : edit.key,
+        cells: edit.cells,
+        deleted: draftKind(edit) === "delete",
+        inserted: isInsertDraft(edit),
+      })),
     });
     tab.edits = [];
     await loadTable(id);
@@ -258,6 +399,9 @@ export function createTableBrowse(ctx: QueryStoreCtx, exec: QueryExecApi) {
     toggleFiltersOpen,
     applyFilters,
     setCellDraft,
+    setRowDeleted,
+    cloneRow,
+    setInsertCell,
     clearEdits,
     applyEdits,
   };

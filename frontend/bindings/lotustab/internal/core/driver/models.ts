@@ -118,10 +118,13 @@ export interface QueryResult {
 
 /**
  * RowEdit is a set of cell changes for one row, addressed by its original primary key.
+ * Deleted and Inserted are mutually exclusive with a regular UPDATE.
  */
 export interface RowEdit {
     "key": { [_ in string]?: any } | null;
     "cells": { [_ in string]?: any } | null;
+    "deleted"?: boolean;
+    "inserted"?: boolean;
 }
 
 /**
