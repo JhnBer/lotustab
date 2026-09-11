@@ -108,9 +108,19 @@ tasks:
     summary: Generates Windows `.syso` file
     dir: build
     cmds:
-      - wails3 generate syso -arch {{.ARCH}} -icon windows/icon.ico -manifest windows/wails.exe.manifest -info windows/info.json -out ../wails_windows_{{.ARCH}}.syso
+      - task: stamp:info:json
+      - wails3 generate syso -arch {{.ARCH}} -icon windows/icon.ico -manifest windows/wails.exe.manifest -info windows/info.generated.json -out ../wails_windows_{{.ARCH}}.syso
     vars:
       ARCH: '{{.ARCH | default ARCH}}'
+
+  stamp:info:json:
+    summary: Writes APP_VERSION into a generated Windows info.json
+    internal: true
+    dir: build
+    cmds:
+      - node windows/stamp-info.cjs
+    env:
+      APP_VERSION: '{{.APP_VERSION}}'
 
   create:nsis:installer:
     summary: Creates an NSIS installer

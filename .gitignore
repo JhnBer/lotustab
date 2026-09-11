@@ -6,6 +6,7 @@ frontend/node_modules
 .DS_Store
 build/linux/appimage/build
 build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
+build/windows/info.generated.json
 # Mobile generated (per-machine; overlays hold absolute paths)
 build/ios/xcode/overlay.json
 build/ios/xcode/gen/
