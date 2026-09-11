@@ -1,0 +1,86 @@
+# Native per-OS builds. Version comes from the git tag (APP_VERSION).
+# https://v3.wails.io/guides/build/cross-platform/
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: darwin
+          # - os: windows-latest
+          #   target: windows
+          # - os: ubuntu-latest
+          #   target: linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # - name: Install Linux UI deps
+      #   if: matrix.target == 'linux'
+      #   run: |
+      #     sudo apt-get update
+      #     sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.14
+
+      - name: Package macOS universal .app and DMG
+        if: matrix.target == 'darwin'
+        run: |
+          wails3 task darwin:package:universal
+          wails3 task darwin:create:dmg
+          lipo -archs bin/lotustab.app/Contents/MacOS/lotustab
+          ditto -c -k --keepParent bin/lotustab.app bin/lotustab-darwin-universal.zip
+          shopt -s nullglob
+          for f in bin/*.dmg; do mv "$f" bin/lotustab-darwin-universal.dmg; done
+
+      # - name: Build Windows
+      #   if: matrix.target == 'windows'
+      #   run: wails3 task windows:build
+
+      # - name: Build Linux
+      #   if: matrix.target == 'linux'
+      #   run: wails3 task linux:build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lotustab-${{ matrix.target }}
+          path: |
+            bin/lotustab-darwin-universal.zip
+            bin/lotustab-darwin-universal.dmg
+          # When enabling windows/linux, add: bin/lotustab.exe and bin/lotustab
+          if-no-files-found: error
+
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            bin/lotustab-darwin-universal.zip
+            bin/lotustab-darwin-universal.dmg
