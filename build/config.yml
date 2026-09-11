@@ -9,9 +9,9 @@ info:
   productName: "LotusTab"
   productIdentifier: "com.lotustab.app"
   description: "Desktop database client"
-  copyright: "(c) 2026, LotusTab"
+  copyright: "(c) 2026, John Ber (https://github.com/JhnBer)"
   comments: "Desktop database client"
-  version: "0.1.0"
+  version: "0.0.8"
   # cfBundleIconName: "appicon" # The macOS icon name in Assets.car icon bundles (optional)
   #                               # Should match the name of your .icon file without the extension
   #                               # If not set and Assets.car exists, defaults to "appicon"

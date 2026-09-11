@@ -19,6 +19,10 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+// currentVersion is overwritten at release build via
+// -ldflags "-X main.currentVersion=<tag>".
+var currentVersion = "dev"
+
 func main() {
 	registry := driver.NewRegistry()
 	if err := registry.Register(postgres.New()); err != nil {

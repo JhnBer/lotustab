@@ -9,6 +9,9 @@ vars:
   # by `wails3 build GOOS=...` (or the GOOS env var) for cross-compilation. The
   # tasks below dispatch to the matching platform Taskfile via this variable.
   GOOS: '{{.GOOS | default OS}}'
+  # Latest git tag without the leading "v" (v0.0.6 → 0.0.6). Override with APP_VERSION=...
+  APP_VERSION:
+    sh: 'v=$(git describe --tags --abbrev=0 2>/dev/null) && echo "${v#v}" || echo dev'
 
 includes:
   common: ./build/Taskfile.yml

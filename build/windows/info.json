@@ -1,15 +1,15 @@
 {
 	"fixed": {
-		"file_version": "0.1.0"
+		"file_version": "0.0.8"
 	},
 	"info": {
 		"0000": {
-			"ProductVersion": "0.1.0",
+			"ProductVersion": "0.0.8",
 			"CompanyName": "LotusTab",
 			"FileDescription": "Desktop database client",
-			"LegalCopyright": "© 2026, My Company",
+			"LegalCopyright": "(c) 2026, John Ber (https://github.com/JhnBer)",
 			"ProductName": "LotusTab",
-			"Comments": "This is a comment"
+			"Comments": "Desktop database client"
 		}
 	}
 }
