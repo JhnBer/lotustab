@@ -67,6 +67,7 @@ jobs:
       #   if: matrix.target == 'linux'
       #   run: wails3 task linux:build
 
+      
       - uses: actions/upload-artifact@v4
         with:
           name: lotustab-${{ matrix.target }}
