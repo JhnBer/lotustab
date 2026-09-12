@@ -1,4 +1,5 @@
 # Native per-OS builds. Version comes from the git tag (APP_VERSION).
+# Artifacts: lotustab-{target}-{arch}-{version}.{ext}
 # https://v3.wails.io/guides/build/cross-platform/
 
 name: Release
@@ -20,10 +21,13 @@ jobs:
         include:
           - os: macos-latest
             target: darwin
+            arch: universal
           # - os: windows-latest
           #   target: windows
+          #   arch: amd64
           # - os: ubuntu-latest
           #   target: linux
+          #   arch: amd64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -55,26 +59,29 @@ jobs:
           wails3 task darwin:package:universal
           wails3 task darwin:create:dmg
           lipo -archs bin/lotustab.app/Contents/MacOS/lotustab
-          ditto -c -k --keepParent bin/lotustab.app bin/lotustab-darwin-universal.zip
+          NAME="lotustab-${{ matrix.target }}-${{ matrix.arch }}-${GITHUB_REF_NAME}"
+          ditto -c -k --keepParent bin/lotustab.app bin/${NAME}.zip
           shopt -s nullglob
-          for f in bin/*.dmg; do mv "$f" bin/lotustab-darwin-universal.dmg; done
+          for f in bin/*.dmg; do mv "$f" bin/${NAME}.dmg; done
 
       # - name: Build Windows
       #   if: matrix.target == 'windows'
-      #   run: wails3 task windows:build
+      #   run: |
+      #     wails3 task windows:build
+      #     NAME="lotustab-${{ matrix.target }}-${{ matrix.arch }}-${GITHUB_REF_NAME}"
+      #     mv bin/lotustab.exe bin/${NAME}.exe
 
       # - name: Build Linux
       #   if: matrix.target == 'linux'
-      #   run: wails3 task linux:build
-
+      #   run: |
+      #     wails3 task linux:build
+      #     NAME="lotustab-${{ matrix.target }}-${{ matrix.arch }}-${GITHUB_REF_NAME}"
+      #     tar -czf bin/${NAME}.tar.gz -C bin lotustab
 
       - uses: actions/upload-artifact@v4
         with:
-          name: lotustab-${{ matrix.target }}
-          path: |
-            bin/lotustab-darwin-universal.zip
-            bin/lotustab-darwin-universal.dmg
-          # When enabling windows/linux, add: bin/lotustab.exe and bin/lotustab
+          name: lotustab-${{ matrix.target }}-${{ matrix.arch }}
+          path: bin/lotustab-*
           if-no-files-found: error
 
       - name: Attach to GitHub Release
@@ -82,6 +89,4 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: |
-            bin/lotustab-darwin-universal.zip
-            bin/lotustab-darwin-universal.dmg
+          files: bin/lotustab-*
