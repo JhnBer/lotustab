@@ -22,3 +22,14 @@ func TestAccountKeepsPasswordCompatible(t *testing.T) {
 		t.Fatalf("jump passphrase account = %q", got)
 	}
 }
+
+func TestGitHubTokenAccountIsNotAProfileSlot(t *testing.T) {
+	if githubTokenAccount != "app:githubToken" {
+		t.Fatalf("github token account = %q", githubTokenAccount)
+	}
+	for _, kind := range Kinds {
+		if account("app", kind) == githubTokenAccount {
+			t.Fatalf("profile kind %q collides with github token account", kind)
+		}
+	}
+}

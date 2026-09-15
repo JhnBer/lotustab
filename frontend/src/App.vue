@@ -27,6 +27,7 @@ import { errorMessage } from "@/lib/errors";
 import { WindowsService } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
 import { useQueryStore, type WorkspaceSnapshot } from "@/stores/query";
+import { useUpdatesStore } from "@/stores/updates";
 
 useColorMode({ initialValue: "dark" });
 
@@ -34,6 +35,7 @@ const route = useRoute();
 const router = useRouter();
 const connections = useConnectionsStore();
 const queries = useQueryStore();
+const updates = useUpdatesStore();
 const { tintClass: headerTint } = useConnectionTint();
 useWorkspaceShortcuts();
 useBlockHistoryBackspace();
@@ -56,10 +58,12 @@ function restoreHandoff(raw: string | null | undefined): boolean {
 }
 
 onMounted(async () => {
+  await updates.loadInfo();
   try {
     await connections.refresh();
   } catch (err) {
     toast.error(errorMessage(err));
+    updates.bindMainWindow();
     return;
   }
   try {
@@ -79,8 +83,10 @@ onMounted(async () => {
       });
       return;
     }
+    updates.bindMainWindow();
   } catch {
     // Main window / non-Wails preview.
+    updates.bindMainWindow();
   }
   if (connections.selectedId) {
     await router.replace("/query");

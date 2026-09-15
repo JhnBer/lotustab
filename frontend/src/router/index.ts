@@ -3,6 +3,7 @@ import ConnectionsPage from "@/features/connections/ConnectionsPage.vue";
 import QueryWorkspace from "@/features/editor/QueryWorkspace.vue";
 import SettingsPage from "@/features/settings/SettingsPage.vue";
 import ShortcutsPage from "@/features/settings/ShortcutsPage.vue";
+import AboutPage from "@/features/settings/AboutPage.vue";
 import TransfersPage from "@/features/transfers/TransfersPage.vue";
 
 export const router = createRouter({
@@ -37,7 +38,13 @@ export const router = createRouter({
       path: "/settings/shortcuts",
       name: "settings-shortcuts",
       component: ShortcutsPage,
-      meta: { title: "Shortcuts" },
+      meta: { title: "Settings" },
+    },
+    {
+      path: "/settings/about",
+      name: "settings-about",
+      component: AboutPage,
+      meta: { title: "Settings" },
     },
   ],
 });

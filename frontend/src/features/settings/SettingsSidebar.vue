@@ -41,6 +41,11 @@ const route = useRoute();
                 <RouterLink to="/settings/shortcuts">Shortcuts</RouterLink>
               </SidebarMenuButton>
             </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton as-child :is-active="route.path === '/settings/about'">
+                <RouterLink to="/settings/about">About</RouterLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroupContent>
       </SidebarGroup>

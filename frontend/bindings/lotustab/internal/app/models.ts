@@ -6,6 +6,18 @@
 import * as connection$0 from "../core/connection/models.js";
 
 /**
+ * AboutInfo is the static identity shown on Settings → About.
+ */
+export interface AboutInfo {
+    "version": string;
+    "goos": string;
+    "goarch": string;
+    "updatesEnabled": boolean;
+    "state": string;
+    "hasGitHubToken": boolean;
+}
+
+/**
  * ConnectionsState is the saved profile list plus navigation prefs.
  */
 export interface ConnectionsState {
@@ -65,4 +77,16 @@ export interface SaveProfileInput {
     "driverId": string;
     "params": { [_ in string]?: string } | null;
     "color": string;
+}
+
+/**
+ * UpdateCheckResult is the outcome of a GitHub Releases check.
+ */
+export interface UpdateCheckResult {
+    "available": boolean;
+    "version": string;
+    "name": string;
+    "notes": string;
+    "filename": string;
+    "size": number;
 }

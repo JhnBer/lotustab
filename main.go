@@ -47,6 +47,7 @@ func main() {
 	exports := app.NewExportService(connections)
 	drivers := app.NewDriversService(registry)
 	windows := app.NewWindowsService()
+	about := app.NewAboutService(currentVersion, true, secretStore)
 
 	appl := application.New(application.Options{
 		Name:        "LotusTab",
@@ -57,6 +58,7 @@ func main() {
 			application.NewService(queries),
 			application.NewService(exports),
 			application.NewService(windows),
+			application.NewService(about),
 		},
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),

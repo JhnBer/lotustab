@@ -12,12 +12,18 @@ export const TAB_LAYOUTS = ["scroll", "wrap"] as const;
 export type TabLayout = (typeof TAB_LAYOUTS)[number];
 export const DEFAULT_TAB_LAYOUT: TabLayout = "scroll";
 
+export const UPDATE_CHECK_SOURCES = ["manual", "automatic"] as const;
+export type UpdateCheckSource = (typeof UPDATE_CHECK_SOURCES)[number];
+
 const PAGE_SIZE_KEY = "lotustab.tablePageSize";
 const TINT_KEY = "lotustab.connectionTint";
 const SHOW_ALL_DBS_KEY = "lotustab.showAllDatabases";
 const TAB_LAYOUT_KEY = "lotustab.tabLayout";
 const QUERY_TIMEOUT_KEY = "lotustab.queryTimeout";
 const DELETE_ON_ABORT_KEY = "lotustab.deleteOnAbortExport";
+const AUTO_INSTALL_KEY = "lotustab.autoInstallUpdates";
+const LAST_CHECK_AT_KEY = "lotustab.lastUpdateCheckAt";
+const LAST_CHECK_SOURCE_KEY = "lotustab.lastUpdateCheckSource";
 const SETTINGS_CHANGED = "settings:changed";
 
 export function isPageSize(n: number): boolean {
@@ -69,6 +75,24 @@ function readDeleteOnAbortExport(): boolean {
   return localStorage.getItem(DELETE_ON_ABORT_KEY) !== "false";
 }
 
+export function isUpdateCheckSource(v: unknown): v is UpdateCheckSource {
+  return (UPDATE_CHECK_SOURCES as readonly string[]).includes(v as string);
+}
+
+function readAutoInstallUpdates(): boolean {
+  return localStorage.getItem(AUTO_INSTALL_KEY) === "true";
+}
+
+function readLastUpdateCheckAt(): string | null {
+  const v = localStorage.getItem(LAST_CHECK_AT_KEY);
+  return v && !Number.isNaN(Date.parse(v)) ? v : null;
+}
+
+function readLastUpdateCheckSource(): UpdateCheckSource | null {
+  const v = localStorage.getItem(LAST_CHECK_SOURCE_KEY);
+  return isUpdateCheckSource(v) ? v : null;
+}
+
 type SettingsPayload = {
   connectionTint: boolean;
   defaultPageSize: number;
@@ -76,6 +100,9 @@ type SettingsPayload = {
   tabLayout: TabLayout;
   queryTimeoutSeconds: number;
   deleteOnAbortExport: boolean;
+  autoInstallUpdates: boolean;
+  lastUpdateCheckAt: string | null;
+  lastUpdateCheckSource: UpdateCheckSource | null;
 };
 
 export const useSettingsStore = defineStore("settings", () => {
@@ -85,6 +112,9 @@ export const useSettingsStore = defineStore("settings", () => {
   const tabLayout = ref(readTabLayout());
   const queryTimeoutSeconds = ref(readQueryTimeout());
   const deleteOnAbortExport = ref(readDeleteOnAbortExport());
+  const autoInstallUpdates = ref(readAutoInstallUpdates());
+  const lastUpdateCheckAt = ref<string | null>(readLastUpdateCheckAt());
+  const lastUpdateCheckSource = ref<UpdateCheckSource | null>(readLastUpdateCheckSource());
 
   function snapshot(): SettingsPayload {
     return {
@@ -94,6 +124,9 @@ export const useSettingsStore = defineStore("settings", () => {
       tabLayout: tabLayout.value,
       queryTimeoutSeconds: queryTimeoutSeconds.value,
       deleteOnAbortExport: deleteOnAbortExport.value,
+      autoInstallUpdates: autoInstallUpdates.value,
+      lastUpdateCheckAt: lastUpdateCheckAt.value,
+      lastUpdateCheckSource: lastUpdateCheckSource.value,
     };
   }
 
@@ -104,6 +137,17 @@ export const useSettingsStore = defineStore("settings", () => {
     localStorage.setItem(TAB_LAYOUT_KEY, tabLayout.value);
     localStorage.setItem(QUERY_TIMEOUT_KEY, String(queryTimeoutSeconds.value));
     localStorage.setItem(DELETE_ON_ABORT_KEY, String(deleteOnAbortExport.value));
+    localStorage.setItem(AUTO_INSTALL_KEY, String(autoInstallUpdates.value));
+    if (lastUpdateCheckAt.value) {
+      localStorage.setItem(LAST_CHECK_AT_KEY, lastUpdateCheckAt.value);
+    } else {
+      localStorage.removeItem(LAST_CHECK_AT_KEY);
+    }
+    if (lastUpdateCheckSource.value) {
+      localStorage.setItem(LAST_CHECK_SOURCE_KEY, lastUpdateCheckSource.value);
+    } else {
+      localStorage.removeItem(LAST_CHECK_SOURCE_KEY);
+    }
   }
 
   function commit() {
@@ -127,6 +171,18 @@ export const useSettingsStore = defineStore("settings", () => {
         typeof next.deleteOnAbortExport === "boolean"
           ? next.deleteOnAbortExport
           : deleteOnAbortExport.value,
+      autoInstallUpdates: Boolean(next.autoInstallUpdates),
+      lastUpdateCheckAt:
+        typeof next.lastUpdateCheckAt === "string" && !Number.isNaN(Date.parse(next.lastUpdateCheckAt))
+          ? next.lastUpdateCheckAt
+          : next.lastUpdateCheckAt === null
+            ? null
+            : lastUpdateCheckAt.value,
+      lastUpdateCheckSource: isUpdateCheckSource(next.lastUpdateCheckSource)
+        ? next.lastUpdateCheckSource
+        : next.lastUpdateCheckSource === null
+          ? null
+          : lastUpdateCheckSource.value,
     };
   }
 
@@ -148,7 +204,10 @@ export const useSettingsStore = defineStore("settings", () => {
       showAllDatabases.value === next.showAllDatabases &&
       tabLayout.value === layout &&
       queryTimeoutSeconds.value === timeout &&
-      deleteOnAbortExport.value === deleteOnAbort
+      deleteOnAbortExport.value === deleteOnAbort &&
+      autoInstallUpdates.value === next.autoInstallUpdates &&
+      lastUpdateCheckAt.value === next.lastUpdateCheckAt &&
+      lastUpdateCheckSource.value === next.lastUpdateCheckSource
     ) {
       return;
     }
@@ -158,6 +217,9 @@ export const useSettingsStore = defineStore("settings", () => {
     tabLayout.value = layout;
     queryTimeoutSeconds.value = timeout;
     deleteOnAbortExport.value = deleteOnAbort;
+    autoInstallUpdates.value = next.autoInstallUpdates;
+    lastUpdateCheckAt.value = next.lastUpdateCheckAt;
+    lastUpdateCheckSource.value = next.lastUpdateCheckSource;
     persist();
   }
 
@@ -209,6 +271,20 @@ export const useSettingsStore = defineStore("settings", () => {
     commit();
   }
 
+  function setAutoInstallUpdates(on: boolean) {
+    if (autoInstallUpdates.value === on) {
+      return;
+    }
+    autoInstallUpdates.value = on;
+    commit();
+  }
+
+  function recordUpdateCheck(source: UpdateCheckSource) {
+    lastUpdateCheckAt.value = new Date().toISOString();
+    lastUpdateCheckSource.value = source;
+    commit();
+  }
+
   Events.On(SETTINGS_CHANGED, (ev) => {
     const data = payloadFromEvent(ev.data);
     if (!data) {
@@ -224,11 +300,16 @@ export const useSettingsStore = defineStore("settings", () => {
     tabLayout,
     queryTimeoutSeconds,
     deleteOnAbortExport,
+    autoInstallUpdates,
+    lastUpdateCheckAt,
+    lastUpdateCheckSource,
     setDefaultPageSize,
     setConnectionTint,
     setShowAllDatabases,
     setTabLayout,
     setQueryTimeout,
     setDeleteOnAbortExport,
+    setAutoInstallUpdates,
+    recordUpdateCheck,
   };
 });
