@@ -19,11 +19,13 @@ const props = withDefaults(
     placeholder?: string;
     noneValue?: string;
     noneLabel?: string;
+    disabled?: boolean;
     class?: string;
   }>(),
   {
     placeholder: "Select database",
     noneLabel: "None",
+    disabled: false,
   },
 );
 
@@ -39,6 +41,15 @@ watch(open, (value) => {
     filter.value = "";
   }
 });
+
+watch(
+  () => props.disabled,
+  (disabled) => {
+    if (disabled) {
+      open.value = false;
+    }
+  },
+);
 
 const filtered = computed(() => {
   const q = filter.value.trim().toLowerCase();
@@ -56,18 +67,30 @@ const display = computed(() => {
 });
 
 function select(value: string) {
+  if (props.disabled) {
+    return;
+  }
   emit("update:modelValue", value);
   open.value = false;
+}
+
+function onOpen(value: boolean) {
+  if (props.disabled) {
+    open.value = false;
+    return;
+  }
+  open.value = value;
 }
 </script>
 
 <template>
-  <PopoverRoot v-model:open="open">
+  <PopoverRoot :open="open" @update:open="onOpen">
     <PopoverTrigger as-child>
       <button
         type="button"
         data-slot="select-trigger"
         data-size="sm"
+        :disabled="disabled"
         :class="cn(
           'border-input data-placeholder:text-muted-foreground dark:bg-input/30 dark:hover:bg-input/50 focus-visible:border-ring focus-visible:ring-ring/50 gap-1.5 border bg-transparent py-2 pr-2 pl-2.5 text-sm transition-colors select-none focus-visible:ring-3 h-7 rounded-[min(var(--radius-md),10px)] flex w-fit items-center justify-between whitespace-nowrap outline-none disabled:cursor-not-allowed disabled:opacity-50',
           props.class,

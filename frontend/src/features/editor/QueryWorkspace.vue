@@ -3,7 +3,9 @@ import { computed, watch } from "vue";
 import { Play, Plug } from "@lucide/vue";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
+import { Switch } from "@/components/ui/switch";
 import DatabaseCombobox from "@/components/DatabaseCombobox.vue";
 import { useProfileActions } from "@/composables/useProfileActions";
 import { errorMessage, isCanceled } from "@/lib/errors";
@@ -20,12 +22,14 @@ import TablePager from "@/features/results/TablePager.vue";
 import { useConnectionsStore } from "@/stores/connections";
 import { useExplorerStore } from "@/stores/explorer";
 import { isQueryTab, isTableTab, useQueryStore, type QueryTab, type TableTab } from "@/stores/query";
+import { useSettingsStore } from "@/stores/settings";
 
 const NONE = "__none__";
 
 const connections = useConnectionsStore();
 const queries = useQueryStore();
 const explorer = useExplorerStore();
+const settings = useSettingsStore();
 const { connect } = useProfileActions();
 
 const connecting = computed(() => {
@@ -87,12 +91,11 @@ async function connectSelected() {
   await connect(profile);
 }
 
-function onDatabase(value: string) {
-  const tab = queries.activeTab;
-  if (!isQueryTab(tab)) {
+function onDatabase(tabId: string, value: string) {
+  if (!settings.enableDatabaseChoice) {
     return;
   }
-  queries.setDatabase(tab.id, value === NONE ? "" : value);
+  queries.setDatabase(tabId, value === NONE ? "" : value);
 }
 </script>
 
@@ -149,18 +152,38 @@ function onDatabase(value: string) {
       <ResizablePanel :default-size="45" :min-size="20">
         <div class="flex h-full min-h-0 flex-col">
           <div class="flex items-center gap-2 border-b px-3 py-2 text-xs" style="--wails-draggable: no-drag">
-            <DatabaseCombobox
-              class="h-7 w-44"
-              :model-value="tab.database || NONE"
-              :options="explorer.databases"
-              :none-value="NONE"
-              none-label="None"
-              placeholder="Database"
-              @update:model-value="onDatabase"
-            />
-            <span class="text-muted-foreground min-w-0 flex-1 truncate">
-              You can choose a database here or specify it in the query.
-            </span>
+            <template v-if="settings.showAllDatabases">
+              <DatabaseCombobox
+                class="h-7 w-44"
+                :model-value="tab.database || NONE"
+                :options="explorer.databases"
+                :none-value="NONE"
+                none-label="None"
+                placeholder="Database"
+                :disabled="!settings.enableDatabaseChoice"
+                @update:model-value="onDatabase(tab.id, $event)"
+              />
+              <Label
+                class="text-muted-foreground flex shrink-0 items-center gap-2 font-normal"
+              >
+                <Switch
+                  :id="`query-enable-db-choice-${tab.id}`"
+                  size="sm"
+                  :model-value="settings.enableDatabaseChoice"
+                  @update:model-value="settings.setEnableDatabaseChoice(Boolean($event))"
+                />
+                Enable database choice
+              </Label>
+              <span class="text-muted-foreground min-w-0 flex-1 truncate">
+                <template v-if="settings.enableDatabaseChoice">
+                  You can choose a database here or specify it in the query.
+                </template>
+                <template v-else>
+                  Specify the database in the query.
+                </template>
+              </span>
+            </template>
+            <span v-else class="min-w-0 flex-1" />
             <Button
               v-if="tab.running"
               size="sm"

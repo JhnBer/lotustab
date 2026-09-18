@@ -36,6 +36,10 @@ function onShowAllDatabases(value: unknown) {
   settings.setShowAllDatabases(Boolean(value));
 }
 
+function onEnableDatabaseChoice(value: unknown) {
+  settings.setEnableDatabaseChoice(Boolean(value));
+}
+
 function onTabLayout(value: unknown) {
   if (isTabLayout(value)) {
     settings.setTabLayout(value);
@@ -88,6 +92,15 @@ function onDeleteOnAbort(value: unknown) {
         id="settings-show-all-dbs"
         :model-value="settings.showAllDatabases"
         @update:model-value="onShowAllDatabases"
+      />
+    </div>
+
+    <div v-if="settings.showAllDatabases" class="flex items-center justify-between gap-4">
+      <Label for="settings-enable-db-choice">Enable database choice</Label>
+      <Switch
+        id="settings-enable-db-choice"
+        :model-value="settings.enableDatabaseChoice"
+        @update:model-value="onEnableDatabaseChoice"
       />
     </div>
 

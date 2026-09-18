@@ -18,6 +18,7 @@ export type UpdateCheckSource = (typeof UPDATE_CHECK_SOURCES)[number];
 const PAGE_SIZE_KEY = "lotustab.tablePageSize";
 const TINT_KEY = "lotustab.connectionTint";
 const SHOW_ALL_DBS_KEY = "lotustab.showAllDatabases";
+const ENABLE_DB_CHOICE_KEY = "lotustab.enableDatabaseChoice";
 const TAB_LAYOUT_KEY = "lotustab.tabLayout";
 const QUERY_TIMEOUT_KEY = "lotustab.queryTimeout";
 const DELETE_ON_ABORT_KEY = "lotustab.deleteOnAbortExport";
@@ -55,6 +56,10 @@ function readTint(): boolean {
 
 function readShowAllDatabases(): boolean {
   return localStorage.getItem(SHOW_ALL_DBS_KEY) !== "false";
+}
+
+function readEnableDatabaseChoice(): boolean {
+  return localStorage.getItem(ENABLE_DB_CHOICE_KEY) !== "false";
 }
 
 export function isTabLayout(v: unknown): v is TabLayout {
@@ -97,6 +102,7 @@ type SettingsPayload = {
   connectionTint: boolean;
   defaultPageSize: number;
   showAllDatabases: boolean;
+  enableDatabaseChoice: boolean;
   tabLayout: TabLayout;
   queryTimeoutSeconds: number;
   deleteOnAbortExport: boolean;
@@ -109,6 +115,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const connectionTint = ref(readTint());
   const defaultPageSize = ref(readPageSize());
   const showAllDatabases = ref(readShowAllDatabases());
+  const enableDatabaseChoice = ref(readEnableDatabaseChoice());
   const tabLayout = ref(readTabLayout());
   const queryTimeoutSeconds = ref(readQueryTimeout());
   const deleteOnAbortExport = ref(readDeleteOnAbortExport());
@@ -121,6 +128,7 @@ export const useSettingsStore = defineStore("settings", () => {
       connectionTint: connectionTint.value,
       defaultPageSize: defaultPageSize.value,
       showAllDatabases: showAllDatabases.value,
+      enableDatabaseChoice: enableDatabaseChoice.value,
       tabLayout: tabLayout.value,
       queryTimeoutSeconds: queryTimeoutSeconds.value,
       deleteOnAbortExport: deleteOnAbortExport.value,
@@ -134,6 +142,7 @@ export const useSettingsStore = defineStore("settings", () => {
     localStorage.setItem(TINT_KEY, String(connectionTint.value));
     localStorage.setItem(PAGE_SIZE_KEY, String(defaultPageSize.value));
     localStorage.setItem(SHOW_ALL_DBS_KEY, String(showAllDatabases.value));
+    localStorage.setItem(ENABLE_DB_CHOICE_KEY, String(enableDatabaseChoice.value));
     localStorage.setItem(TAB_LAYOUT_KEY, tabLayout.value);
     localStorage.setItem(QUERY_TIMEOUT_KEY, String(queryTimeoutSeconds.value));
     localStorage.setItem(DELETE_ON_ABORT_KEY, String(deleteOnAbortExport.value));
@@ -165,6 +174,7 @@ export const useSettingsStore = defineStore("settings", () => {
       connectionTint: Boolean(next.connectionTint),
       defaultPageSize: Number(next.defaultPageSize),
       showAllDatabases: next.showAllDatabases !== false,
+      enableDatabaseChoice: next.enableDatabaseChoice !== false,
       tabLayout: isTabLayout(next.tabLayout) ? next.tabLayout : DEFAULT_TAB_LAYOUT,
       queryTimeoutSeconds: Number(next.queryTimeoutSeconds),
       deleteOnAbortExport:
@@ -202,6 +212,7 @@ export const useSettingsStore = defineStore("settings", () => {
       connectionTint.value === next.connectionTint &&
       defaultPageSize.value === size &&
       showAllDatabases.value === next.showAllDatabases &&
+      enableDatabaseChoice.value === next.enableDatabaseChoice &&
       tabLayout.value === layout &&
       queryTimeoutSeconds.value === timeout &&
       deleteOnAbortExport.value === deleteOnAbort &&
@@ -214,6 +225,7 @@ export const useSettingsStore = defineStore("settings", () => {
     connectionTint.value = next.connectionTint;
     defaultPageSize.value = size;
     showAllDatabases.value = next.showAllDatabases;
+    enableDatabaseChoice.value = next.enableDatabaseChoice;
     tabLayout.value = layout;
     queryTimeoutSeconds.value = timeout;
     deleteOnAbortExport.value = deleteOnAbort;
@@ -244,6 +256,14 @@ export const useSettingsStore = defineStore("settings", () => {
       return;
     }
     showAllDatabases.value = on;
+    commit();
+  }
+
+  function setEnableDatabaseChoice(on: boolean) {
+    if (enableDatabaseChoice.value === on) {
+      return;
+    }
+    enableDatabaseChoice.value = on;
     commit();
   }
 
@@ -297,6 +317,7 @@ export const useSettingsStore = defineStore("settings", () => {
     connectionTint,
     defaultPageSize,
     showAllDatabases,
+    enableDatabaseChoice,
     tabLayout,
     queryTimeoutSeconds,
     deleteOnAbortExport,
@@ -306,6 +327,7 @@ export const useSettingsStore = defineStore("settings", () => {
     setDefaultPageSize,
     setConnectionTint,
     setShowAllDatabases,
+    setEnableDatabaseChoice,
     setTabLayout,
     setQueryTimeout,
     setDeleteOnAbortExport,

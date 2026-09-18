@@ -1,8 +1,21 @@
 import { errorMessage, isCanceled } from "@/lib/errors";
 import { QueryService } from "@/lib/wails";
+import type { QueryTab } from "@/features/editor/tabs";
 import { useConnectionsStore } from "@/stores/connections";
+import { useExplorerStore } from "@/stores/explorer";
 import { useSettingsStore } from "@/stores/settings";
 import type { QueryStoreCtx } from "@/stores/queryContext";
+
+function queryExecuteDatabase(tab: QueryTab): string {
+  const settings = useSettingsStore();
+  if (!settings.showAllDatabases) {
+    return useExplorerStore().activeDatabase || "";
+  }
+  if (!settings.enableDatabaseChoice) {
+    return "";
+  }
+  return tab.database ?? "";
+}
 
 export function createQueryExec(ctx: QueryStoreCtx) {
   async function execute(id: string) {
@@ -29,7 +42,7 @@ export function createQueryExec(ctx: QueryStoreCtx) {
     const pending = QueryService.Execute(
       tab.profileId,
       tab.sql,
-      tab.database ?? "",
+      queryExecuteDatabase(tab),
       tab.pageSize,
       (tab.page - 1) * tab.pageSize,
       useSettingsStore().queryTimeoutSeconds,
