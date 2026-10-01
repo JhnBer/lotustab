@@ -183,3 +183,18 @@ func safeFileBase(name string) string {
 	}
 	return out
 }
+
+// SafeFileBase is the exported form of the dump filename sanitizer.
+func SafeFileBase(name string) string {
+	return safeFileBase(name)
+}
+
+// FileBaseForTable builds `{prefix}{table}` for folder-mode dumps.
+func FileBaseForTable(prefix, name string) string {
+	prefix = strings.TrimSpace(prefix)
+	name = strings.TrimSpace(name)
+	if prefix == "" {
+		return safeFileBase(name)
+	}
+	return safeFileBase(prefix + name)
+}

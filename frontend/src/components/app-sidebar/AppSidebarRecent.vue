@@ -20,6 +20,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import ConnectionDialog from "@/features/connections/ConnectionDialog.vue";
 import { useConnectionDialog } from "@/composables/useConnectionDialog";
+import { useExportData } from "@/composables/useExportData";
 import { useProfileActions } from "@/composables/useProfileActions";
 import { connBg } from "@/lib/colors";
 import { useConnectionsStore } from "@/stores/connections";
@@ -27,6 +28,7 @@ import { useConnectionsStore } from "@/stores/connections";
 const connections = useConnectionsStore();
 const { recentProfiles } = storeToRefs(connections);
 const { dialogOpen, editing, openEdit } = useConnectionDialog();
+const { openExportData } = useExportData();
 const { activateProfile, togglePin, connect, disconnect, clone, remove } = useProfileActions();
 </script>
 
@@ -123,6 +125,9 @@ const { activateProfile, togglePin, connect, disconnect, clone, remove } = usePr
               </ContextMenuItem>
               <ContextMenuItem @select="openEdit(profile)">
                 Edit
+              </ContextMenuItem>
+              <ContextMenuItem @select="openExportData(profile.id)">
+                Export…
               </ContextMenuItem>
               <ContextMenuItem @select="clone(profile)">
                 Clone

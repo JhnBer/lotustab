@@ -18,10 +18,14 @@ export {
 
 export type {
     AboutInfo,
+    BatchExportRequest,
     ConnectionsState,
+    CountTablesRequest,
     ExportPathResult,
     ExportResult,
     ExportTableRequest,
+    OutputStatus,
     SaveProfileInput,
+    TableRowCount,
     UpdateCheckResult
 } from "./models.js";

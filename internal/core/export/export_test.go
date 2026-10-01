@@ -168,6 +168,90 @@ func TestCountQuery(t *testing.T) {
 	}
 }
 
+func TestFileBaseForTable(t *testing.T) {
+	if got := FileBaseForTable("", "users"); got != "users" {
+		t.Fatalf("got %q", got)
+	}
+	if got := FileBaseForTable("prod_", "users"); got != "prod_users" {
+		t.Fatalf("got %q", got)
+	}
+	if got := FileBaseForTable("a b", "t-1"); got != "a_bt-1" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestRunMultiSQL(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "dump.sql")
+	result, err := RunMulti(t.Context(), []MultiTable{
+		{
+			Table: "users",
+			DDL:   "CREATE TABLE `users` (id int);",
+			Stream: func(fn func(cols []driver.Column, rows [][]any) error) error {
+				return fn([]driver.Column{{Name: "id"}}, [][]any{{int64(1)}, {int64(2)}})
+			},
+		},
+		{
+			Table: "orders",
+			DDL:   "CREATE TABLE `orders` (id int);",
+			Stream: func(fn func(cols []driver.Column, rows [][]any) error) error {
+				return fn([]driver.Column{{Name: "id"}}, [][]any{{int64(9)}})
+			},
+		},
+	}, Options{
+		Format:          FormatSQL,
+		IncludeCreate:   true,
+		IncludeDrop:     true,
+		InsertBatchSize: 10,
+		WrapTransaction: true,
+		Dialect:         DialectMySQL,
+		OutputPath:      path,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Rows != 3 {
+		t.Fatalf("rows=%d", result.Rows)
+	}
+	if len(result.Files) != 1 {
+		t.Fatalf("files=%v", result.Files)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(raw)
+	want := []string{
+		"BEGIN;",
+		"DROP TABLE IF EXISTS `users`;",
+		"CREATE TABLE `users` (id int);",
+		"INSERT INTO `users`",
+		"DROP TABLE IF EXISTS `orders`;",
+		"CREATE TABLE `orders` (id int);",
+		"INSERT INTO `orders`",
+		"COMMIT;",
+	}
+	for _, part := range want {
+		if !strings.Contains(got, part) {
+			t.Fatalf("missing %q in\n%s", part, got)
+		}
+	}
+	if strings.Count(got, "BEGIN;") != 1 || strings.Count(got, "COMMIT;") != 1 {
+		t.Fatalf("expected one transaction around the file:\n%s", got)
+	}
+}
+
+func TestRunMultiRequiresSQL(t *testing.T) {
+	_, err := RunMulti(t.Context(), []MultiTable{{
+		Table: "t",
+		Stream: func(fn func(cols []driver.Column, rows [][]any) error) error {
+			return fn(nil, nil)
+		},
+	}}, Options{Format: FormatCSV, OutputPath: filepath.Join(t.TempDir(), "x.csv")}, nil)
+	if err == nil || !strings.Contains(err.Error(), "SQL") {
+		t.Fatalf("expected SQL-only error, got %v", err)
+	}
+}
+
 func TestRunDeleteOnAbort(t *testing.T) {
 	dir := t.TempDir()
 	_, err := Run(t.Context(), func(fn func(cols []driver.Column, rows [][]any) error) error {

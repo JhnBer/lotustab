@@ -4,6 +4,9 @@
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore: Unused imports
 import * as connection$0 from "../core/connection/models.js";
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore: Unused imports
+import * as driver$0 from "../core/driver/models.js";
 
 /**
  * AboutInfo is the static identity shown on Settings → About.
@@ -18,12 +21,44 @@ export interface AboutInfo {
 }
 
 /**
+ * BatchExportRequest dumps several tables from one database.
+ */
+export interface BatchExportRequest {
+    "profileId": string;
+    "database": string;
+    "tables": driver$0.TableRef[] | null;
+    "format": string;
+    "gzip": boolean;
+    "singleFile": boolean;
+    "outputDir": string;
+    "fileName": string;
+    "folderName": string;
+    "prefix": string;
+    "prefixEnabled": boolean;
+    "force": boolean;
+    "includeCreate": boolean;
+    "includeDrop": boolean;
+    "insertBatchSize": number;
+    "wrapTransaction": boolean;
+    "deleteOnAbort": boolean;
+}
+
+/**
  * ConnectionsState is the saved profile list plus navigation prefs.
  */
 export interface ConnectionsState {
     "profiles": connection$0.Profile[] | null;
     "pinnedIds": string[] | null;
     "recentIds": string[] | null;
+}
+
+/**
+ * CountTablesRequest is the payload for counting rows across tables.
+ */
+export interface CountTablesRequest {
+    "profileId": string;
+    "database": string;
+    "tables": driver$0.TableRef[] | null;
 }
 
 /**
@@ -65,7 +100,20 @@ export interface ExportTableRequest {
     "outputPath": string;
     "outputDir": string;
     "fileName": string;
+    "folderMode": boolean;
+    "folderName": string;
+    "prefix": string;
+    "prefixEnabled": boolean;
+    "force": boolean;
     "deleteOnAbort": boolean;
+}
+
+/**
+ * OutputStatus describes whether a dump destination already has data.
+ */
+export interface OutputStatus {
+    "exists": boolean;
+    "hasFiles": boolean;
 }
 
 /**
@@ -77,6 +125,15 @@ export interface SaveProfileInput {
     "driverId": string;
     "params": { [_ in string]?: string } | null;
     "color": string;
+}
+
+/**
+ * TableRowCount is SELECT COUNT(*) for one table.
+ */
+export interface TableRowCount {
+    "schema": string;
+    "name": string;
+    "rows": number;
 }
 
 /**

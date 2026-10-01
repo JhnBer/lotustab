@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/table";
 import ConnectionDialog from "@/features/connections/ConnectionDialog.vue";
 import { useConnectionDialog } from "@/composables/useConnectionDialog";
+import { useExportData } from "@/composables/useExportData";
 import { useProfileActions } from "@/composables/useProfileActions";
 import { errorMessage } from "@/lib/errors";
 import { connBg } from "@/lib/colors";
@@ -33,6 +34,7 @@ import { useConnectionsStore } from "@/stores/connections";
 
 const connections = useConnectionsStore();
 const { dialogOpen, editing, openCreate, openEdit } = useConnectionDialog();
+const { openExportData } = useExportData();
 const { activateProfile, connect, disconnect, togglePin, clone, remove } = useProfileActions();
 
 const sortableProfiles = computed({
@@ -222,6 +224,9 @@ async function onReorder() {
               </ContextMenuItem>
               <ContextMenuItem @select="openEdit(profile)">
                 Edit
+              </ContextMenuItem>
+              <ContextMenuItem @select="openExportData(profile.id)">
+                Export…
               </ContextMenuItem>
               <ContextMenuItem @select="clone(profile)">
                 Clone

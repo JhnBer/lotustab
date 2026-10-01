@@ -30,7 +30,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { formatBytes, formatDuration, formatRows, suggestedExportFileName, withExportExt } from "@/features/export/format";
+import { formatBytes, formatDuration, formatRows, isDirNotEmptyError, suggestedExportFileName, suggestedExportFolderName, withExportExt } from "@/features/export/format";
 import { errorMessage, isCanceled } from "@/lib/errors";
 import { ExportService, type ExportTableRequest } from "@/lib/wails";
 import { useSettingsStore } from "@/stores/settings";
@@ -70,6 +70,11 @@ const insertBatchSize = ref("500");
 const wrapTransaction = ref(true);
 const outputDir = ref("");
 const fileName = ref("");
+const folderMode = ref(false);
+const folderName = ref("");
+const prefixEnabled = ref(false);
+const prefix = ref("");
+const overwriteWarn = ref(false);
 const checkedTotal = ref<number | null>(null);
 const counting = ref(false);
 const browsing = ref(false);
@@ -82,9 +87,15 @@ const exportStartedAt = ref(0);
 const elapsedMs = ref(0);
 let tick: ReturnType<typeof setInterval> | null = null;
 
-const canExport = computed(
-  () => fileName.value.trim().length > 0 && outputDir.value.trim().length > 0,
-);
+const canExport = computed(() => {
+  if (outputDir.value.trim().length === 0) {
+    return false;
+  }
+  if (folderMode.value) {
+    return folderName.value.trim().length > 0;
+  }
+  return fileName.value.trim().length > 0;
+});
 const remainingLabel = computed(() => {
   const total = checkedTotal.value;
   const rows = progress.value.rows;
@@ -119,6 +130,11 @@ watch(
     insertBatchSize.value = "500";
     wrapTransaction.value = true;
     fileName.value = suggestedExportFileName(target.name, "sql", false);
+    folderMode.value = false;
+    folderName.value = suggestedExportFolderName(target.name);
+    prefixEnabled.value = false;
+    prefix.value = "";
+    overwriteWarn.value = false;
     outputDir.value = lastExportDir;
     checkedTotal.value = null;
     counting.value = false;
@@ -141,7 +157,10 @@ watch(customWhere, (on) => {
   }
 });
 
-watch([format, gzip], () => {
+watch([format, gzip], ([nextFormat]) => {
+  if (nextFormat === "csv") {
+    folderMode.value = true;
+  }
   fileName.value = withExportExt(fileName.value, format.value, gzip.value);
 });
 
@@ -262,6 +281,21 @@ async function startExport() {
   if (!target || running.value || !canExport.value) {
     return;
   }
+  if (!overwriteWarn.value) {
+    try {
+      const dest = folderMode.value
+        ? `${outputDir.value.trim().replace(/[/\\]+$/, "")}/${folderName.value.trim()}`
+        : `${outputDir.value.trim().replace(/[/\\]+$/, "")}/${fileName.value.trim()}`;
+      const status = await ExportService.CheckOutput(dest, folderMode.value);
+      if (status?.hasFiles) {
+        overwriteWarn.value = true;
+        return;
+      }
+    } catch (err) {
+      toast.error(errorMessage(err));
+      return;
+    }
+  }
   const req: ExportTableRequest = {
     profileId: target.profileId,
     database: target.database,
@@ -269,7 +303,7 @@ async function startExport() {
     table: target.name,
     format: format.value,
     gzip: gzip.value,
-    chunkSize: parseCount(chunkSize.value, 0),
+    chunkSize: folderMode.value ? 0 : parseCount(chunkSize.value, 0),
     whereSQL: customWhere.value ? whereSQL.value.trim() : "",
     includeCreate: format.value === "sql" && includeCreate.value,
     includeDrop: format.value === "sql" && includeDrop.value,
@@ -278,10 +312,16 @@ async function startExport() {
     outputPath: "",
     outputDir: outputDir.value.trim(),
     fileName: fileName.value.trim(),
+    folderMode: folderMode.value,
+    folderName: folderName.value.trim(),
+    prefix: prefix.value,
+    prefixEnabled: folderMode.value && prefixEnabled.value,
+    force: overwriteWarn.value,
     deleteOnAbort: settings.deleteOnAbortExport,
   };
 
   lastExportDir = req.outputDir;
+  overwriteWarn.value = false;
 
   running.value = true;
   progress.value = { chunk: 0, rows: 0, bytes: 0, query: "" };
@@ -324,6 +364,12 @@ async function startExport() {
         bytes: progress.value.bytes,
       });
       emit("update:open", false);
+      return;
+    }
+    if (isDirNotEmptyError(err)) {
+      overwriteWarn.value = true;
+      transfers.fail(id, "Destination is not empty");
+      running.value = false;
       return;
     }
     transfers.fail(id, errorMessage(err));
@@ -373,7 +419,19 @@ function cancelExport() {
       </div>
 
       <div v-else class="grid gap-3">
-        <div class="grid gap-1.5">
+        <div v-if="folderMode" class="grid gap-1.5">
+          <Label for="export-foldername">Folder name</Label>
+          <Input
+            id="export-foldername"
+            v-model="folderName"
+            placeholder="table_20260101"
+            spellcheck="false"
+          />
+          <p class="text-muted-foreground text-xs">
+            Each table is saved as a separate file.
+          </p>
+        </div>
+        <div v-else class="grid gap-1.5">
           <Label for="export-filename">Filename</Label>
           <Input
             id="export-filename"
@@ -414,7 +472,28 @@ function cancelExport() {
           </Select>
         </div>
 
-        <div class="grid gap-1.5">
+        <div v-if="format === 'sql'" class="flex items-center justify-between gap-4">
+          <Label for="export-folder-mode">Separate files in a folder</Label>
+          <Switch
+            id="export-folder-mode"
+            :model-value="folderMode"
+            @update:model-value="(v) => (folderMode = v === true)"
+          />
+        </div>
+
+        <div v-if="folderMode" class="flex items-center justify-between gap-4">
+          <Label for="export-prefix-on">Filename prefix</Label>
+          <Switch
+            id="export-prefix-on"
+            :model-value="prefixEnabled"
+            @update:model-value="(v) => (prefixEnabled = v === true)"
+          />
+        </div>
+        <div v-if="folderMode && prefixEnabled" class="grid gap-1.5">
+          <Input v-model="prefix" placeholder="prod_" spellcheck="false" />
+        </div>
+
+        <div v-if="!folderMode" class="grid gap-1.5">
           <Label for="export-chunk">Chunk size (rows per file)</Label>
           <Input
             id="export-chunk"
@@ -509,6 +588,10 @@ function cancelExport() {
           />
           <Label for="export-delete-abort" class="font-normal">Delete files on abort/error</Label>
         </div>
+
+        <p v-if="overwriteWarn" class="text-destructive text-xs">
+          Files in this destination will be overwritten.
+        </p>
       </div>
 
       <DialogFooter>
@@ -519,7 +602,7 @@ function cancelExport() {
           Close
         </Button>
         <Button v-if="!running" type="button" :disabled="!canExport" @click="startExport">
-          Export
+          {{ overwriteWarn ? "Overwrite and export" : "Export" }}
         </Button>
       </DialogFooter>
     </DialogContent>

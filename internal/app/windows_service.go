@@ -36,8 +36,9 @@ func WindowOptions(name, title, pageURL string) application.WebviewWindowOptions
 			Backdrop: application.MacBackdropTranslucent,
 			TitleBar: application.MacTitleBarHiddenInset,
 		},
-		BackgroundColour: application.NewRGB(10, 10, 10),
-		URL:              pageURL,
+		BackgroundColour:   application.NewRGB(10, 10, 10),
+		URL:                pageURL,
+		UseApplicationMenu: true,
 	}
 }
 

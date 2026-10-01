@@ -3,6 +3,7 @@ package main
 import (
 	"embed"
 	"log"
+	"runtime"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
@@ -68,9 +69,30 @@ func main() {
 		},
 	})
 
+	applyAppMenu(appl)
 	appl.Window.NewWithOptions(app.WindowOptions("main", "LotusTab", "/"))
 
 	if err := appl.Run(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func applyAppMenu(appl *application.App) {
+	menu := appl.NewMenu()
+	menu.AddRole(application.AppMenu)
+	fileMenu := menu.AddSubmenu("File")
+	fileMenu.Add("Export").OnClick(func(*application.Context) {
+		appl.Event.Emit("open:export-data")
+	})
+	fileMenu.AddSeparator()
+	if runtime.GOOS == "darwin" {
+		fileMenu.AddRole(application.CloseWindow)
+	} else {
+		fileMenu.AddRole(application.Quit)
+	}
+	menu.AddRole(application.EditMenu)
+	menu.AddRole(application.ViewMenu)
+	menu.AddRole(application.WindowMenu)
+	menu.AddRole(application.HelpMenu)
+	appl.Menu.Set(menu)
 }

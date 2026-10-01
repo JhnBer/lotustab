@@ -35,6 +35,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import DatabaseCombobox from "@/components/DatabaseCombobox.vue";
 import { useProfileActions } from "@/composables/useProfileActions";
+import { useExportData } from "@/composables/useExportData";
 import ExportDialog, { type ExportTarget } from "@/features/export/ExportDialog.vue";
 import {
   buildExplorerRows,
@@ -57,6 +58,7 @@ const explorer = useExplorerStore();
 const queries = useQueryStore();
 const settings = useSettingsStore();
 const { connect, disconnect } = useProfileActions();
+const { openExportData } = useExportData();
 const { selected } = storeToRefs(connections);
 const disconnecting = ref(false);
 
@@ -354,17 +356,25 @@ function openExport(database: string, table: TableInfo) {
             class="absolute top-0 left-0 w-full"
             :style="{ transform: `translateY(${item.v.start}px)`, height: `${item.v.size}px` }"
           >
-            <SidebarMenuButton
-              v-if="item.row.kind === 'db'"
-              :is-active="item.row.open"
-              class="h-full"
-              @click="onToggleDatabase(item.row.name)"
-            >
-              <ChevronDown v-if="item.row.open" class="size-3.5" />
-              <ChevronRight v-else class="size-3.5" />
-              <Database class="size-3.5" />
-              <span>{{ item.row.name }}</span>
-            </SidebarMenuButton>
+            <ContextMenu v-if="item.row.kind === 'db'">
+              <ContextMenuTrigger as-child>
+                <SidebarMenuButton
+                  :is-active="item.row.open"
+                  class="h-full"
+                  @click="onToggleDatabase(item.row.name)"
+                >
+                  <ChevronDown v-if="item.row.open" class="size-3.5" />
+                  <ChevronRight v-else class="size-3.5" />
+                  <Database class="size-3.5" />
+                  <span>{{ item.row.name }}</span>
+                </SidebarMenuButton>
+              </ContextMenuTrigger>
+              <ContextMenuContent>
+                <ContextMenuItem @select="openExportData(selected?.id, item.row.name)">
+                  Export…
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
             <div
               v-else-if="item.row.kind === 'schema'"
               class="text-muted-foreground flex h-full items-center px-6 text-[11px] font-medium"

@@ -8,11 +8,15 @@ export {
 } from "../../bindings/lotustab/internal/app";
 export type {
   AboutInfo,
+  BatchExportRequest,
   ConnectionsState,
+  CountTablesRequest,
   ExportPathResult,
   ExportResult,
   ExportTableRequest,
+  OutputStatus,
   SaveProfileInput,
+  TableRowCount,
   UpdateCheckResult,
 } from "../../bindings/lotustab/internal/app/models";
 export type { Profile } from "../../bindings/lotustab/internal/core/connection/models";

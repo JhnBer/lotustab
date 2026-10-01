@@ -28,6 +28,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import ConnectionDialog from "@/features/connections/ConnectionDialog.vue";
 import { useConnectionDialog } from "@/composables/useConnectionDialog";
+import { useExportData } from "@/composables/useExportData";
 import { useConnectionTint } from "@/composables/useConnectionTint";
 import { useProfileActions } from "@/composables/useProfileActions";
 import { connBg } from "@/lib/colors";
@@ -43,6 +44,7 @@ const transfers = useTransfersStore();
 const { setOpen } = useSidebar();
 const { pinnedProfiles } = storeToRefs(connections);
 const { dialogOpen, editing, openEdit } = useConnectionDialog();
+const { openExportData } = useExportData();
 const { activateProfile, connect, disconnect, unpin, openInNewWindow } = useProfileActions();
 const { tintClass: connectionsTint } = useConnectionTint();
 const menuOpenId = ref("");
@@ -219,6 +221,9 @@ onBeforeUnmount(() => {
                     </ContextMenuItem>
                     <ContextMenuItem @click="openEdit(profile)">
                       Edit
+                    </ContextMenuItem>
+                    <ContextMenuItem @click="openExportData(profile.id)">
+                      Export…
                     </ContextMenuItem>
                     <ContextMenuSeparator />
                     <template v-if="connections.isConnected(profile.id)">

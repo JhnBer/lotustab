@@ -22,7 +22,9 @@ import {
 import { Toaster } from "@/components/ui/sonner";
 import { useBlockHistoryBackspace } from "@/composables/useBlockHistoryBackspace";
 import { useConnectionTint } from "@/composables/useConnectionTint";
+import { useExportData } from "@/composables/useExportData";
 import { useWorkspaceShortcuts } from "@/composables/useWorkspaceShortcuts";
+import ExportDataDialog from "@/features/export/ExportDataDialog.vue";
 import { errorMessage } from "@/lib/errors";
 import { WindowsService } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
@@ -37,6 +39,8 @@ const connections = useConnectionsStore();
 const queries = useQueryStore();
 const updates = useUpdatesStore();
 const { tintClass: headerTint } = useConnectionTint();
+const { open: exportDataOpen, presetProfileId, presetDatabase, openExportData } =
+  useExportData();
 useWorkspaceShortcuts();
 useBlockHistoryBackspace();
 
@@ -64,8 +68,10 @@ onMounted(async () => {
   } catch (err) {
     toast.error(errorMessage(err));
     updates.bindMainWindow();
-    return;
   }
+  Events.On("open:export-data", () => {
+    openExportData();
+  });
   try {
     const name = await Window.Name();
     if (name.startsWith("conn-")) {
@@ -138,5 +144,10 @@ onMounted(async () => {
       </AppResizableLayout>
       <Toaster rich-colors position="bottom-right" />
     </SidebarProvider>
+    <ExportDataDialog
+      v-model:open="exportDataOpen"
+      :profile-id="presetProfileId"
+      :database="presetDatabase"
+    />
   </div>
 </template>

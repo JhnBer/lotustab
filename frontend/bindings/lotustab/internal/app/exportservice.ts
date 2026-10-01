@@ -15,6 +15,13 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as $models from "./models.js";
 
 /**
+ * CheckOutput reports whether a file or folder already exists / has contents.
+ */
+export function CheckOutput(path: string, folder: boolean): $CancellablePromise<$models.OutputStatus | null> {
+    return $Call.ByID(3653177721, path, folder);
+}
+
+/**
  * ChoosePath opens a native folder dialog for an export.
  */
 export function ChoosePath(table: string, format: string, gzipOn: boolean, chunked: boolean): $CancellablePromise<$models.ExportPathResult | null> {
@@ -29,8 +36,22 @@ export function CountRows(profileID: string, database: string, schema: string, t
 }
 
 /**
+ * CountTables returns SELECT COUNT(*) for each table.
+ */
+export function CountTables(req: $models.CountTablesRequest): $CancellablePromise<$models.TableRowCount[] | null> {
+    return $Call.ByID(1762760098, req);
+}
+
+/**
  * ExportTable dumps one table to one or more files chosen via a native dialog.
  */
 export function ExportTable(req: $models.ExportTableRequest): $CancellablePromise<$models.ExportResult | null> {
     return $Call.ByID(241499166, req);
+}
+
+/**
+ * ExportTables dumps the selected tables sequentially into one file or a folder.
+ */
+export function ExportTables(req: $models.BatchExportRequest): $CancellablePromise<$models.ExportResult | null> {
+    return $Call.ByID(368664471, req);
 }

@@ -38,6 +38,11 @@ type ExportTableRequest struct {
 	OutputPath      string `json:"outputPath"`
 	OutputDir       string `json:"outputDir"`
 	FileName        string `json:"fileName"`
+	FolderMode      bool   `json:"folderMode"`
+	FolderName      string `json:"folderName"`
+	Prefix          string `json:"prefix"`
+	PrefixEnabled   bool   `json:"prefixEnabled"`
+	Force           bool   `json:"force"`
 	DeleteOnAbort   bool   `json:"deleteOnAbort"`
 }
 
@@ -110,6 +115,22 @@ func (s *ExportService) ExportTable(ctx context.Context, req ExportTableRequest)
 
 	if ctx.Err() != nil {
 		return &ExportResult{Canceled: true}, nil
+	}
+
+	if req.FolderMode {
+		dest, destErr := resolveFolderDest(req.OutputDir, req.FolderName, req.Force)
+		if destErr != nil {
+			return nil, destErr
+		}
+		prefix := ""
+		if req.PrefixEnabled {
+			prefix = req.Prefix
+		}
+		base := export.FileBaseForTable(prefix, req.Table)
+		req.OutputDir = dest
+		req.OutputPath = filepath.Join(dest, base+fileExt(req.Format, req.Gzip))
+		req.FileName = filepath.Base(req.OutputPath)
+		req.ChunkSize = 0
 	}
 
 	profile, err := s.connections.store.Get(req.ProfileID)

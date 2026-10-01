@@ -50,3 +50,19 @@ export function withExportExt(name: string, format: string, gzipOn: boolean): st
   const stem = name.replace(/\.(sql|csv)(\.gz)?$/i, "").trim() || "table";
   return `${stem}${exportFileExt(format, gzipOn)}`;
 }
+
+export function suggestedExportFolderName(name: string): string {
+  const base =
+    name
+      .trim()
+      .replace(/[^A-Za-z0-9._-]+/g, "_")
+      .replace(/^[._]+|[._]+$/g, "") || "export";
+  const d = new Date();
+  const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+  return `${base}_${stamp}`;
+}
+
+export function isDirNotEmptyError(err: unknown): boolean {
+  const message = err == null ? "" : err instanceof Error ? err.message : String(err);
+  return message.includes("dir_not_empty");
+}
