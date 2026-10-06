@@ -49,11 +49,19 @@ func TestSearchTablesValidatesInput(t *testing.T) {
 
 func TestExecuteValidatesInput(t *testing.T) {
 	s := &QueryService{}
-	_, err := s.Execute(context.Background(), "", "SELECT 1", "", 10, 0, 0)
+	_, err := s.Execute(context.Background(), "", "SELECT 1", "", 10, 0, 0, "")
 	if err == nil || !strings.Contains(err.Error(), "profile") {
 		t.Fatalf("expected profile error, got %v", err)
 	}
-	_, err = s.Execute(context.Background(), "abc", "  ", "db", 10, 0, 0)
+	_, err = s.Execute(context.Background(), "abc", "  ", "db", 10, 0, 0, "")
+	if err == nil || !strings.Contains(err.Error(), "empty") {
+		t.Fatalf("expected empty query error, got %v", err)
+	}
+}
+
+func TestExecuteEmptyComments(t *testing.T) {
+	s := &QueryService{}
+	_, err := s.Execute(context.Background(), "abc", "-- just a comment\n/* x */", "", 10, 0, 0, "")
 	if err == nil || !strings.Contains(err.Error(), "empty") {
 		t.Fatalf("expected empty query error, got %v", err)
 	}

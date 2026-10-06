@@ -32,6 +32,74 @@ const explorer = useExplorerStore();
 const settings = useSettingsStore();
 const { connect } = useProfileActions();
 
+type SqlEditorExpose = { runSql: () => string };
+const editors = new Map<string, SqlEditorExpose>();
+
+function bindEditor(id: string, el: unknown) {
+  if (el && typeof el === "object" && "runSql" in el && typeof (el as SqlEditorExpose).runSql === "function") {
+    editors.set(id, el as SqlEditorExpose);
+  } else {
+    editors.delete(id);
+  }
+}
+
+function queryPager(tab: QueryTab) {
+  const result = tab.result;
+  const results = tab.results ?? [];
+  const multi = results.length > 1;
+  const statements = results.map((stmt) => ({ index: stmt.index, sql: stmt.sql }));
+  if (!result) {
+    return {
+      compact: multi,
+      label: undefined as string | undefined,
+      durationMs: undefined as number | undefined,
+      rowCount: 0,
+      truncated: undefined as boolean | undefined,
+      statements,
+    };
+  }
+  if (!result.columns?.length) {
+    if (result.affectedKnown) {
+      return {
+        compact: true,
+        label: `${result.rowsAffected} affected · ${result.durationMs} ms`,
+        durationMs: undefined as number | undefined,
+        rowCount: 0,
+        truncated: result.truncated,
+        statements,
+      };
+    }
+    return {
+      compact: true,
+      label: `${result.durationMs} ms`,
+      durationMs: undefined as number | undefined,
+      rowCount: 0,
+      truncated: result.truncated,
+      statements,
+    };
+  }
+  if (!multi) {
+    return {
+      compact: false,
+      label: undefined as string | undefined,
+      durationMs: result.durationMs,
+      rowCount: result.rows?.length ?? 0,
+      truncated: result.truncated,
+      statements,
+    };
+  }
+  const n = result.rows?.length ?? 0;
+  const trunc = result.truncated ? " (truncated)" : "";
+  return {
+    compact: true,
+    label: `${n} row${n === 1 ? "" : "s"}${trunc} · ${result.durationMs} ms`,
+    durationMs: undefined as number | undefined,
+    rowCount: n,
+    truncated: result.truncated,
+    statements,
+  };
+}
+
 const connecting = computed(() => {
   const id = connections.selectedId;
   return Boolean(id && connections.isConnecting(id));
@@ -62,7 +130,7 @@ watch(
   { immediate: true },
 );
 
-async function run() {
+async function run(sql?: string) {
   const tab = queries.activeTab;
   if (!tab || tab.kind !== "query") {
     return;
@@ -74,7 +142,7 @@ async function run() {
         return;
       }
     }
-    await queries.run(tab.id);
+    await queries.run(tab.id, typeof sql === "string" ? sql : (editors.get(tab.id)?.runSql() ?? tab.sql));
   } catch (err) {
     if (isCanceled(err)) {
       return;
@@ -193,7 +261,7 @@ function onDatabase(tabId: string, value: string) {
             >
               Cancel
             </Button>
-            <Button size="sm" class="shrink-0" :disabled="tab.running" @click="run">
+            <Button size="sm" class="shrink-0" :disabled="tab.running" @click="run()">
               <Spinner v-if="tab.running" class="size-3.5" />
               <Play v-else class="size-3.5" />
               Run
@@ -201,6 +269,7 @@ function onDatabase(tabId: string, value: string) {
           </div>
           <SqlEditor
             class="min-h-0 flex-1"
+            :ref="(el) => bindEditor(tab.id, el)"
             :model-value="tab.sql"
             @update:model-value="queries.setSql(tab.id, $event)"
             @run="run"
@@ -216,17 +285,22 @@ function onDatabase(tabId: string, value: string) {
             :error="tab.error"
             :running="tab.running"
             :show-status="false"
-            :row-offset="(tab.page - 1) * tab.pageSize"
+            :row-offset="(tab.results?.length ?? 0) > 1 ? 0 : (tab.page - 1) * tab.pageSize"
           />
           <TablePager
             :page="tab.page"
             :page-size="tab.pageSize"
-            :row-count="tab.result?.rows?.length ?? 0"
+            :row-count="queryPager(tab).rowCount"
             :running="tab.running"
-            :truncated="tab.result?.truncated"
-            :duration-ms="tab.result?.durationMs"
+            :truncated="queryPager(tab).truncated"
+            :duration-ms="queryPager(tab).durationMs"
+            :compact="queryPager(tab).compact"
+            :label="queryPager(tab).label"
+            :statements="queryPager(tab).statements"
+            :selected-statement="tab.selectedResult"
             @page="queries.setPage(tab.id, $event)"
             @page-size="queries.setPageSize(tab.id, $event)"
+            @statement="queries.setSelectedResult(tab.id, $event)"
           />
         </div>
       </ResizablePanel>

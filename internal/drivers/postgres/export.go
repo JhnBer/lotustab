@@ -185,4 +185,5 @@ func postgresDumpColumnDef(col driver.ColumnInfo) (string, error) {
 }
 
 var _ pgxQuerier = (*pgxpool.Pool)(nil)
+var _ pgxQuerier = (*pgxpool.Conn)(nil)
 var _ pgxQuerier = (pgx.Tx)(nil)

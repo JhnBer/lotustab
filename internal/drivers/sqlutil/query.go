@@ -39,19 +39,17 @@ func Query(ctx context.Context, db ExecQuerier, query string, maxRows int) (*dri
 		return nil, fmt.Errorf("empty query")
 	}
 
+	if !driver.VerbReturnsRows(driver.StatementVerb(q)) {
+		return execResult(ctx, db, q, start)
+	}
+
 	rows, err := db.QueryContext(ctx, q)
 	if err != nil {
-		res, execErr := db.ExecContext(ctx, q)
+		result, execErr := execResult(ctx, db, q, start)
 		if execErr != nil {
 			return nil, err
 		}
-		affected, _ := res.RowsAffected()
-		return &driver.QueryResult{
-			Columns:      []driver.Column{},
-			Rows:         [][]any{},
-			RowsAffected: affected,
-			DurationMs:   time.Since(start).Milliseconds(),
-		}, nil
+		return result, nil
 	}
 	defer rows.Close()
 
@@ -61,6 +59,21 @@ func Query(ctx context.Context, db ExecQuerier, query string, maxRows int) (*dri
 	}
 	result.DurationMs = time.Since(start).Milliseconds()
 	return result, nil
+}
+
+func execResult(ctx context.Context, db ExecQuerier, q string, start time.Time) (*driver.QueryResult, error) {
+	res, err := db.ExecContext(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	affected, _ := res.RowsAffected()
+	return &driver.QueryResult{
+		Columns:       []driver.Column{},
+		Rows:          [][]any{},
+		RowsAffected:  affected,
+		AffectedKnown: driver.VerbAffectsRows(driver.StatementVerb(q)),
+		DurationMs:    time.Since(start).Milliseconds(),
+	}, nil
 }
 
 func scanRows(rows *sql.Rows, maxRows int) (*driver.QueryResult, error) {

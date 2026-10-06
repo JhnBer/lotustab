@@ -176,6 +176,35 @@ func (c *conn) Query(ctx context.Context, sqlText, database string, limit, offse
 	return driver.FinishQueryPage(result, page), nil
 }
 
+func (c *conn) WithSession(ctx context.Context, database string, fn func(driver.ScriptSession) error) error {
+	if fn == nil {
+		return fmt.Errorf("session callback is required")
+	}
+	database = strings.TrimSpace(database)
+	return c.withSession(ctx, func(session *sql.Conn) error {
+		if database != "" && database != c.database {
+			if _, err := session.ExecContext(ctx, mysqlUse(database)); err != nil {
+				return err
+			}
+			defer func() {
+				if c.database != "" {
+					_, _ = session.ExecContext(ctx, mysqlUse(c.database))
+				}
+			}()
+		}
+		return fn(sqlutil.ScriptConn{DB: session, Tx: mysqlInTransaction})
+	})
+}
+
+func mysqlInTransaction(ctx context.Context, session *sql.Conn) (bool, error) {
+	var n int
+	if err := session.QueryRowContext(ctx, "SELECT @@in_transaction").Scan(&n); err == nil {
+		return n != 0, nil
+	}
+	// MySQL: ROLLBACK is a no-op outside a transaction.
+	return true, nil
+}
+
 func mysqlUse(database string) string {
 	return "USE " + sqlutil.QuoteMySQL(database)
 }

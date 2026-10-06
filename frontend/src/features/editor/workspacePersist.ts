@@ -71,11 +71,16 @@ export function restoreQueryTab(tab: PersistedQueryTab, defaultPageSize: number)
     profileId: tab.profileId,
     database: tab.database ?? "",
     sql: tab.sql,
+    executedSql: "",
     page: tab.page >= 1 ? tab.page : 1,
     pageSize: tab.pageSize || defaultPageSize,
     running: false,
     error: "",
     result: null,
+    results: [],
+    selectedResult: 0,
+    followResults: true,
+    runId: "",
   };
 }
 

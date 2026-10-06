@@ -46,9 +46,10 @@ export function DescribeTable(profileID: string, ref: driver$0.TableRef): $Cance
  * Execute runs SQL for the given profile. The profile is connected if needed.
  * database is optional; empty uses the connection default catalog.
  * timeoutSeconds is 0 to wait until the caller cancels.
+ * runID correlates query:progress events when more than one statement runs.
  */
-export function Execute(profileID: string, sqlText: string, database: string, limit: number, offset: number, timeoutSeconds: number): $CancellablePromise<driver$0.QueryResult | null> {
-    return $Call.ByID(2569199963, profileID, sqlText, database, limit, offset, timeoutSeconds);
+export function Execute(profileID: string, sqlText: string, database: string, limit: number, offset: number, timeoutSeconds: number, runID: string): $CancellablePromise<driver$0.QueryBatch | null> {
+    return $Call.ByID(2569199963, profileID, sqlText, database, limit, offset, timeoutSeconds, runID);
 }
 
 /**

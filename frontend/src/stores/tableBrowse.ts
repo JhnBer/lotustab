@@ -103,6 +103,9 @@ export function createTableBrowse(ctx: QueryStoreCtx, exec: QueryExecApi) {
       return;
     }
     if (tab.kind === "query") {
+      if ((tab.results?.length ?? 0) > 1) {
+        return;
+      }
       tab.page = Math.max(1, page);
       void exec.execute(id);
     }
@@ -118,6 +121,9 @@ export function createTableBrowse(ctx: QueryStoreCtx, exec: QueryExecApi) {
     useSettingsStore().setDefaultPageSize(pageSize);
     if (tab.kind === "table") {
       void loadTable(id);
+      return;
+    }
+    if ((tab.results?.length ?? 0) > 1) {
       return;
     }
     void exec.execute(id);

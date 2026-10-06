@@ -53,11 +53,25 @@ type Column struct {
 
 // QueryResult is a JSON-friendly tabular query result.
 type QueryResult struct {
-	Columns      []Column `json:"columns"`
-	Rows         [][]any  `json:"rows"`
-	RowsAffected int64    `json:"rowsAffected"`
-	DurationMs   int64    `json:"durationMs"`
-	Truncated    bool     `json:"truncated"`
+	Columns       []Column `json:"columns"`
+	Rows          [][]any  `json:"rows"`
+	RowsAffected  int64    `json:"rowsAffected"`
+	AffectedKnown bool     `json:"affectedKnown"`
+	DurationMs    int64    `json:"durationMs"`
+	Truncated     bool     `json:"truncated"`
+}
+
+// StatementResult is one statement from Execute: a result set, a command, or an error.
+type StatementResult struct {
+	Index  int          `json:"index"`
+	SQL    string       `json:"sql"`
+	Result *QueryResult `json:"result,omitempty"`
+	Error  string       `json:"error,omitempty"`
+}
+
+// QueryBatch is every statement Execute ran, in order.
+type QueryBatch struct {
+	Results []StatementResult `json:"results"`
 }
 
 const (

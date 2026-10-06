@@ -106,12 +106,20 @@ export interface Option {
 }
 
 /**
+ * QueryBatch is every statement Execute ran, in order.
+ */
+export interface QueryBatch {
+    "results": StatementResult[] | null;
+}
+
+/**
  * QueryResult is a JSON-friendly tabular query result.
  */
 export interface QueryResult {
     "columns": Column[] | null;
     "rows": (any[] | null)[] | null;
     "rowsAffected": number;
+    "affectedKnown": boolean;
     "durationMs": number;
     "truncated": boolean;
 }
@@ -125,6 +133,16 @@ export interface RowEdit {
     "cells": { [_ in string]?: any } | null;
     "deleted"?: boolean;
     "inserted"?: boolean;
+}
+
+/**
+ * StatementResult is one statement from Execute: a result set, a command, or an error.
+ */
+export interface StatementResult {
+    "index": number;
+    "sql": string;
+    "result"?: QueryResult | null;
+    "error"?: string;
 }
 
 /**

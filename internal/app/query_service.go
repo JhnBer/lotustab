@@ -2,9 +2,12 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/wailsapp/wails/v3/pkg/application"
 
 	"lotustab/internal/core/connection"
 	"lotustab/internal/core/driver"
@@ -12,9 +15,21 @@ import (
 	"lotustab/internal/storage"
 )
 
+const queryProgressEvent = "query:progress"
+
 // QueryService executes SQL against an open (or lazily opened) connection.
 type QueryService struct {
 	connections *ConnectionsService
+}
+
+// QueryProgress is emitted on query:progress after each statement of a script.
+type QueryProgress struct {
+	RunID  string              `json:"runId"`
+	Index  int                 `json:"index"`
+	Total  int                 `json:"total"`
+	SQL    string              `json:"sql"`
+	Result *driver.QueryResult `json:"result,omitempty"`
+	Error  string              `json:"error,omitempty"`
 }
 
 // NewQueryService constructs the Wails query service.
@@ -37,15 +52,21 @@ func NewQueryServiceFromConnections(connections *ConnectionsService) *QueryServi
 // Execute runs SQL for the given profile. The profile is connected if needed.
 // database is optional; empty uses the connection default catalog.
 // timeoutSeconds is 0 to wait until the caller cancels.
-func (s *QueryService) Execute(ctx context.Context, profileID, sqlText, database string, limit, offset, timeoutSeconds int) (*driver.QueryResult, error) {
+// runID correlates query:progress events when more than one statement runs.
+func (s *QueryService) Execute(ctx context.Context, profileID, sqlText, database string, limit, offset, timeoutSeconds int, runID string) (*driver.QueryBatch, error) {
 	if strings.TrimSpace(profileID) == "" {
 		return nil, fmt.Errorf("profile is required")
 	}
 	if strings.TrimSpace(sqlText) == "" {
 		return nil, fmt.Errorf("query is empty")
 	}
+	statements := driver.SplitStatements(sqlText)
+	if len(statements) == 0 {
+		return nil, fmt.Errorf("query is empty")
+	}
 	limit, offset = driver.ClampLimitOffset(limit, offset)
 	database = strings.TrimSpace(database)
+	runID = strings.TrimSpace(runID)
 
 	queryCtx := ctx
 	if timeoutSeconds > 0 {
@@ -54,13 +75,83 @@ func (s *QueryService) Execute(ctx context.Context, profileID, sqlText, database
 		defer cancel()
 	}
 
-	result, err := withLiveConn(s, queryCtx, profileID, func(ctx context.Context, conn driver.Conn) (*driver.QueryResult, error) {
-		return conn.Query(ctx, sqlText, database, limit, offset)
+	batch, err := withLiveConn(s, queryCtx, profileID, func(liveCtx context.Context, conn driver.Conn) (*driver.QueryBatch, error) {
+		if len(statements) == 1 {
+			result, err := conn.Query(liveCtx, sqlText, database, limit, offset)
+			if err != nil {
+				return nil, err
+			}
+			return &driver.QueryBatch{Results: []driver.StatementResult{{
+				Index:  0,
+				SQL:    statements[0],
+				Result: result,
+			}}}, nil
+		}
+		return runScriptBatch(liveCtx, ctx, conn, statements, database, timeoutSeconds, runID)
 	})
-	if err != nil && queryCtx.Err() == context.DeadlineExceeded && ctx.Err() == nil {
-		return nil, fmt.Errorf("query timed out after %d seconds", timeoutSeconds)
+	if err != nil {
+		if batch != nil && len(batch.Results) > 0 {
+			return batch, nil
+		}
+		if queryCtx.Err() == context.DeadlineExceeded && ctx.Err() == nil {
+			return nil, fmt.Errorf("query timed out after %d seconds", timeoutSeconds)
+		}
+		return nil, err
 	}
-	return result, err
+	return batch, nil
+}
+
+func runScriptBatch(queryCtx, parent context.Context, conn driver.Conn, statements []string, database string, timeoutSeconds int, runID string) (*driver.QueryBatch, error) {
+	batch := &driver.QueryBatch{Results: make([]driver.StatementResult, 0, len(statements))}
+	err := conn.WithSession(queryCtx, database, func(sess driver.ScriptSession) error {
+		return driver.RunScript(queryCtx, sess, statements, driver.MaxBrowseLimit, func(i int, result *driver.QueryResult, qerr error) error {
+			if qerr != nil && isStaleConn(qerr) && len(batch.Results) == 0 {
+				return nil
+			}
+			item := driver.StatementResult{
+				Index:  i,
+				SQL:    statements[i],
+				Result: result,
+				Error:  statementErrText(qerr, queryCtx, parent, timeoutSeconds),
+			}
+			batch.Results = append(batch.Results, item)
+			emitQueryProgress(QueryProgress{
+				RunID:  runID,
+				Index:  item.Index,
+				Total:  len(statements),
+				SQL:    item.SQL,
+				Result: item.Result,
+				Error:  item.Error,
+			})
+			return nil
+		})
+	})
+	return batch, err
+}
+
+func statementErrText(err error, queryCtx, parent context.Context, timeoutSeconds int) string {
+	if err == nil {
+		return ""
+	}
+	if queryCtx.Err() == context.DeadlineExceeded && parent.Err() == nil {
+		if timeoutSeconds > 0 {
+			return fmt.Sprintf("query timed out after %d seconds", timeoutSeconds)
+		}
+		return "query timed out"
+	}
+	if errors.Is(err, context.Canceled) || parent.Err() == context.Canceled {
+		return "query was cancelled"
+	}
+	return err.Error()
+}
+
+func emitQueryProgress(p QueryProgress) {
+	if p.RunID == "" {
+		return
+	}
+	if appl := application.Get(); appl != nil {
+		appl.Event.Emit(queryProgressEvent, p)
+	}
 }
 
 // ListTables returns tables and views in the given database.

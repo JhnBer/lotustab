@@ -13,7 +13,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   "update:modelValue": [value: string];
-  run: [];
+  run: [sql: string];
 }>();
 
 const host = ref<HTMLDivElement | null>(null);
@@ -23,6 +23,17 @@ let view: EditorView | undefined;
 
 function themeExtensions() {
   return mode.value === "light" ? [] : [oneDark];
+}
+
+function runSql(): string {
+  if (!view) {
+    return props.modelValue;
+  }
+  const sel = view.state.selection.main;
+  if (sel.empty) {
+    return view.state.doc.toString();
+  }
+  return view.state.sliceDoc(sel.from, sel.to);
 }
 
 function createEditor() {
@@ -47,7 +58,7 @@ function createEditor() {
           {
             key: "Mod-Enter",
             run: () => {
-              emit("run");
+              emit("run", runSql());
               return true;
             },
           },
@@ -94,6 +105,8 @@ onBeforeUnmount(() => {
   view?.destroy();
   view = undefined;
 });
+
+defineExpose({ runSql });
 </script>
 
 <template>

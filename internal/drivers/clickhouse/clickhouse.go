@@ -138,6 +138,35 @@ func (c *conn) Query(ctx context.Context, sqlText, database string, limit, offse
 	return driver.FinishQueryPage(result, page), nil
 }
 
+func (c *conn) WithSession(ctx context.Context, database string, fn func(driver.ScriptSession) error) error {
+	if fn == nil {
+		return fmt.Errorf("session callback is required")
+	}
+	database = strings.TrimSpace(database)
+	return c.withSession(ctx, func(session *sql.Conn) error {
+		if database != "" && database != c.database {
+			if _, err := session.ExecContext(ctx, clickhouseUse(database)); err != nil {
+				return err
+			}
+			defer func() {
+				if c.database != "" {
+					_, _ = session.ExecContext(ctx, clickhouseUse(c.database))
+				}
+			}()
+		}
+		return fn(sqlutil.ScriptConn{DB: session, Tx: clickhouseInTransaction})
+	})
+}
+
+func clickhouseInTransaction(ctx context.Context, session *sql.Conn) (bool, error) {
+	var n int
+	err := session.QueryRowContext(ctx, "SELECT toUInt8(transactionID().2 != 0)").Scan(&n)
+	if err != nil {
+		return false, nil
+	}
+	return n != 0, nil
+}
+
 func clickhouseUse(database string) string {
 	return "USE " + sqlutil.QuoteClickHouse(database)
 }

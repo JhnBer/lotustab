@@ -753,10 +753,13 @@ async function pasteCell() {
           {{ rows.length }} row{{ rows.length === 1 ? "" : "s" }}
           <span v-if="result.truncated"> (truncated)</span>
         </span>
-        <span>{{ result.durationMs }} ms · {{ result.rowsAffected }} affected</span>
+        <span>{{ result.durationMs }} ms<template v-if="result.affectedKnown"> · {{ result.rowsAffected }} affected</template></span>
       </div>
       <div v-if="columns.length === 0" class="text-muted-foreground p-4 text-sm">
-        Statement completed. {{ result.rowsAffected }} row{{ result.rowsAffected === 1 ? "" : "s" }} affected.
+        <template v-if="result.affectedKnown">
+          Statement completed. {{ result.rowsAffected }} row{{ result.rowsAffected === 1 ? "" : "s" }} affected.
+        </template>
+        <template v-else>Statement completed.</template>
       </div>
       <div v-else class="relative min-h-0 flex-1">
         <ContextMenu>

@@ -48,6 +48,7 @@ type stubConn struct {
 	query        error
 	closed       bool
 	queries      int
+	failAfter    int
 	blockQuery   bool
 	queryStarted chan struct{}
 }
@@ -66,12 +67,37 @@ func (c *stubConn) Query(ctx context.Context, _ string, _ string, _ int, _ int) 
 		<-ctx.Done()
 		return nil, ctx.Err()
 	}
+	if c.failAfter > 0 {
+		if c.queries > c.failAfter {
+			if c.query != nil {
+				return nil, c.query
+			}
+			return nil, fmt.Errorf("stmt failed")
+		}
+		return &driver.QueryResult{}, nil
+	}
 	if c.query != nil {
 		return nil, c.query
 	}
 	return &driver.QueryResult{}, nil
 }
-func (c *stubConn) Databases(context.Context) ([]string, error) { return nil, nil }
+func (c *stubConn) WithSession(ctx context.Context, _ string, fn func(driver.ScriptSession) error) error {
+	if fn == nil {
+		return fmt.Errorf("session callback is required")
+	}
+	return fn(&stubSession{conn: c})
+}
+
+type stubSession struct {
+	conn *stubConn
+}
+
+func (s *stubSession) Query(ctx context.Context, sql string, _ int) (*driver.QueryResult, error) {
+	return s.conn.Query(ctx, sql, "", 0, 0)
+}
+func (s *stubSession) InTransaction(context.Context) (bool, error) { return false, nil }
+func (s *stubSession) Rollback(context.Context) error              { return nil }
+func (c *stubConn) Databases(context.Context) ([]string, error)    { return nil, nil }
 func (c *stubConn) ListTables(context.Context, string) ([]driver.TableInfo, error) {
 	return []driver.TableInfo{}, nil
 }
@@ -161,7 +187,7 @@ func TestExecuteDoesNotRetryAfterCancel(t *testing.T) {
 	cancel()
 
 	qs := NewQueryServiceFromConnections(s)
-	_, err := qs.Execute(ctx, "p1", "SELECT 1", "", 10, 0, 0)
+	_, err := qs.Execute(ctx, "p1", "SELECT 1", "", 10, 0, 0, "")
 	if err == nil {
 		t.Fatal("expected canceled query to fail")
 	}
@@ -177,7 +203,7 @@ func TestExecuteRetriesStaleQuery(t *testing.T) {
 	s.manager.Put("p1", stale)
 
 	qs := NewQueryServiceFromConnections(s)
-	_, err := qs.Execute(context.Background(), "p1", "SELECT 1", "", 10, 0, 0)
+	_, err := qs.Execute(context.Background(), "p1", "SELECT 1", "", 10, 0, 0, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +249,7 @@ func TestDisconnectCancelsQuery(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() {
-		_, err := qs.Execute(context.Background(), "p1", "SELECT 1", "", 10, 0, 0)
+		_, err := qs.Execute(context.Background(), "p1", "SELECT 1", "", 10, 0, 0, "")
 		done <- err
 	}()
 	select {
@@ -244,12 +270,51 @@ func TestDisconnectCancelsQuery(t *testing.T) {
 	}
 }
 
+func TestExecuteScriptRunsEachStatement(t *testing.T) {
+	d := &stubDriver{}
+	s := stubService(t, d)
+	live := &stubConn{id: 1}
+	s.manager.Put("p1", live)
+	qs := NewQueryServiceFromConnections(s)
+	got, err := qs.Execute(context.Background(), "p1", "SELECT 1; SELECT 2;", "", 10, 0, 0, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if live.queries != 2 {
+		t.Fatalf("queries=%d want 2", live.queries)
+	}
+	if got == nil || len(got.Results) != 2 {
+		t.Fatalf("results=%v", got)
+	}
+}
+
+func TestExecuteScriptKeepsPriorResultsOnError(t *testing.T) {
+	d := &stubDriver{}
+	s := stubService(t, d)
+	live := &stubConn{id: 1, failAfter: 1, query: fmt.Errorf("syntax")}
+	s.manager.Put("p1", live)
+	qs := NewQueryServiceFromConnections(s)
+	got, err := qs.Execute(context.Background(), "p1", "SELECT 1; SELECT 2; SELECT 3;", "", 10, 0, 0, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if live.queries != 2 {
+		t.Fatalf("queries=%d want 2", live.queries)
+	}
+	if got == nil || len(got.Results) != 2 {
+		t.Fatalf("results=%v", got)
+	}
+	if got.Results[0].Error != "" || got.Results[1].Error == "" {
+		t.Fatalf("errors: %+v", got.Results)
+	}
+}
+
 func TestExecuteTimeout(t *testing.T) {
 	d := &stubDriver{}
 	s := stubService(t, d)
 	s.manager.Put("p1", &stubConn{blockQuery: true})
 	qs := NewQueryServiceFromConnections(s)
-	_, err := qs.Execute(context.Background(), "p1", "SELECT 1", "", 10, 0, 1)
+	_, err := qs.Execute(context.Background(), "p1", "SELECT 1", "", 10, 0, 1, "")
 	if err == nil || !strings.Contains(err.Error(), "timed out") {
 		t.Fatalf("expected timeout error, got %v", err)
 	}

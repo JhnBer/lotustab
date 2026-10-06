@@ -8,6 +8,7 @@ export function asQueryResult(result: TableBrowseResult | null): QueryResult | n
     columns: result.columns,
     rows: result.rows,
     rowsAffected: result.rowsAffected,
+    affectedKnown: false,
     durationMs: result.durationMs,
     truncated: result.truncated,
   };

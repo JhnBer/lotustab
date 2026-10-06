@@ -23,6 +23,8 @@ const props = defineProps<{
   switchLabel?: string;
   compact?: boolean;
   label?: string;
+  statements?: { index: number; sql: string }[];
+  selectedStatement?: number;
 }>();
 
 const emit = defineEmits<{
@@ -31,6 +33,7 @@ const emit = defineEmits<{
   apply: [];
   cancel: [];
   switch: [];
+  statement: [index: number];
 }>();
 
 const pageCount = computed(() => {
@@ -82,6 +85,16 @@ function onPageSize(value: unknown) {
   }
   emit("pageSize", size);
 }
+
+function onStatement(value: unknown) {
+  const index = Number(value);
+  if (!Number.isFinite(index)) {
+    return;
+  }
+  emit("statement", index);
+}
+
+const multiStatement = computed(() => (props.statements?.length ?? 0) > 1);
 </script>
 
 <template>
@@ -97,10 +110,30 @@ function onPageSize(value: unknown) {
     >
       {{ switchLabel }}
     </Button>
-    <span class="text-muted-foreground mr-auto min-w-0 truncate text-xs">
-      {{ label ?? rangeLabel }}
-      <template v-if="durationMs != null && !label"> · {{ durationMs }} ms</template>
-    </span>
+    <div class="text-muted-foreground mr-auto flex min-w-0 items-center gap-2 text-xs">
+      <Select
+        v-if="multiStatement"
+        :model-value="String(selectedStatement ?? 0)"
+        @update:model-value="onStatement"
+      >
+        <SelectTrigger size="xs" class="w-auto min-w-12 shrink-0">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem
+            v-for="stmt in statements"
+            :key="stmt.index"
+            :value="String(stmt.index)"
+          >
+            <span :title="stmt.sql">{{ stmt.index + 1 }}</span>
+          </SelectItem>
+        </SelectContent>
+      </Select>
+      <span class="min-w-0 truncate">
+        {{ label ?? rangeLabel }}
+        <template v-if="durationMs != null && !label"> · {{ durationMs }} ms</template>
+      </span>
+    </div>
     <div v-if="dirty" class="flex items-center gap-1">
       <Button size="xs" :disabled="running" @click="emit('apply')">Apply</Button>
       <Button size="xs" variant="outline" :disabled="running" @click="emit('cancel')">Cancel</Button>

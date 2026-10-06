@@ -153,6 +153,41 @@ func (c *conn) Query(ctx context.Context, sql, database string, limit, offset in
 	return driver.FinishQueryPage(result, page), nil
 }
 
+func (c *conn) WithSession(ctx context.Context, database string, fn func(driver.ScriptSession) error) error {
+	if fn == nil {
+		return fmt.Errorf("session callback is required")
+	}
+	pool, cleanup, err := c.poolFor(ctx, database)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+	acquired, err := pool.Acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer acquired.Release()
+	return fn(&pgSession{conn: acquired})
+}
+
+type pgSession struct {
+	conn *pgxpool.Conn
+}
+
+func (s *pgSession) Query(ctx context.Context, sql string, maxRows int) (*driver.QueryResult, error) {
+	return queryPool(ctx, s.conn, maxRows, sql)
+}
+
+func (s *pgSession) InTransaction(context.Context) (bool, error) {
+	status := s.conn.Conn().PgConn().TxStatus()
+	return status == 'T' || status == 'E', nil
+}
+
+func (s *pgSession) Rollback(ctx context.Context) error {
+	_, err := s.conn.Exec(ctx, "ROLLBACK")
+	return err
+}
+
 func (c *conn) Databases(ctx context.Context) ([]string, error) {
 	rows, err := c.pool.Query(ctx, `SELECT datname FROM pg_database WHERE datallowconn ORDER BY 1`)
 	if err != nil {
@@ -404,9 +439,9 @@ func postgresQualified(schema, name string) string {
 	return sqlutil.QuotePostgres(schema) + "." + sqlutil.QuotePostgres(name)
 }
 
-func queryPool(ctx context.Context, pool *pgxpool.Pool, maxRows int, sqlText string, args ...any) (*driver.QueryResult, error) {
+func queryPool(ctx context.Context, q pgxQuerier, maxRows int, sqlText string, args ...any) (*driver.QueryResult, error) {
 	start := time.Now()
-	rows, err := pool.Query(ctx, sqlText, args...)
+	rows, err := q.Query(ctx, sqlText, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -447,13 +482,18 @@ func queryPool(ctx context.Context, pool *pgxpool.Pool, maxRows int, sqlText str
 	if affected == 0 && len(out) > 0 {
 		affected = int64(len(out))
 	}
+	verb := strings.ToUpper(strings.TrimSpace(tag.String()))
+	if fields := strings.Fields(verb); len(fields) > 0 {
+		verb = fields[0]
+	}
 
 	return &driver.QueryResult{
-		Columns:      columns,
-		Rows:         out,
-		RowsAffected: affected,
-		DurationMs:   time.Since(start).Milliseconds(),
-		Truncated:    truncated,
+		Columns:       columns,
+		Rows:          out,
+		RowsAffected:  affected,
+		AffectedKnown: driver.VerbAffectsRows(verb),
+		DurationMs:    time.Since(start).Milliseconds(),
+		Truncated:     truncated,
 	}, nil
 }
 

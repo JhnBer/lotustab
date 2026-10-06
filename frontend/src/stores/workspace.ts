@@ -48,11 +48,16 @@ function newQueryTab(profileId: string, title: string): QueryTab {
     profileId,
     database: defaultQueryDatabase(),
     sql: "SELECT 1;",
+    executedSql: "",
     page: 1,
     pageSize: storedPageSize(),
     running: false,
     error: "",
     result: null,
+    results: [],
+    selectedResult: 0,
+    followResults: true,
+    runId: "",
   };
 }
 
@@ -367,6 +372,11 @@ export const useWorkspaceStore = defineStore("query", () => {
           tabs.value.push({
             ...tab,
             running: false,
+            executedSql: tab.executedSql ?? "",
+            results: tab.results ?? [],
+            selectedResult: tab.selectedResult ?? 0,
+            followResults: true,
+            runId: "",
             page: tab.page >= 1 ? tab.page : 1,
             pageSize: tab.pageSize || storedPageSize(),
           });

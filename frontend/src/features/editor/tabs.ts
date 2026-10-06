@@ -1,4 +1,4 @@
-import type { QueryResult, TableStructure } from "@/lib/wails";
+import type { QueryResult, StatementResult, TableStructure } from "@/lib/wails";
 import type { CellDraft } from "@/features/results/edits";
 import type { TableFilter } from "@/features/results/filters";
 import type { DraftColumn, TableView } from "@/features/results/structure";
@@ -19,9 +19,14 @@ export interface QueryTab extends TabBase {
   kind: "query";
   database: string;
   sql: string;
+  executedSql: string;
   page: number;
   pageSize: number;
   result: QueryResult | null;
+  results: StatementResult[];
+  selectedResult: number;
+  followResults: boolean;
+  runId: string;
 }
 
 export interface TableTab extends TabBase {
