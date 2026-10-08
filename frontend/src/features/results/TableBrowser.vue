@@ -113,7 +113,7 @@ async function applyStructure() {
 <template>
   <div class="flex min-h-0 flex-1 flex-col bg-background">
     <!--  control header   -->
-    <div v-if="!structureView" class="flex items-center gap-2 border-b px-3 py-2 text-xs">
+    <div v-if="!structureView" class="relative z-20 flex items-center gap-2 border-b bg-background px-3 py-2 text-xs">
       <Button
         size="icon-xs"
         variant="outline"
@@ -193,7 +193,7 @@ async function applyStructure() {
       </div>
       <ResultsTable
         v-else
-        class="min-h-0 flex-1"
+        class="relative z-0 -mt-px min-h-0 flex-1"
         :result="tab.result"
         :error="tab.error"
         :running="loading"

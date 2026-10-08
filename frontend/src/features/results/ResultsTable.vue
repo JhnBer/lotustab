@@ -829,7 +829,7 @@ async function pasteCell() {
                 </div>
                 <div
                   ref="bodyRef"
-                  class="relative -z-10"
+                  class="relative"
                   :style="{ height: `${totalSize}px` }"
                 >
                   <div
