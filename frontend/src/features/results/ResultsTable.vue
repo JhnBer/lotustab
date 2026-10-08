@@ -418,9 +418,6 @@ function stopDrag() {
   if (!dragging.value) {
     return;
   }
-  if (dragging.value === "cells") {
-    selection.commitCellDrag();
-  }
   dragging.value = null;
   document.body.style.userSelect = "";
   window.removeEventListener("pointermove", onDragMove);
@@ -450,7 +447,7 @@ function onDragMove(event: PointerEvent) {
     const row = rowIndexAtClientY(event.clientY);
     const col = colIndexAtClientX(event.clientX);
     if (row != null && col != null) {
-      selection.extendCellDragTo(row, col);
+      selection.extendCellTo(row, col);
     }
   }
 }
@@ -481,7 +478,7 @@ function onCellPointerDown(event: PointerEvent, rowIndex: number, colIndex: numb
     return;
   }
   if (event.shiftKey) {
-    selection.beginAdditionalCellRange(rowIndex, colIndex);
+    selection.extendCellTo(rowIndex, colIndex);
   } else {
     selection.selectCell(rowIndex, colIndex);
   }

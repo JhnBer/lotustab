@@ -139,40 +139,34 @@ export function useTableSelection() {
     dragActive.value = { row, col };
   }
 
-  function beginAdditionalCellRange(row: number, col: number) {
-    clearRows();
-    commitCellDrag();
-    dragAnchor.value = { row, col };
-    dragActive.value = { row, col };
-  }
-
-  function extendCellDragTo(row: number, col: number) {
+  function extendCellTo(row: number, col: number) {
     if (!dragAnchor.value) {
       selectCell(row, col);
       return;
     }
     clearRows();
+    committedCells.value = new Set();
     dragActive.value = { row, col };
   }
 
-  function commitCellDrag() {
+  function foldRangeIntoCommitted() {
     const range = dragRange.value;
-    if (range) {
-      const next = new Set(committedCells.value);
-      for (let r = range.r1; r <= range.r2; r++) {
-        for (let c = range.c1; c <= range.c2; c++) {
-          next.add(cellKey(r, c));
-        }
-      }
-      committedCells.value = next;
+    if (!range) {
+      return;
     }
-    dragAnchor.value = null;
+    const next = new Set(committedCells.value);
+    for (let r = range.r1; r <= range.r2; r++) {
+      for (let c = range.c1; c <= range.c2; c++) {
+        next.add(cellKey(r, c));
+      }
+    }
+    committedCells.value = next;
     dragActive.value = null;
   }
 
   function toggleCell(row: number, col: number) {
     clearRows();
-    commitCellDrag();
+    foldRangeIntoCommitted();
     const key = cellKey(row, col);
     const next = new Set(committedCells.value);
     if (next.has(key)) {
@@ -181,6 +175,10 @@ export function useTableSelection() {
       next.add(key);
     }
     committedCells.value = next;
+    if (next.size === 0) {
+      dragAnchor.value = null;
+      dragActive.value = null;
+    }
   }
 
   function clear() {
@@ -200,9 +198,7 @@ export function useTableSelection() {
     selectRow,
     extendRowTo,
     selectCell,
-    beginAdditionalCellRange,
-    extendCellDragTo,
-    commitCellDrag,
+    extendCellTo,
     toggleCell,
     clear,
   };
