@@ -1,6 +1,7 @@
 package export
 
 import (
+	"fmt"
 	"io"
 	"strings"
 
@@ -101,4 +102,19 @@ func (s *sqlDumpWriter) writeFooter(wrapTx bool) error {
 		}
 	}
 	return nil
+}
+
+// WriteInserts writes INSERT statements for in-memory rows. No DDL or transaction wrap.
+func WriteInserts(w io.Writer, table, dialect string, cols []driver.Column, rows [][]any, batchSize int) error {
+	table = strings.TrimSpace(table)
+	if table == "" {
+		return fmt.Errorf("table name is required")
+	}
+	s := newSQLDumpWriter(w, quoteIdent(dialect, table), dialect, cols, batchSize)
+	for _, row := range rows {
+		if err := s.writeRow(row); err != nil {
+			return err
+		}
+	}
+	return s.flushInsert()
 }

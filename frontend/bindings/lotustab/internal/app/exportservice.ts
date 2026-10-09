@@ -55,3 +55,10 @@ export function ExportTable(req: $models.ExportTableRequest): $CancellablePromis
 export function ExportTables(req: $models.BatchExportRequest): $CancellablePromise<$models.ExportResult | null> {
     return $Call.ByID(368664471, req);
 }
+
+/**
+ * SaveResultSets writes in-memory query results as SQL INSERTs or JSON.
+ */
+export function SaveResultSets(req: $models.SaveResultSetsRequest): $CancellablePromise<$models.ExportResult | null> {
+    return $Call.ByID(2819502193, req);
+}

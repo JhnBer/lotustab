@@ -16,8 +16,9 @@ const (
 	DialectMySQL      = "mysql"
 	DialectClickHouse = "clickhouse"
 
-	FormatSQL = "sql"
-	FormatCSV = "csv"
+	FormatSQL  = "sql"
+	FormatCSV  = "csv"
+	FormatJSON = "json"
 )
 
 func quoteIdent(dialect, ident string) string {

@@ -26,6 +26,8 @@ export type {
     ExportTableRequest,
     OutputStatus,
     SaveProfileInput,
+    SaveResultItem,
+    SaveResultSetsRequest,
     TableRowCount,
     UpdateCheckResult
 } from "./models.js";

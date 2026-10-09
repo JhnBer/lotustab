@@ -31,7 +31,7 @@ export function formatDuration(ms: number): string {
 }
 
 export function exportFileExt(format: string, gzipOn: boolean): string {
-  const ext = format === "csv" ? ".csv" : ".sql";
+  const ext = format === "csv" ? ".csv" : format === "json" ? ".json" : ".sql";
   return gzipOn ? `${ext}.gz` : ext;
 }
 
@@ -47,7 +47,7 @@ export function suggestedExportFileName(table: string, format: string, gzipOn: b
 }
 
 export function withExportExt(name: string, format: string, gzipOn: boolean): string {
-  const stem = name.replace(/\.(sql|csv)(\.gz)?$/i, "").trim() || "table";
+  const stem = name.replace(/\.(sql|csv|json)(\.gz)?$/i, "").trim() || "table";
   return `${stem}${exportFileExt(format, gzipOn)}`;
 }
 

@@ -64,6 +64,68 @@ func TestSQLDumpPostgresBool(t *testing.T) {
 	}
 }
 
+func TestWriteInsertsNoDDL(t *testing.T) {
+	cols := []driver.Column{{Name: "id"}, {Name: "name"}}
+	var b strings.Builder
+	if err := WriteInserts(&b, "t", DialectMySQL, cols, [][]any{
+		{int64(1), "a'b"},
+		{int64(2), nil},
+		{int64(3), "z"},
+	}, 2); err != nil {
+		t.Fatal(err)
+	}
+	got := b.String()
+	if strings.Contains(got, "BEGIN") || strings.Contains(got, "DROP") || strings.Contains(got, "CREATE") || strings.Contains(got, "COMMIT") {
+		t.Fatalf("unexpected DDL/tx in\n%s", got)
+	}
+	want := []string{
+		"INSERT INTO `t` (`id`, `name`) VALUES",
+		"(1, 'a''b'),",
+		"(2, NULL);",
+		"(3, 'z');",
+	}
+	for _, part := range want {
+		if !strings.Contains(got, part) {
+			t.Fatalf("missing %q in\n%s", part, got)
+		}
+	}
+}
+
+func TestWriteInsertsRequiresTable(t *testing.T) {
+	err := WriteInserts(&strings.Builder{}, "  ", DialectMySQL, nil, nil, 0)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestJSONRowsColumnOrder(t *testing.T) {
+	cols := []driver.Column{{Name: "id"}, {Name: "name"}}
+	got, err := JSONRows(cols, [][]any{{int64(1), "a"}, {nil, "b"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `[{"id":1,"name":"a"},{"id":null,"name":"b"}]`
+	if string(got) != want {
+		t.Fatalf("got %s want %s", got, want)
+	}
+}
+
+func TestJSONResultSets(t *testing.T) {
+	got, err := JSONResultSets([]JSONSet{{
+		Index:   1,
+		SQL:     "SELECT 1",
+		Columns: []driver.Column{{Name: "n"}},
+		Rows:    [][]any{{int64(1)}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `[{"index":1,"sql":"SELECT 1","rows":[{"n":1}]}]`
+	if string(got) != want {
+		t.Fatalf("got %s want %s", got, want)
+	}
+}
+
 func TestRunChunksGzipSQL(t *testing.T) {
 	dir := t.TempDir()
 	rows := [][]any{

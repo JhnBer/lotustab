@@ -18,6 +18,7 @@ import SqlEditor from "@/features/editor/SqlEditor.vue";
 import WorkspaceTabBar from "@/features/editor/WorkspaceTabBar.vue";
 import ResultsTable from "@/features/results/ResultsTable.vue";
 import TableBrowser from "@/features/results/TableBrowser.vue";
+import QueryResultActions from "@/features/results/QueryResultActions.vue";
 import TablePager from "@/features/results/TablePager.vue";
 import { useConnectionsStore } from "@/stores/connections";
 import { useExplorerStore } from "@/stores/explorer";
@@ -301,7 +302,11 @@ function onDatabase(tabId: string, value: string) {
             @page="queries.setPage(tab.id, $event)"
             @page-size="queries.setPageSize(tab.id, $event)"
             @statement="queries.setSelectedResult(tab.id, $event)"
-          />
+          >
+            <template #actions>
+              <QueryResultActions :tab="tab" />
+            </template>
+          </TablePager>
         </div>
       </ResizablePanel>
     </ResizablePanelGroup>

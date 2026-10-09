@@ -128,6 +128,32 @@ export interface SaveProfileInput {
 }
 
 /**
+ * SaveResultItem is one in-memory result set to write as SQL or JSON.
+ */
+export interface SaveResultItem {
+    "index": number;
+    "sql": string;
+    "fileBase": string;
+    "tableName": string;
+    "columns": driver$0.Column[] | null;
+    "rows": (any[] | null)[] | null;
+}
+
+/**
+ * SaveResultSetsRequest writes query results already in memory.
+ */
+export interface SaveResultSetsRequest {
+    "profileId": string;
+    "format": string;
+    "singleFile": boolean;
+    "outputDir": string;
+    "fileName": string;
+    "folderName": string;
+    "force": boolean;
+    "items": SaveResultItem[] | null;
+}
+
+/**
  * TableRowCount is SELECT COUNT(*) for one table.
  */
 export interface TableRowCount {

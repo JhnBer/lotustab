@@ -401,6 +401,9 @@ func exportFileName(table, format string, gzipOn bool) string {
 	if format == export.FormatCSV {
 		ext = ".csv"
 	}
+	if format == export.FormatJSON {
+		ext = ".json"
+	}
 	if gzipOn {
 		ext += ".gz"
 	}
@@ -437,6 +440,8 @@ func extOf(name string) string {
 		return ".sql"
 	case strings.HasSuffix(name, ".csv"):
 		return ".csv"
+	case strings.HasSuffix(name, ".json"):
+		return ".json"
 	default:
 		return ""
 	}

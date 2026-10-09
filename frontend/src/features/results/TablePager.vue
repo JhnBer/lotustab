@@ -138,6 +138,7 @@ const multiStatement = computed(() => (props.statements?.length ?? 0) > 1);
       <Button size="xs" :disabled="running" @click="emit('apply')">Apply</Button>
       <Button size="xs" variant="outline" :disabled="running" @click="emit('cancel')">Cancel</Button>
     </div>
+    <slot name="actions" />
     <template v-if="!compact">
       <Select :model-value="String(pageSize)" @update:model-value="onPageSize">
         <SelectTrigger size="xs" class="w-36">

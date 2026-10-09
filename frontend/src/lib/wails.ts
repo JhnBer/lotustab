@@ -16,6 +16,8 @@ export type {
   ExportTableRequest,
   OutputStatus,
   SaveProfileInput,
+  SaveResultItem,
+  SaveResultSetsRequest,
   TableRowCount,
   UpdateCheckResult,
 } from "../../bindings/lotustab/internal/app/models";
