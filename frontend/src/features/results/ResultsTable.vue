@@ -136,6 +136,7 @@ const inspector = ref<ValueInspectorPayload | null>(null);
 const lastInspectorToken = ref("");
 const sourceWindowName = ref("main");
 let offValueHandoff: (() => void) | undefined;
+let offValueDraft: (() => void) | undefined;
 let widthLoadToken = 0;
 
 function widthScopeKey(scope: ColumnWidthScope | null | undefined): string {
@@ -516,16 +517,35 @@ function buildInspectorPayload(row: number, col: number, token?: string): ValueI
     return null;
   }
   const value = cellValue(row, col);
+  const baseline = originalValue(row, col);
   return {
     token: token ?? newInspectorToken(),
     sourceWindow: sourceWindowName.value,
     columnName: column.name,
     columnType: column.type ?? "",
     text: valueToEditorText(value),
+    baselineText: valueToEditorText(baseline),
     editable: props.editable && !isDeletedIndex(row),
     row,
     col,
   };
+}
+
+function applyInspectorDraft(draft: ValueInspectorPayload, opts?: { openPanel?: boolean }) {
+  lastInspectorToken.value = draft.token;
+  if (opts?.openPanel) {
+    inspector.value = {
+      ...draft,
+      baselineText: draft.baselineText ?? "",
+    };
+  }
+  if (!draft.editable) {
+    return;
+  }
+  const name = columns.value[draft.col]?.name;
+  if (name) {
+    emitCellChange(draft.row, name, draft.text);
+  }
 }
 
 function openInspector(row: number, col: number) {
@@ -554,15 +574,21 @@ function onInspectorText(text: string) {
   }
 }
 
-async function applyReturnedInspector(returned: ValueInspectorPayload) {
-  lastInspectorToken.value = returned.token;
-  inspector.value = returned;
-  if (returned.editable) {
-    const name = columns.value[returned.col]?.name;
-    if (name) {
-      emitCellChange(returned.row, name, returned.text);
-    }
+function onInspectorCancel() {
+  const current = inspector.value;
+  if (!current || !current.editable) {
+    return;
   }
+  const baseline = current.baselineText ?? "";
+  inspector.value = { ...current, text: baseline };
+  const name = columns.value[current.col]?.name;
+  if (name) {
+    emitCellChange(current.row, name, baseline);
+  }
+}
+
+async function applyReturnedInspector(returned: ValueInspectorPayload) {
+  applyInspectorDraft(returned, { openPanel: true });
 }
 
 async function openInspectorWindow() {
@@ -577,6 +603,7 @@ async function openInspectorWindow() {
   }
   const payload: ValueInspectorPayload = {
     ...current,
+    baselineText: current.baselineText ?? valueToEditorText(originalValue(current.row, current.col)),
     sourceWindow: sourceWindowName.value,
     token: current.token || newInspectorToken(),
   };
@@ -627,6 +654,19 @@ onMounted(() => {
       }
     })();
   });
+  offValueDraft = Events.On("value:draft", () => {
+    void (async () => {
+      const token = lastInspectorToken.value;
+      if (!token) {
+        return;
+      }
+      const draft = parseInspectorPayload(await WindowsService.TakeValueDraft(token));
+      if (draft) {
+        // Keep the side panel closed while the detached window owns the editor.
+        applyInspectorDraft(draft, { openPanel: false });
+      }
+    })();
+  });
 });
 
 onBeforeUnmount(() => {
@@ -634,6 +674,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("keyup", syncToggleModifier);
   window.removeEventListener("blur", clearToggleModifier);
   offValueHandoff?.();
+  offValueDraft?.();
 });
 
 function selectionEdges(row: number, col: number) {
@@ -1287,6 +1328,7 @@ async function pasteCell() {
                 :payload="inspector"
                 @close="closeInspector"
                 @update:text="onInspectorText"
+                @cancel="onInspectorCancel"
                 @open-window="openInspectorWindow"
               />
             </ResizablePanel>

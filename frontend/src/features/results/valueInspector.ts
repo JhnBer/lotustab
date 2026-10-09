@@ -9,6 +9,11 @@ export type ValueInspectorPayload = {
   columnType: string;
   /** Current editor text (may include unsaved edits). */
   text: string;
+  /**
+   * Server / pre-edit cell text used by Cancel to drop the draft.
+   * Kept separate from `text` so opening with an existing draft can still revert.
+   */
+  baselineText: string;
   editable: boolean;
   row: number;
   col: number;

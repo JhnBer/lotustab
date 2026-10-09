@@ -14,6 +14,7 @@ const (
 	valueWindowPrefix      = "value-"
 	workspaceHandoffEvent  = "workspace:handoff"
 	valueHandoffEvent      = "value:handoff"
+	valueDraftEvent        = "value:draft"
 )
 
 // WindowsService opens (or focuses) a native window for a connection profile.
@@ -22,6 +23,7 @@ type WindowsService struct {
 	handoffs      map[string]string
 	valueHandoffs map[string]string
 	valueReturns  map[string]string
+	valueDrafts   map[string]string
 }
 
 // NewWindowsService constructs the Wails windows service.
@@ -30,6 +32,7 @@ func NewWindowsService() *WindowsService {
 		handoffs:      make(map[string]string),
 		valueHandoffs: make(map[string]string),
 		valueReturns:  make(map[string]string),
+		valueDrafts:   make(map[string]string),
 	}
 }
 
@@ -189,6 +192,41 @@ func (s *WindowsService) TakeValueReturn(token string) string {
 	return snap
 }
 
+// PushValueDraft parks a live edit from the value window for the source grid.
+// Does not focus or close windows — the source applies the draft in the background.
+func (s *WindowsService) PushValueDraft(token, sourceWindow, payload string) error {
+	token = strings.TrimSpace(token)
+	sourceWindow = strings.TrimSpace(sourceWindow)
+	if token == "" {
+		return fmt.Errorf("token is required")
+	}
+	if sourceWindow == "" {
+		return fmt.Errorf("source window is required")
+	}
+	appl := application.Get()
+	if appl == nil {
+		return fmt.Errorf("application is not running")
+	}
+	if _, ok := appl.Window.GetByName(sourceWindow); !ok {
+		return fmt.Errorf("source window is closed")
+	}
+	if !s.parkValueDraft(token, payload) {
+		return fmt.Errorf("payload is required")
+	}
+	appl.Event.Emit(valueDraftEvent)
+	return nil
+}
+
+// TakeValueDraft returns and clears the parked live draft for a token.
+func (s *WindowsService) TakeValueDraft(token string) string {
+	token = strings.TrimSpace(token)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	snap := s.valueDrafts[token]
+	delete(s.valueDrafts, token)
+	return snap
+}
+
 func (s *WindowsService) parkValue(token, payload string) bool {
 	payload = strings.TrimSpace(payload)
 	if token == "" || payload == "" {
@@ -207,4 +245,15 @@ func (s *WindowsService) parkValueReturn(token, payload string) {
 		return
 	}
 	s.valueReturns[token] = payload
+}
+
+func (s *WindowsService) parkValueDraft(token, payload string) bool {
+	payload = strings.TrimSpace(payload)
+	if token == "" || payload == "" {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.valueDrafts[token] = payload
+	return true
 }

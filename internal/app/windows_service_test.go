@@ -77,3 +77,29 @@ func TestParkAndTakeValueReturn(t *testing.T) {
 		t.Fatalf("second take should be empty, got %q", got)
 	}
 }
+
+func TestParkAndTakeValueDraft(t *testing.T) {
+	s := NewWindowsService()
+	if s.parkValueDraft("t1", "") || s.parkValueDraft("t1", "  ") {
+		t.Fatal("empty payload should not park")
+	}
+	if !s.parkValueDraft("t1", `{"text":"live"}`) {
+		t.Fatal("expected park")
+	}
+	if got := s.TakeValueDraft("t1"); got != `{"text":"live"}` {
+		t.Fatalf("got %q", got)
+	}
+	if got := s.TakeValueDraft("t1"); got != "" {
+		t.Fatalf("second take should be empty, got %q", got)
+	}
+}
+
+func TestPushValueDraftRequiresFields(t *testing.T) {
+	s := NewWindowsService()
+	if err := s.PushValueDraft(" ", "main", `{"text":"x"}`); err == nil || !strings.Contains(err.Error(), "token") {
+		t.Fatalf("expected token error, got %v", err)
+	}
+	if err := s.PushValueDraft("t1", " ", `{"text":"x"}`); err == nil || !strings.Contains(err.Error(), "source") {
+		t.Fatalf("expected source error, got %v", err)
+	}
+}

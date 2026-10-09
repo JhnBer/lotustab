@@ -24,6 +24,13 @@ function parsePayload(raw: string | null | undefined): ValueInspectorPayload | n
   }
 }
 
+function withBaseline(next: ValueInspectorPayload): ValueInspectorPayload {
+  return {
+    ...next,
+    baselineText: next.baselineText ?? next.text ?? "",
+  };
+}
+
 async function loadHandoff() {
   const token = String(route.query.id ?? "").trim();
   if (!token) {
@@ -35,15 +42,48 @@ async function loadHandoff() {
     missing.value = true;
     return;
   }
-  payload.value = next;
+  payload.value = withBaseline(next);
   missing.value = false;
+}
+
+async function pushDraft(next: ValueInspectorPayload) {
+  if (!next.editable) {
+    return;
+  }
+  try {
+    await WindowsService.PushValueDraft(
+      next.token,
+      next.sourceWindow,
+      JSON.stringify(next),
+    );
+    returnUnavailable.value = false;
+  } catch (err) {
+    const message = errorMessage(err);
+    if (message.toLowerCase().includes("closed")) {
+      returnUnavailable.value = true;
+      return;
+    }
+    // Best-effort live sync; Return still delivers the final payload.
+  }
 }
 
 function onTextUpdate(text: string) {
   if (!payload.value) {
     return;
   }
-  payload.value = { ...payload.value, text };
+  const next = { ...payload.value, text };
+  payload.value = next;
+  void pushDraft(next);
+}
+
+function onCancel() {
+  if (!payload.value) {
+    return;
+  }
+  const baseline = payload.value.baselineText ?? "";
+  const next = { ...payload.value, text: baseline };
+  payload.value = next;
+  void pushDraft(next);
 }
 
 async function returnToPanel() {
@@ -93,6 +133,7 @@ onBeforeUnmount(() => {
         window-mode
         :return-unavailable="returnUnavailable"
         @update:text="onTextUpdate"
+        @cancel="onCancel"
         @return-panel="returnToPanel"
       />
       <div

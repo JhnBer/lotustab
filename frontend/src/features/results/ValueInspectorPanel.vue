@@ -34,6 +34,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   close: [];
   "update:text": [text: string];
+  cancel: [];
   openWindow: [];
   returnPanel: [];
 }>();
@@ -69,6 +70,9 @@ watch(
 const parsedJson = computed(() => tryParseJson(text.value));
 const binaryPreview = computed(() => formatBinaryPreview(text.value));
 const canEdit = computed(() => props.payload.editable && mode.value !== "binary");
+const dirty = computed(
+  () => canEdit.value && text.value !== (props.payload.baselineText ?? ""),
+);
 
 function onTextInput(value: string | number) {
   const next = String(value);
@@ -76,6 +80,16 @@ function onTextInput(value: string | number) {
   if (canEdit.value) {
     emit("update:text", next);
   }
+}
+
+function onCancel() {
+  if (!canEdit.value) {
+    return;
+  }
+  const baseline = props.payload.baselineText ?? "";
+  text.value = baseline;
+  emit("update:text", baseline);
+  emit("cancel");
 }
 
 const title = computed(() => {
@@ -94,6 +108,16 @@ const title = computed(() => {
           Read-only
         </div>
       </div>
+      <Button
+        v-if="canEdit"
+        variant="outline"
+        size="sm"
+        class="shrink-0"
+        :disabled="!dirty"
+        @click="onCancel"
+      >
+        Cancel
+      </Button>
       <Button
         v-if="windowMode"
         variant="outline"
