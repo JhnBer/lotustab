@@ -58,6 +58,8 @@ export function createTableBrowse(ctx: QueryStoreCtx, exec: QueryExecApi) {
       tab.result = asQueryResult(result);
       tab.total = result?.total ?? 0;
       tab.primaryKey = result?.primaryKey ?? [];
+      // Fresh server page replaces drafts so reload / sort / filter don't keep stale edits.
+      tab.edits = [];
     } catch (err) {
       if (isCanceled(err) || ctx.inflight.get(id) !== pending) {
         return;

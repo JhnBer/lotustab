@@ -225,6 +225,44 @@ watch(
   },
 );
 
+/** Keep an open inspector in sync when Cancel clears drafts or reload replaces rows. */
+watch(
+  () => {
+    const current = inspector.value;
+    if (!current) {
+      return null;
+    }
+    return {
+      row: current.row,
+      col: current.col,
+      edits: props.edits,
+      result: props.result,
+      editable: props.editable,
+    };
+  },
+  () => {
+    const current = inspector.value;
+    if (!current) {
+      return;
+    }
+    if (
+      current.row < 0 ||
+      current.col < 0 ||
+      current.row >= allRows.value.length ||
+      current.col >= columns.value.length
+    ) {
+      inspector.value = null;
+      return;
+    }
+    const text = valueToEditorText(cellValue(current.row, current.col));
+    const editable = props.editable && !isDeletedIndex(current.row);
+    if (current.text === text && current.editable === editable) {
+      return;
+    }
+    inspector.value = { ...current, text, editable };
+  },
+);
+
 function colWidth(name: string) {
   return manualWidths.value[name] ?? autoWidths.value[name] ?? DEFAULT_COL_WIDTH;
 }
