@@ -1,5 +1,6 @@
 export {
   AboutService,
+  ColumnWidthsService,
   ConnectionsService,
   DriversService,
   ExportService,

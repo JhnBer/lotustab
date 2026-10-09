@@ -205,6 +205,11 @@ async function applyStructure() {
         :editable="(tab.primaryKey?.length ?? 0) > 0"
         :edits="tab.edits ?? []"
         :primary-key="tab.primaryKey ?? []"
+        :width-scope="{
+          database: tab.database,
+          schema: tab.schema,
+          table: tab.name,
+        }"
         :empty-hint="connected ? 'Loading table…' : 'Connect to view this table.'"
         @sort="queries.cycleSort(tab.id, $event)"
         @edit="onEdit"

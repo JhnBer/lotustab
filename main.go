@@ -40,6 +40,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	columnWidths, err := storage.NewColumnWidths()
+	if err != nil {
+		log.Fatal(err)
+	}
 	secretStore := secrets.New()
 	manager := connection.NewManager()
 
@@ -47,6 +51,7 @@ func main() {
 	queries := app.NewQueryServiceFromConnections(connections)
 	exports := app.NewExportService(connections)
 	drivers := app.NewDriversService(registry)
+	widths := app.NewColumnWidthsService(columnWidths)
 	windows := app.NewWindowsService()
 	about := app.NewAboutService(currentVersion, true, secretStore)
 
@@ -58,6 +63,7 @@ func main() {
 			application.NewService(connections),
 			application.NewService(queries),
 			application.NewService(exports),
+			application.NewService(widths),
 			application.NewService(windows),
 			application.NewService(about),
 		},

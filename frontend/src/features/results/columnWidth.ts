@@ -7,10 +7,18 @@ export const SAMPLE_ROW_LIMIT = 40;
 export const LONG_VALUE_CHARS = 120;
 export const CELL_PAD_X = 16;
 
+/** Header chrome: `px-2` (16) + inner `pr-2` (8). */
+export const HEADER_PAD_X = 24;
+/** Sort icon `size-3` (12) + `gap-1` (4). Reserved when the header can show a sort control. */
+export const HEADER_SORT_CHROME = 16;
+
 const LARGE_TYPE_RE = /\b(jsonb?|text|clob|blob|bytea|binary)\b/i;
 
 const MONO_XS_FONT =
   '12px "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+
+const HEADER_FONT =
+  '500 14px Inter, ui-sans-serif, system-ui, sans-serif';
 
 let measureCtx: CanvasRenderingContext2D | null = null;
 
@@ -22,20 +30,26 @@ function measureContext(): CanvasRenderingContext2D | null {
     const canvas = document.createElement("canvas");
     measureCtx = canvas.getContext("2d");
   }
-  if (measureCtx) {
-    measureCtx.font = MONO_XS_FONT;
-  }
   return measureCtx;
+}
+
+function measureWithFont(text: string, font: string, fallbackPerChar: number): number {
+  const ctx = measureContext();
+  if (!ctx) {
+    return Math.ceil(text.length * fallbackPerChar);
+  }
+  ctx.font = font;
+  return Math.ceil(ctx.measureText(text).width);
 }
 
 /** Pixel width of text in the grid's `text-xs font-mono` face. */
 export function measureMonoXs(text: string): number {
-  const ctx = measureContext();
-  if (!ctx) {
-    // SSR / tests without canvas: ~7px per mono character at 12px.
-    return Math.ceil(text.length * 7);
-  }
-  return Math.ceil(ctx.measureText(text).width);
+  return measureWithFont(text, MONO_XS_FONT, 7);
+}
+
+/** Pixel width of header names (`text-sm font-medium` sans). */
+export function measureHeaderName(text: string): number {
+  return measureWithFont(text, HEADER_FONT, 8);
 }
 
 export function isLargeColumnType(type: string | undefined | null): boolean {
@@ -69,9 +83,18 @@ export function cellDisplayText(value: unknown): string {
   return String(value);
 }
 
-function clampWidth(raw: number, large: boolean): number {
+function clampContentWidth(raw: number, large: boolean): number {
   const max = large ? MAX_LARGE_COL_WIDTH : MAX_COL_WIDTH;
   return Math.min(max, Math.max(MIN_COL_WIDTH, raw));
+}
+
+/**
+ * Visible header floor: name in the header face, sort-icon chrome, and padding.
+ * Sort chrome is reserved for both table browse and SQL results so the name
+ * never collapses under the shared header layout. Not clamped by content ceilings.
+ */
+export function headerFloorWidth(name: string): number {
+  return measureHeaderName(name) + HEADER_SORT_CHROME + HEADER_PAD_X;
 }
 
 /**
@@ -87,7 +110,7 @@ export function computeColumnWidths(
 
   for (let colIndex = 0; colIndex < columns.length; colIndex++) {
     const column = columns[colIndex]!;
-    const headerPx = measureMonoXs(column.name) + CELL_PAD_X;
+    const headerPx = headerFloorWidth(column.name);
     let contentPx = 0;
     let longSample = false;
 
@@ -100,7 +123,8 @@ export function computeColumnWidths(
     }
 
     const large = isLargeColumnType(column.type) || longSample;
-    widths[column.name] = clampWidth(Math.max(headerPx, contentPx), large);
+    // Content is capped; header floor is not — long names stay fully visible.
+    widths[column.name] = Math.max(headerPx, clampContentWidth(contentPx, large));
   }
 
   return widths;

@@ -6,7 +6,7 @@ import { Events, Window } from "@wailsio/runtime";
 import { toast } from "vue-sonner";
 import { Spinner } from "@/components/ui/spinner";
 import type { QueryResult } from "@/lib/wails";
-import { WindowsService } from "@/lib/wails";
+import { ColumnWidthsService, WindowsService } from "@/lib/wails";
 import { Button } from "@/components/ui/button";
 import {
   ContextMenu,
@@ -61,6 +61,13 @@ import { errorMessage } from "@/lib/errors";
 const ROW_HEIGHT = 28;
 const ROW_NUM_WIDTH = 56;
 
+/** When set, manual widths persist for this table scope across sessions. SQL results omit it. */
+export type ColumnWidthScope = {
+  database: string;
+  schema?: string;
+  table: string;
+};
+
 const props = withDefaults(
   defineProps<{
     result: QueryResult | null;
@@ -75,6 +82,7 @@ const props = withDefaults(
     editable?: boolean;
     edits?: CellDraft[];
     primaryKey?: string[];
+    widthScope?: ColumnWidthScope | null;
   }>(),
   {
     sortable: false,
@@ -86,6 +94,7 @@ const props = withDefaults(
     editable: false,
     edits: () => [],
     primaryKey: () => [],
+    widthScope: null,
   },
 );
 
@@ -110,6 +119,7 @@ const allRows = computed(() => visualList.value.map((row) => row.values));
 const autoWidths = ref<Record<string, number>>({});
 const manualWidths = ref<Record<string, number>>({});
 const sizedColumnKey = ref("");
+const resizingColumn = ref<string | null>(null);
 const scrollRef = ref<HTMLElement | null>(null);
 const bodyRef = ref<HTMLElement | null>(null);
 const editing = ref<{ row: number; col: number; start: string } | null>(null);
@@ -125,6 +135,58 @@ const inspector = ref<ValueInspectorPayload | null>(null);
 const lastInspectorToken = ref("");
 const sourceWindowName = ref("main");
 let offValueHandoff: (() => void) | undefined;
+let widthLoadToken = 0;
+
+function widthScopeKey(scope: ColumnWidthScope | null | undefined): string {
+  if (!scope?.table) {
+    return "";
+  }
+  return `${scope.database ?? ""}\0${scope.schema ?? ""}\0${scope.table}`;
+}
+
+async function loadPersistedWidths(scope: ColumnWidthScope | null | undefined) {
+  const key = widthScopeKey(scope);
+  if (!scope?.table || !key) {
+    return;
+  }
+  const token = ++widthLoadToken;
+  try {
+    const saved = await ColumnWidthsService.GetTableWidths(
+      scope.database ?? "",
+      scope.schema ?? "",
+      scope.table,
+    );
+    if (token !== widthLoadToken || widthScopeKey(props.widthScope) !== key) {
+      return;
+    }
+    const next: Record<string, number> = {};
+    for (const [name, width] of Object.entries(saved ?? {})) {
+      if (typeof width === "number" && Number.isFinite(width) && width >= MIN_COL_WIDTH) {
+        next[name] = Math.round(width);
+      }
+    }
+    // In-session resize wins if the user dragged before the cache returned.
+    manualWidths.value = { ...next, ...manualWidths.value };
+  } catch {
+    // Missing cache or IPC failure: keep autosize / in-session manual widths.
+  }
+}
+
+function persistManualWidth(name: string, width: number) {
+  const scope = props.widthScope;
+  if (!scope?.table || !name) {
+    return;
+  }
+  void ColumnWidthsService.SetTableColumnWidth(
+    scope.database ?? "",
+    scope.schema ?? "",
+    scope.table,
+    name,
+    width,
+  ).catch(() => {
+    // Persistence is best-effort; autosize/manual state still works in-session.
+  });
+}
 
 watch(
   () => props.result,
@@ -143,8 +205,23 @@ watch(
     manualWidths.value = {};
     autoWidths.value = computeColumnWidths(columns.value, rows.value);
     inspector.value = null;
+    void loadPersistedWidths(props.widthScope);
   },
   { immediate: true },
+);
+
+watch(
+  () => widthScopeKey(props.widthScope),
+  (next, prev) => {
+    if (next === prev) {
+      return;
+    }
+    if (!sizedColumnKey.value) {
+      return;
+    }
+    manualWidths.value = {};
+    void loadPersistedWidths(props.widthScope);
+  },
 );
 
 function colWidth(name: string) {
@@ -239,10 +316,23 @@ const { start: startResize } = usePointerResize<{ name: string; startWidth: numb
   onMove(event, drag) {
     const next = Math.max(MIN_COL_WIDTH, drag.startWidth + (event.clientX - drag.startX));
     manualWidths.value = { ...manualWidths.value, [drag.name]: next };
+    resizingColumn.value = drag.name;
+  },
+  onEnd() {
+    const name = resizingColumn.value;
+    resizingColumn.value = null;
+    if (!name) {
+      return;
+    }
+    const width = manualWidths.value[name];
+    if (typeof width === "number") {
+      persistManualWidth(name, width);
+    }
   },
 });
 
 function onStartResize(event: PointerEvent, name: string) {
+  resizingColumn.value = name;
   startResize(event, { name, startWidth: colWidth(name) });
 }
 
