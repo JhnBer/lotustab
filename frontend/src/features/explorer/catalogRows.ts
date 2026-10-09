@@ -252,7 +252,8 @@ export function buildExplorerRows(input: ExplorerCatalogInput): ExplorerRow[] {
     if (!open) {
       continue;
     }
-    if (input.loadingTables[name] && !(name in input.tablesByDb)) {
+    // Expanded state is persisted; tablesByDb is not — treat missing as loading.
+    if (!(name in input.tablesByDb)) {
       rows.push({ key: `loading:${name}`, kind: "status", text: "Loading…", height: ROW_META });
       continue;
     }

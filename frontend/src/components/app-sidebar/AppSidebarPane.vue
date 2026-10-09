@@ -121,6 +121,16 @@ function syncActiveDatabase() {
   });
 }
 
+function hydrateExplorer(id: string) {
+  syncActiveDatabase();
+  if (!settings.showAllDatabases) {
+    return;
+  }
+  void explorer.ensureExpandedTables(id).catch((err) => {
+    toast.error(errorMessage(err));
+  });
+}
+
 watch(
   () => [selected.value?.id, currentConnected.value] as const,
   async ([id, connected]) => {
@@ -134,12 +144,12 @@ watch(
       return;
     }
     if (explorer.hasCatalog(id)) {
-      syncActiveDatabase();
+      hydrateExplorer(id);
       return;
     }
     try {
       await explorer.loadDatabases(id);
-      syncActiveDatabase();
+      hydrateExplorer(id);
     } catch (err) {
       toast.error(errorMessage(err));
     }
@@ -152,6 +162,10 @@ watch(
   (showAll) => {
     if (!showAll) {
       syncActiveDatabase();
+      return;
+    }
+    if (selected.value && currentConnected.value) {
+      hydrateExplorer(selected.value.id);
     }
   },
 );

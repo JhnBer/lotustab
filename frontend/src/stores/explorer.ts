@@ -212,6 +212,19 @@ export const useExplorerStore = defineStore("explorer", () => {
     }
   }
 
+  /** Reload tables for persisted expanded DBs (tablesByDb is not persisted). */
+  async function ensureExpandedTables(id: string) {
+    if (!id) {
+      return;
+    }
+    const slice = sliceOf(id);
+    const known = new Set(slice.databases);
+    const pending = Object.keys(slice.expanded)
+      .filter((db) => slice.expanded[db] && known.has(db) && !(db in slice.tablesByDb))
+      .map((db) => loadTables(id, db));
+    await Promise.all(pending);
+  }
+
   async function searchTables(id: string, query: string) {
     if (!id) {
       return;
@@ -306,6 +319,7 @@ export const useExplorerStore = defineStore("explorer", () => {
     loadTables,
     toggleDatabase,
     setActiveDatabase,
+    ensureExpandedTables,
     searchTables,
     refresh,
   };
