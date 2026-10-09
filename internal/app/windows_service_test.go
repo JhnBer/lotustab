@@ -42,3 +42,38 @@ func TestParkAndTakeHandoff(t *testing.T) {
 		t.Fatalf("second take should be empty, got %q", got)
 	}
 }
+
+func TestOpenValueWindowRequiresToken(t *testing.T) {
+	s := NewWindowsService()
+	err := s.OpenValueWindow("  ", "Value", `{"text":"x"}`)
+	if err == nil || !strings.Contains(err.Error(), "token") {
+		t.Fatalf("expected token error, got %v", err)
+	}
+}
+
+func TestParkAndTakeValueHandoff(t *testing.T) {
+	s := NewWindowsService()
+	if s.parkValue("t1", "") || s.parkValue("t1", "  ") {
+		t.Fatal("empty payload should not park")
+	}
+	if !s.parkValue("t1", `{"text":"hello"}`) {
+		t.Fatal("expected park")
+	}
+	if got := s.TakeValueHandoff("t1"); got != `{"text":"hello"}` {
+		t.Fatalf("got %q", got)
+	}
+	if got := s.TakeValueHandoff("t1"); got != "" {
+		t.Fatalf("second take should be empty, got %q", got)
+	}
+}
+
+func TestParkAndTakeValueReturn(t *testing.T) {
+	s := NewWindowsService()
+	s.parkValueReturn("t1", `{"text":"edited"}`)
+	if got := s.TakeValueReturn("t1"); got != `{"text":"edited"}` {
+		t.Fatalf("got %q", got)
+	}
+	if got := s.TakeValueReturn("t1"); got != "" {
+		t.Fatalf("second take should be empty, got %q", got)
+	}
+}

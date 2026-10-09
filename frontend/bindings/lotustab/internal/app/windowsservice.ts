@@ -19,8 +19,38 @@ export function OpenConnection(profileID: string, title: string, snapshot: strin
 }
 
 /**
+ * OpenValueWindow shows (or creates) a value inspector window.
+ * token identifies the parked payload; payload is opaque JSON (value is not put in the URL).
+ */
+export function OpenValueWindow(token: string, title: string, payload: string): $CancellablePromise<void> {
+    return $Call.ByID(3043432166, token, title, payload);
+}
+
+/**
+ * ReturnValueToPanel parks the payload for the source window, focuses it, and closes the value window.
+ * Returns an error when the source window is gone so the value window can stay open.
+ */
+export function ReturnValueToPanel(token: string, sourceWindow: string, payload: string): $CancellablePromise<void> {
+    return $Call.ByID(1162063113, token, sourceWindow, payload);
+}
+
+/**
  * TakeHandoff returns and clears the parked workspace snapshot for a profile.
  */
 export function TakeHandoff(profileID: string): $CancellablePromise<string> {
     return $Call.ByID(2889088988, profileID);
+}
+
+/**
+ * TakeValueHandoff returns and clears the parked payload for a value window.
+ */
+export function TakeValueHandoff(token: string): $CancellablePromise<string> {
+    return $Call.ByID(3532502343, token);
+}
+
+/**
+ * TakeValueReturn returns and clears the payload parked for return to a side panel.
+ */
+export function TakeValueReturn(token: string): $CancellablePromise<string> {
+    return $Call.ByID(1251180721, token);
 }
