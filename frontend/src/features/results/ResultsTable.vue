@@ -2,8 +2,11 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "@lucide/vue";
+import { Events, Window } from "@wailsio/runtime";
+import { toast } from "vue-sonner";
 import { Spinner } from "@/components/ui/spinner";
 import type { QueryResult } from "@/lib/wails";
+import { WindowsService } from "@/lib/wails";
 import { Button } from "@/components/ui/button";
 import {
   ContextMenu,
@@ -20,6 +23,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 import { useClipboardText } from "@/composables/useClipboardText";
 import { usePointerResize } from "@/composables/usePointerResize";
 import {
@@ -34,11 +42,22 @@ import {
   rowKey,
   type CellDraft,
 } from "@/features/results/edits";
+import {
+  columnSetKey,
+  computeColumnWidths,
+  isLargeCell,
+  MIN_COL_WIDTH,
+} from "@/features/results/columnWidth";
+import {
+  newInspectorToken,
+  valueToEditorText,
+  type ValueInspectorPayload,
+} from "@/features/results/valueInspector";
+import ValueInspectorPanel from "@/features/results/ValueInspectorPanel.vue";
 import { useTableSelection } from "@/features/results/useTableSelection";
 import SelectionBorder from "@/features/results/SelectionBorder.vue";
+import { errorMessage } from "@/lib/errors";
 
-const DEFAULT_COL_WIDTH = 160;
-const MIN_COL_WIDTH = 72;
 const ROW_HEIGHT = 28;
 const ROW_NUM_WIDTH = 56;
 
@@ -88,7 +107,9 @@ const visualList = computed(() =>
   layoutVisualRows(rows.value, columns.value, props.edits, props.primaryKey),
 );
 const allRows = computed(() => visualList.value.map((row) => row.values));
-const widths = ref<Record<string, number>>({});
+const autoWidths = ref<Record<string, number>>({});
+const manualWidths = ref<Record<string, number>>({});
+const sizedColumnKey = ref("");
 const scrollRef = ref<HTMLElement | null>(null);
 const bodyRef = ref<HTMLElement | null>(null);
 const editing = ref<{ row: number; col: number; start: string } | null>(null);
@@ -100,21 +121,34 @@ const selectedRowCount = computed(() => selection.selectedRows.value.size);
 const setValueOpen = ref(false);
 const setValueInput = ref("");
 const selectedCellCount = computed(() => selection.cellSelectionList.value.length);
+const inspector = ref<ValueInspectorPayload | null>(null);
+const lastInspectorToken = ref("");
+const sourceWindowName = ref("main");
+let offValueHandoff: (() => void) | undefined;
 
 watch(
-  columns,
-  (cols) => {
-    const next: Record<string, number> = {};
-    for (const column of cols) {
-      next[column.name] = widths.value[column.name] ?? DEFAULT_COL_WIDTH;
+  () => props.result,
+  () => {
+    const key = columnSetKey(columns.value);
+    if (!key) {
+      sizedColumnKey.value = "";
+      autoWidths.value = {};
+      manualWidths.value = {};
+      return;
     }
-    widths.value = next;
+    if (key === sizedColumnKey.value) {
+      return;
+    }
+    sizedColumnKey.value = key;
+    manualWidths.value = {};
+    autoWidths.value = computeColumnWidths(columns.value, rows.value);
+    inspector.value = null;
   },
   { immediate: true },
 );
 
 function colWidth(name: string) {
-  return widths.value[name] ?? DEFAULT_COL_WIDTH;
+  return manualWidths.value[name] ?? autoWidths.value[name] ?? MIN_COL_WIDTH;
 }
 
 const rowVirtualizer = useVirtualizer(
@@ -147,16 +181,12 @@ watch(
   },
 );
 
-function columnKey(cols: { name: string }[]) {
-  return cols.map((column) => column.name).join("\0");
-}
-
-let prevColumnKey = columnKey(columns.value);
+let prevColumnKey = columnSetKey(columns.value);
 
 watch(
   () => props.result,
   () => {
-    const nextKey = columnKey(columns.value);
+    const nextKey = columnSetKey(columns.value);
     const colsChanged = nextKey !== prevColumnKey;
     prevColumnKey = nextKey;
     rowVirtualizer.value.scrollToOffset(0);
@@ -172,7 +202,7 @@ watch(
   { flush: "post" },
 );
 
-watch(widths, () => {
+watch([autoWidths, manualWidths], () => {
   columnVirtualizer.value.measure();
 });
 
@@ -208,7 +238,7 @@ const { writeClipboard } = useClipboardText();
 const { start: startResize } = usePointerResize<{ name: string; startWidth: number }>({
   onMove(event, drag) {
     const next = Math.max(MIN_COL_WIDTH, drag.startWidth + (event.clientX - drag.startX));
-    widths.value = { ...widths.value, [drag.name]: next };
+    manualWidths.value = { ...manualWidths.value, [drag.name]: next };
   },
 });
 
@@ -340,16 +370,141 @@ function clearToggleModifier() {
   toggleModifierHeld.value = false;
 }
 
+function parseInspectorPayload(raw: string | null | undefined): ValueInspectorPayload | null {
+  if (!raw) {
+    return null;
+  }
+  try {
+    return JSON.parse(raw) as ValueInspectorPayload;
+  } catch {
+    return null;
+  }
+}
+
+function buildInspectorPayload(row: number, col: number, token?: string): ValueInspectorPayload | null {
+  const column = columns.value[col];
+  if (!column) {
+    return null;
+  }
+  const value = cellValue(row, col);
+  return {
+    token: token ?? newInspectorToken(),
+    sourceWindow: sourceWindowName.value,
+    columnName: column.name,
+    columnType: column.type ?? "",
+    text: valueToEditorText(value),
+    editable: props.editable && !isDeletedIndex(row),
+    row,
+    col,
+  };
+}
+
+function openInspector(row: number, col: number) {
+  const next = buildInspectorPayload(row, col, inspector.value?.token || lastInspectorToken.value || undefined);
+  if (!next) {
+    return;
+  }
+  lastInspectorToken.value = next.token;
+  inspector.value = next;
+  selection.selectCell(row, col);
+}
+
+function closeInspector() {
+  inspector.value = null;
+}
+
+function onInspectorText(text: string) {
+  const current = inspector.value;
+  if (!current || !current.editable) {
+    return;
+  }
+  inspector.value = { ...current, text };
+  const name = columns.value[current.col]?.name;
+  if (name) {
+    emitCellChange(current.row, name, text);
+  }
+}
+
+async function applyReturnedInspector(returned: ValueInspectorPayload) {
+  lastInspectorToken.value = returned.token;
+  inspector.value = returned;
+  if (returned.editable) {
+    const name = columns.value[returned.col]?.name;
+    if (name) {
+      emitCellChange(returned.row, name, returned.text);
+    }
+  }
+}
+
+async function openInspectorWindow() {
+  const current = inspector.value;
+  if (!current) {
+    return;
+  }
+  try {
+    sourceWindowName.value = await Window.Name();
+  } catch {
+    sourceWindowName.value = "main";
+  }
+  const payload: ValueInspectorPayload = {
+    ...current,
+    sourceWindow: sourceWindowName.value,
+    token: current.token || newInspectorToken(),
+  };
+  lastInspectorToken.value = payload.token;
+  inspector.value = payload;
+  try {
+    await WindowsService.OpenValueWindow(
+      payload.token,
+      payload.columnName || "Value",
+      JSON.stringify(payload),
+    );
+    inspector.value = null;
+  } catch (err) {
+    toast.error(errorMessage(err));
+  }
+}
+
+function onCellDoubleClick(row: number, col: number) {
+  const column = columns.value[col];
+  const value = cellValue(row, col);
+  if (isLargeCell(column?.type, value)) {
+    openInspector(row, col);
+    return;
+  }
+  startEdit(row, col);
+}
+
 onMounted(() => {
   window.addEventListener("keydown", syncToggleModifier);
   window.addEventListener("keyup", syncToggleModifier);
   window.addEventListener("blur", clearToggleModifier);
+  void Window.Name()
+    .then((name) => {
+      sourceWindowName.value = name || "main";
+    })
+    .catch(() => {
+      sourceWindowName.value = "main";
+    });
+  offValueHandoff = Events.On("value:handoff", () => {
+    void (async () => {
+      const token = lastInspectorToken.value;
+      if (!token) {
+        return;
+      }
+      const returned = parseInspectorPayload(await WindowsService.TakeValueReturn(token));
+      if (returned) {
+        await applyReturnedInspector(returned);
+      }
+    })();
+  });
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", syncToggleModifier);
   window.removeEventListener("keyup", syncToggleModifier);
   window.removeEventListener("blur", clearToggleModifier);
+  offValueHandoff?.();
 });
 
 function selectionEdges(row: number, col: number) {
@@ -759,6 +914,13 @@ async function pasteCell() {
         <template v-else>Statement completed.</template>
       </div>
       <div v-else class="relative min-h-0 flex-1">
+        <ResizablePanelGroup direction="horizontal" class="h-full">
+          <ResizablePanel
+            :default-size="inspector ? 70 : 100"
+            :min-size="40"
+            class="min-w-0"
+          >
+            <div class="relative h-full min-h-0">
         <ContextMenu>
           <div ref="scrollRef" class="absolute inset-0 overflow-auto" @contextmenu.capture="onContextMenu">
             <ContextMenuTrigger as-child>
@@ -890,7 +1052,7 @@ async function pasteCell() {
                       :style="{ width: `${col.size}px` }"
                       :title="isEditing(item.index, col.index) ? undefined : cellText(cellValue(item.index, col.index))"
                       @pointerdown="onCellPointerDown($event, item.index, col.index)"
-                      @dblclick="startEdit(item.index, col.index)"
+                      @dblclick="onCellDoubleClick(item.index, col.index)"
                     >
                       <template v-if="isRowsMode()">
                         <template v-for="e in [selectionEdges(item.index, col.index)]" :key="0">
@@ -964,6 +1126,12 @@ async function pasteCell() {
               <ContextMenuItem @select="copySelection(true)">
                 Copy as JSON
               </ContextMenuItem>
+              <ContextMenuItem
+                v-if="contextTarget"
+                @select="openInspector(contextTarget.row, contextTarget.col)"
+              >
+                Open value
+              </ContextMenuItem>
               <ContextMenuSeparator />
               <ContextMenuItem :disabled="!selectionEditable()" @select="setNullSelection">
                 Set NULL
@@ -981,6 +1149,20 @@ async function pasteCell() {
             </template>
           </ContextMenuContent>
         </ContextMenu>
+            </div>
+          </ResizablePanel>
+          <template v-if="inspector">
+            <ResizableHandle with-handle />
+            <ResizablePanel :default-size="30" :min-size="18" class="min-w-0">
+              <ValueInspectorPanel
+                :payload="inspector"
+                @close="closeInspector"
+                @update:text="onInspectorText"
+                @open-window="openInspectorWindow"
+              />
+            </ResizablePanel>
+          </template>
+        </ResizablePanelGroup>
         <Dialog :open="setValueOpen" @update:open="setValueOpen = $event">
           <DialogContent>
             <DialogHeader>

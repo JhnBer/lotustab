@@ -49,6 +49,8 @@ const pageTitle = computed(() => {
   return typeof title === "string" ? title : "LotusTab";
 });
 
+const minimalChrome = computed(() => route.meta.chrome === "minimal");
+
 function restoreHandoff(raw: string | null | undefined): boolean {
   if (!raw) {
     return false;
@@ -74,6 +76,13 @@ onMounted(async () => {
   });
   try {
     const name = await Window.Name();
+    if (name.startsWith("value-")) {
+      if (route.path !== "/value") {
+        const id = name.slice("value-".length);
+        await router.replace({ path: "/value", query: { id } });
+      }
+      return;
+    }
     if (name.startsWith("conn-")) {
       const id = name.slice("conn-".length);
       const profile = connections.profiles.find((p) => p.id === id);
@@ -94,6 +103,9 @@ onMounted(async () => {
     // Main window / non-Wails preview.
     updates.bindMainWindow();
   }
+  if (route.path === "/value") {
+    return;
+  }
   if (connections.selectedId) {
     await router.replace("/query");
   }
@@ -102,52 +114,60 @@ onMounted(async () => {
 
 <template>
   <div class="flex h-full min-h-0 flex-col">
-    <div
-      class="drag-region bg-background border-b shrink-0"
-      :style="{ height: 'var(--titlebar-height)' }"
-    />
-    <SidebarProvider
-      class="flex h-full min-h-0 flex-1 overflow-hidden"
-    >
-      <AppSidebarRail />
-      <AppResizableLayout>
-        <header
-          class="drag-region sticky top-0 flex h-12 shrink-0 items-center gap-2 border-b px-4 transition-[width,height] ease-linear"
-          :class="headerTint || 'bg-background'"
-        >
-          <div class="flex min-w-0 flex-1 items-center gap-2" style="--wails-draggable: no-drag">
-            <SidebarTrigger class="-ml-1" />
-            <Separator
-              orientation="vertical"
-              class="mr-2 data-[orientation=vertical]:h-12"
-            />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem class="hidden md:block">
-                  <BreadcrumbLink as-child>
-                    <RouterLink to="/connections">LotusTab</RouterLink>
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator class="hidden md:block" />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>{{ pageTitle }}</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </div>
-        </header>
-        <div class="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
-          <RouterView v-slot="{ Component }">
-            <component :is="Component" class="h-full min-h-0 flex-1" />
-          </RouterView>
-        </div>
-      </AppResizableLayout>
+    <template v-if="minimalChrome">
+      <RouterView v-slot="{ Component }">
+        <component :is="Component" class="h-full min-h-0 flex-1" />
+      </RouterView>
       <Toaster rich-colors position="bottom-right" />
-    </SidebarProvider>
-    <ExportDataDialog
-      v-model:open="exportDataOpen"
-      :profile-id="presetProfileId"
-      :database="presetDatabase"
-    />
+    </template>
+    <template v-else>
+      <div
+        class="drag-region bg-background border-b shrink-0"
+        :style="{ height: 'var(--titlebar-height)' }"
+      />
+      <SidebarProvider
+        class="flex h-full min-h-0 flex-1 overflow-hidden"
+      >
+        <AppSidebarRail />
+        <AppResizableLayout>
+          <header
+            class="drag-region sticky top-0 flex h-12 shrink-0 items-center gap-2 border-b px-4 transition-[width,height] ease-linear"
+            :class="headerTint || 'bg-background'"
+          >
+            <div class="flex min-w-0 flex-1 items-center gap-2" style="--wails-draggable: no-drag">
+              <SidebarTrigger class="-ml-1" />
+              <Separator
+                orientation="vertical"
+                class="mr-2 data-[orientation=vertical]:h-12"
+              />
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem class="hidden md:block">
+                    <BreadcrumbLink as-child>
+                      <RouterLink to="/connections">LotusTab</RouterLink>
+                    </BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator class="hidden md:block" />
+                  <BreadcrumbItem>
+                    <BreadcrumbPage>{{ pageTitle }}</BreadcrumbPage>
+                  </BreadcrumbItem>
+                </BreadcrumbList>
+              </Breadcrumb>
+            </div>
+          </header>
+          <div class="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
+            <RouterView v-slot="{ Component }">
+              <component :is="Component" class="h-full min-h-0 flex-1" />
+            </RouterView>
+          </div>
+        </AppResizableLayout>
+        <Toaster rich-colors position="bottom-right" />
+      </SidebarProvider>
+      <ExportDataDialog
+        v-model:open="exportDataOpen"
+        :profile-id="presetProfileId"
+        :database="presetDatabase"
+      />
+    </template>
   </div>
 </template>

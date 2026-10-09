@@ -1,6 +1,7 @@
 import { createRouter, createWebHashHistory } from "vue-router";
 import ConnectionsPage from "@/features/connections/ConnectionsPage.vue";
 import QueryWorkspace from "@/features/editor/QueryWorkspace.vue";
+import ValueInspectorPage from "@/features/results/ValueInspectorPage.vue";
 import SettingsPage from "@/features/settings/SettingsPage.vue";
 import ShortcutsPage from "@/features/settings/ShortcutsPage.vue";
 import AboutPage from "@/features/settings/AboutPage.vue";
@@ -21,6 +22,12 @@ export const router = createRouter({
       name: "query",
       component: QueryWorkspace,
       meta: { title: "Query" },
+    },
+    {
+      path: "/value",
+      name: "value",
+      component: ValueInspectorPage,
+      meta: { title: "Value", chrome: "minimal" },
     },
     {
       path: "/transfers",
