@@ -107,11 +107,14 @@ const title = computed(() => {
 
 <template>
   <!--
-    Header height matches the results grid column header (py-2 + name + type line ≈ 46px).
+    Header height matches the results grid column header:
+    py-2 + name (text-sm/leading-5) + type (10px/leading-none) + border-b = 47px.
+    Table browse also pulls ResultsTable up with -mt-px under the toolbar; that offset
+    is on the shared parent — keep this header 47px so its bottom border lines up.
     No left border: the ResizableHandle already draws the divider.
   -->
   <div class="bg-background flex h-full min-h-0 flex-col">
-    <div class="box-border flex h-[46px] shrink-0 items-center gap-1.5 border-b px-3">
+    <div class="box-border flex h-[47px] shrink-0 items-center gap-1.5 border-b px-3">
       <div class="min-w-0 flex-1">
         <div class="truncate text-sm font-medium leading-5">{{ title }}</div>
         <div
