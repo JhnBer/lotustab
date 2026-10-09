@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { X } from "@lucide/vue";
+import { SquareArrowOutUpRight, X } from "@lucide/vue";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -10,6 +10,12 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import JsonTree from "@/features/results/JsonTree.vue";
 import {
   formatBinaryPreview,
@@ -100,18 +106,25 @@ const title = computed(() => {
 </script>
 
 <template>
-  <div class="bg-background flex h-full min-h-0 flex-col border-l">
-    <div class="flex items-center gap-2 border-b px-3 py-2">
+  <!--
+    Header height matches the results grid column header (py-2 + name + type line ≈ 46px).
+    No left border: the ResizableHandle already draws the divider.
+  -->
+  <div class="bg-background flex h-full min-h-0 flex-col">
+    <div class="box-border flex h-[46px] shrink-0 items-center gap-1.5 border-b px-3">
       <div class="min-w-0 flex-1">
-        <div class="truncate text-sm font-medium">{{ title }}</div>
-        <div v-if="!payload.editable" class="text-muted-foreground text-[10px]">
+        <div class="truncate text-sm font-medium leading-5">{{ title }}</div>
+        <div
+          v-if="!payload.editable"
+          class="text-muted-foreground truncate text-[10px] leading-none"
+        >
           Read-only
         </div>
       </div>
       <Button
         v-if="canEdit"
         variant="outline"
-        size="sm"
+        size="xs"
         class="shrink-0"
         :disabled="!dirty"
         @click="onCancel"
@@ -121,30 +134,39 @@ const title = computed(() => {
       <Button
         v-if="windowMode"
         variant="outline"
-        size="sm"
+        size="xs"
         class="shrink-0"
         @click="emit('returnPanel')"
       >
         Return to side panel
       </Button>
-      <Button
-        v-else
-        variant="outline"
-        size="sm"
-        class="shrink-0"
-        @click="emit('openWindow')"
-      >
-        Open in new window
-      </Button>
+      <TooltipProvider v-else :delay-duration="600">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="outline"
+              size="icon-xs"
+              class="shrink-0"
+              aria-label="Open in new window"
+              @click="emit('openWindow')"
+            >
+              <SquareArrowOutUpRight class="size-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" align="end">
+            Open in new window
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       <Button
         v-if="!windowMode"
         variant="ghost"
-        size="icon"
-        class="size-8 shrink-0"
+        size="icon-xs"
+        class="shrink-0"
+        aria-label="Close"
         @click="emit('close')"
       >
-        <X class="size-4" />
-        <span class="sr-only">Close</span>
+        <X class="size-3.5" />
       </Button>
     </div>
     <div

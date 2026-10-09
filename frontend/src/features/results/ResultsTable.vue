@@ -1086,7 +1086,7 @@ async function pasteCell() {
       <div v-else class="relative min-h-0 flex-1">
         <ResizablePanelGroup direction="horizontal" class="h-full">
           <ResizablePanel
-            :default-size="inspector ? 70 : 100"
+            :default-size="inspector ? 62 : 100"
             :min-size="40"
             class="min-w-0"
           >
@@ -1322,8 +1322,8 @@ async function pasteCell() {
             </div>
           </ResizablePanel>
           <template v-if="inspector">
-            <ResizableHandle with-handle />
-            <ResizablePanel :default-size="30" :min-size="18" class="min-w-0">
+            <ResizableHandle />
+            <ResizablePanel :default-size="38" :min-size="28" class="min-w-0">
               <ValueInspectorPanel
                 :payload="inspector"
                 @close="closeInspector"
