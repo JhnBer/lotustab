@@ -1,6 +1,9 @@
 import type { Column } from "@/lib/wails";
 
+/** Manual drag-resize floor (users may shrink below the autosize default). */
 export const MIN_COL_WIDTH = 72;
+/** Autosize / missing-width display floor (pre-autosize default column width). */
+export const DEFAULT_COL_WIDTH = 160;
 export const MAX_COL_WIDTH = 360;
 export const MAX_LARGE_COL_WIDTH = 220;
 export const SAMPLE_ROW_LIMIT = 40;
@@ -123,8 +126,12 @@ export function computeColumnWidths(
     }
 
     const large = isLargeColumnType(column.type) || longSample;
-    // Content is capped; header floor is not — long names stay fully visible.
-    widths[column.name] = Math.max(headerPx, clampContentWidth(contentPx, large));
+    // Autosize floor 160; header beats content ceilings; content may grow to max.
+    widths[column.name] = Math.max(
+      DEFAULT_COL_WIDTH,
+      headerPx,
+      clampContentWidth(contentPx, large),
+    );
   }
 
   return widths;

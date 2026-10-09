@@ -40,19 +40,30 @@ const emit = defineEmits<{
 
 const text = ref(props.payload.text);
 const view = ref<"tree" | "raw">("tree");
+/** UI chrome for the current cell open; not recomputed from in-progress text. */
+const mode = ref(inspectorModeFor(props.payload.columnType, props.payload.text));
+
+function cellIdentity(p: ValueInspectorPayload): string {
+  return `${p.token}\0${p.row}\0${p.col}\0${p.columnName}`;
+}
 
 watch(
   () => props.payload,
-  (next) => {
-    text.value = next.text;
-    const mode = inspectorModeFor(next.columnType, next.text);
-    view.value = mode === "tree" ? "tree" : "raw";
+  (next, prev) => {
+    const identityChanged = !prev || cellIdentity(next) !== cellIdentity(prev);
+    if (identityChanged) {
+      text.value = next.text;
+      mode.value = inspectorModeFor(next.columnType, next.text);
+      view.value = mode.value === "tree" ? "tree" : "raw";
+      return;
+    }
+    // Same cell: parent may echo keystrokes or push an external text update.
+    // Sync text when it diverges, but never reset Tree/Raw selection.
+    if (next.text !== text.value) {
+      text.value = next.text;
+    }
   },
   { immediate: true },
-);
-
-const mode = computed(() =>
-  inspectorModeFor(props.payload.columnType, text.value),
 );
 
 const parsedJson = computed(() => tryParseJson(text.value));

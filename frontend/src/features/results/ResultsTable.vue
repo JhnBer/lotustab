@@ -45,6 +45,7 @@ import {
 import {
   columnSetKey,
   computeColumnWidths,
+  DEFAULT_COL_WIDTH,
   isLargeCell,
   MIN_COL_WIDTH,
 } from "@/features/results/columnWidth";
@@ -225,7 +226,7 @@ watch(
 );
 
 function colWidth(name: string) {
-  return manualWidths.value[name] ?? autoWidths.value[name] ?? MIN_COL_WIDTH;
+  return manualWidths.value[name] ?? autoWidths.value[name] ?? DEFAULT_COL_WIDTH;
 }
 
 const rowVirtualizer = useVirtualizer(
