@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown } from "@lucide/vue";
 import { Events, Window } from "@wailsio/runtime";
 import { toast } from "vue-sonner";
 import { Spinner } from "@/components/ui/spinner";
+import LotusLoader from "@/components/LotusLoader.vue";
 import type { QueryResult } from "@/lib/wails";
 import { ColumnWidthsService, WindowsService } from "@/lib/wails";
 import { Button } from "@/components/ui/button";
@@ -79,6 +80,7 @@ const props = withDefaults(
     sortDir?: string;
     emptyHint?: string;
     showStatus?: boolean;
+    lotusLoader?: boolean;
     rowOffset?: number;
     editable?: boolean;
     edits?: CellDraft[];
@@ -91,6 +93,7 @@ const props = withDefaults(
     sortDir: "",
     emptyHint: "Run a query to see results.",
     showStatus: true,
+    lotusLoader: false,
     rowOffset: 0,
     editable: false,
     edits: () => [],
@@ -1061,7 +1064,8 @@ async function pasteCell() {
 <template>
   <div class="flex h-full min-h-0 flex-col">
     <div v-if="running && !result" class="text-muted-foreground flex flex-1 items-center justify-center p-4">
-      <Spinner />
+      <LotusLoader v-if="lotusLoader" class="size-8" label="Loading results" />
+      <Spinner v-else />
     </div>
     <div v-else-if="error" class="text-destructive overflow-auto p-4 font-mono text-sm whitespace-pre-wrap">
       {{ error }}

@@ -4,9 +4,9 @@ import { Play, Plug } from "@lucide/vue";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import DatabaseCombobox from "@/components/DatabaseCombobox.vue";
+import LotusLoader from "@/components/LotusLoader.vue";
 import { useProfileActions } from "@/composables/useProfileActions";
 import { errorMessage, isCanceled } from "@/lib/errors";
 import {
@@ -176,7 +176,7 @@ function onDatabase(tabId: string, value: string) {
       v-if="connecting"
       class="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-2 p-8 text-sm"
     >
-      <Spinner />
+      <LotusLoader class="size-8" label="Connecting" />
       <span>Connecting…</span>
     </div>
 
@@ -263,7 +263,7 @@ function onDatabase(tabId: string, value: string) {
               Cancel
             </Button>
             <Button size="sm" class="shrink-0" :disabled="tab.running" @click="run()">
-              <Spinner v-if="tab.running" class="size-3.5" />
+              <LotusLoader v-if="tab.running" class="size-3.5" label="Running query" />
               <Play v-else class="size-3.5" />
               Run
             </Button>
@@ -286,6 +286,7 @@ function onDatabase(tabId: string, value: string) {
             :error="tab.error"
             :running="tab.running"
             :show-status="false"
+            lotus-loader
             :row-offset="(tab.results?.length ?? 0) > 1 ? 0 : (tab.page - 1) * tab.pageSize"
           />
           <TablePager
@@ -314,7 +315,7 @@ function onDatabase(tabId: string, value: string) {
           v-if="queries.coldMountId && queries.coldMountId === queries.activeTabId"
           class="absolute inset-0 z-10 flex items-center justify-center bg-background/60"
         >
-          <Spinner />
+          <LotusLoader class="size-8" label="Loading tab" />
         </div>
       </div>
     </template>

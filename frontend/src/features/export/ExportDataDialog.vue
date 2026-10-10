@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import LotusLoader from "@/components/LotusLoader.vue";
 import { Switch } from "@/components/ui/switch";
 import DatabaseCombobox from "@/components/DatabaseCombobox.vue";
 import {
@@ -624,7 +625,7 @@ function cancelExport() {
 
       <div v-if="running" class="grid gap-3 py-2">
         <div class="flex items-center gap-2 text-sm">
-          <Spinner class="size-4" />
+          <LotusLoader class="size-4" label="Exporting" />
           <span v-if="phase === 'counting'">
             Preparing… Counting rows in {{ selectedTables.length }} tables…
           </span>

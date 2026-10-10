@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import LotusLoader from "@/components/LotusLoader.vue";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { formatBytes, formatDuration, formatRows, isDirNotEmptyError, suggestedExportFileName, suggestedExportFolderName, withExportExt } from "@/features/export/format";
@@ -400,7 +401,7 @@ function cancelExport() {
 
       <div v-if="running" class="grid gap-3 py-2">
         <div class="flex items-center gap-2 text-sm">
-          <Spinner class="size-4" />
+          <LotusLoader class="size-4" label="Exporting" />
           <span>{{ progress.rows === 0 && progress.chunk === 0 ? "Starting…" : "Exporting…" }}</span>
         </div>
         <p class="text-muted-foreground text-sm">
