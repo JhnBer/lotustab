@@ -11,6 +11,8 @@ const props = withDefaults(
     label: "Loading",
   },
 );
+
+// old colors fill="#8d6e4e" fill="#4e578d" fill="#8d4e4e"
 </script>
 
 <template>
@@ -25,17 +27,17 @@ const props = withDefaults(
       <path
         class="lotus-loader__petal lotus-loader__petal--0"
         d="M285.836 34.271a154 154 0 0 1 16.546-.588c13.131 20.127 21.658 43.674 23.951 69.279 7.475 83.464-54.126 157.184-137.59 164.659-5.564.499-11.085.69-16.546.588l-.113-.173c21.076-11.256 39.794-27.67 54.104-48.843 35.165-52.033 33.728-118.046 1.576-167.612 17.474-9.36 37.082-15.43 58.072-17.31"
-        fill="#8d6e4e"
+        fill="#999999"
       />
       <path
         class="lotus-loader__petal lotus-loader__petal--1"
         d="M24.566 33.683c5.461-.101 10.982.09 16.546.588 20.959 1.877 40.54 7.932 57.995 17.27-44.826 69.177-26.195 161.813 42.406 208.175a153 153 0 0 0 13.472 8.134l-.234.359a153 153 0 0 1-16.546-.588C54.741 260.146-6.861 186.426.614 102.962 2.908 77.357 11.435 53.81 24.566 33.683"
-        fill="#4e578d"
+        fill="#999999"
       />
       <path
         class="lotus-loader__petal lotus-loader__petal--2"
         d="M108.76 49.043C123.154 27.744 142.009 11.262 163.238 0a153 153 0 0 1 14.197 8.52c17.396 11.757 31.58 26.49 42.329 43.061 32.152 49.566 33.589 115.579-1.576 167.612-14.31 21.173-33.028 37.587-54.104 48.843q-.307-.471-.61-.945l-.489.759a153 153 0 0 1-13.472-8.134c-68.601-46.362-87.232-138.998-42.406-208.175a146 146 0 0 1 1.653-2.498"
-        fill="#8d4e4e"
+        fill="#999999"
       />
     </g>
   </svg>
@@ -45,7 +47,7 @@ const props = withDefaults(
 @keyframes lotus-petal-pulse {
   0%,
   100% {
-    opacity: 0.45;
+    opacity: 0.75;
   }
   50% {
     opacity: 1;
@@ -53,19 +55,22 @@ const props = withDefaults(
 }
 
 .lotus-loader__petal {
-  animation: lotus-petal-pulse 1.8s ease-in-out infinite;
+  /* Hold dim before each delay so the first cycle does not snap from opacity 1. */
+  opacity: 0.75;
+  animation: lotus-petal-pulse 1.8s ease-in-out infinite both;
 }
 
+/* Negative delays = same 0 / 0.6 / 1.2 phase stagger, already in motion on first paint. */
 .lotus-loader__petal--0 {
   animation-delay: 0s;
 }
 
 .lotus-loader__petal--1 {
-  animation-delay: 0.6s;
+  animation-delay: -1.2s;
 }
 
 .lotus-loader__petal--2 {
-  animation-delay: 1.2s;
+  animation-delay: -0.6s;
 }
 
 @media (prefers-reduced-motion: reduce) {
