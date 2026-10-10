@@ -18,10 +18,23 @@ import { AboutService } from "@/lib/wails";
 import { useSettingsStore } from "@/stores/settings";
 import { useUpdatesStore } from "@/stores/updates";
 
+/** Matches build/config.yml productName; no backend field. */
+const productName = "LotusTab";
+/** Public asset; keep as a runtime URL so Vite does not rewrite it. */
+const logoSrc = "/logo.svg";
+
 const settings = useSettingsStore();
 const updates = useUpdatesStore();
 const tokenDraft = ref("");
 const tokenBusy = ref(false);
+
+const versionLine = computed(() => {
+  const { version, goos, goarch } = updates.info;
+  if (!version || !goos || !goarch) {
+    return "…";
+  }
+  return `${version} · ${goos}/${goarch}`;
+});
 
 const canSaveToken = computed(() => tokenDraft.value.trim().length > 0 && !tokenBusy.value);
 const canDeleteToken = computed(
@@ -92,21 +105,10 @@ function formatSize(bytes: number): string {
   <section class="mx-auto flex h-full w-full max-w-lg flex-col gap-8 overflow-auto py-2">
     <h1 class="text-lg font-medium">About</h1>
 
-    <div class="flex items-center justify-between gap-4">
-      <span class="text-sm">Version</span>
-      <span class="text-muted-foreground font-mono text-sm">
-        {{ updates.info.version || "…" }}
-      </span>
-    </div>
-
-    <div class="flex items-center justify-between gap-4">
-      <span class="text-sm">Architecture</span>
-      <span class="text-muted-foreground font-mono text-sm">
-        <template v-if="updates.info.goos">
-          {{ updates.info.goos }}/{{ updates.info.goarch }}
-        </template>
-        <template v-else>…</template>
-      </span>
+    <div class="flex flex-col items-center gap-1.5">
+      <img :src="logoSrc" alt="" width="64" height="64" class="size-16" />
+      <p class="text-base font-medium">{{ productName }}</p>
+      <p class="text-muted-foreground font-mono text-sm">{{ versionLine }}</p>
     </div>
 
     <div class="flex items-center justify-between gap-4">
