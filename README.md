@@ -1,4 +1,8 @@
-# LotusTab
+<p align="center">
+  <img src="frontend/public/logo.svg" alt="LotusTab" width="96" height="96">
+</p>
+
+<h1 align="center">LotusTab</h1>
 
 A desktop database client for **PostgreSQL**, **MySQL**, and **ClickHouse**. Open connections, browse tables, run SQL, and keep as many tabs as you need — without parking passwords in config files.
 
