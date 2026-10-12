@@ -7,10 +7,14 @@ Thanks for contributing. This guide covers how to send changes and how licensing
 1. Fork the repository and create a branch from `main`.
 2. Make focused changes. Follow [AGENTS.md](AGENTS.md) for architecture (drivers as adapters, thin Wails bindings, secrets in the keychain, shadcn-vue + Tailwind only).
 3. Open a pull request against `main`.
-4. On your first PR, **sign the CLA** when [CLA Assistant](https://cla-assistant.io/) asks you to. Unsigned human PRs cannot merge while the CLA check is required.
+4. On your first PR, **sign the CLA** by posting this exact comment when the bot asks:
+
+   `I have read the CLA Document and I hereby sign the CLA`
+
+   Unsigned human PRs cannot merge while the CLA check is required. You can comment `recheck` to re-run the check after signing.
 5. Automated bots (for example Dependabot) are allowlisted and do not need to sign.
 
-Contributor history lives in GitHub / git (`git shortlog`, the Contributors graph). We do **not** maintain a separate in-repo list of CLA signatures.
+Signatures are stored in-repo at `signatures/version1/cla.json` (created by the CLA Action on first sign). Contributor history also lives in GitHub / git (`git shortlog`, the Contributors graph).
 
 ## Licenses
 

@@ -2,7 +2,11 @@
 
 This Contributor License Agreement ("Agreement") applies to Contributions submitted to the LotusTab project (the "Project"), currently hosted at https://github.com/JhnBer/lotustab.
 
-By submitting a Contribution (for example by opening a pull request), you agree to the terms below. Signing via [CLA Assistant](https://cla-assistant.io/) records that agreement for the Project maintainers.
+By submitting a Contribution (for example by opening a pull request), you agree to the terms below. On your first PR, sign by posting this exact comment:
+
+`I have read the CLA Document and I hereby sign the CLA`
+
+A GitHub Action records that signature in `signatures/version1/cla.json` on `main`.
 
 ## 1. Definitions
 
