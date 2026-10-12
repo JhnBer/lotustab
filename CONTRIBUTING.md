@@ -14,7 +14,7 @@ Thanks for contributing. This guide covers how to send changes and how licensing
    Unsigned human PRs cannot merge while the CLA check is required. You can comment `recheck` to re-run the check after signing.
 5. Automated bots (for example Dependabot) are allowlisted and do not need to sign.
 
-Signatures are stored in-repo at `signatures/version1/cla.json` (created by the CLA Action on first sign). Contributor history also lives in GitHub / git (`git shortlog`, the Contributors graph).
+Signatures are stored in-repo at `.signatures/version1/cla.json` (created by the CLA Action on first sign). Contributor history also lives in GitHub / git (`git shortlog`, the Contributors graph).
 
 ## Licenses
 

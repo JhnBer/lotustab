@@ -6,7 +6,7 @@ By submitting a Contribution (for example by opening a pull request), you agree 
 
 `I have read the CLA Document and I hereby sign the CLA`
 
-A GitHub Action records that signature in `signatures/version1/cla.json` on `main`.
+A GitHub Action records that signature in `.signatures/version1/cla.json` on `main`.
 
 ## 1. Definitions
 
