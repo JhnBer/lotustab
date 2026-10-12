@@ -53,3 +53,4 @@ Release version comes from the latest git tag (`v0.1.0` → `0.1.0`) via `APP_VE
 git tag -a v0.1.0 -m "v0.1.0"
 wails3 task darwin:package:universal APP_VERSION=0.1.0
 ```
+
