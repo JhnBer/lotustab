@@ -35,3 +35,7 @@ wails3 task darwin:sign -- 'CLI_ARGS=--identity "-"'
 ```shell
 sudo xattr -cr ./lotustab.app
 ```
+
+## License
+
+LotusTab is licensed under the [GNU General Public License v3.0](LICENSE).
