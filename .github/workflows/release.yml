@@ -22,13 +22,16 @@ jobs:
           - os: macos-latest
             target: darwin
             arch: universal
-          # - os: windows-latest
-          #   target: windows
-          #   arch: amd64
+          - os: windows-latest
+            target: windows
+            arch: amd64
           # - os: ubuntu-latest
           #   target: linux
           #   arch: amd64
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
         with:
@@ -65,13 +68,13 @@ jobs:
           for f in bin/*.dmg; do mv "$f" bin/${NAME}.dmg; done
           (cd bin && shasum -a 256 lotustab-* > SHA256SUMS)
 
-      # - name: Build Windows
-      #   if: matrix.target == 'windows'
-      #   run: |
-      #     wails3 task windows:build
-      #     NAME="lotustab-${{ matrix.target }}-${{ matrix.arch }}-${GITHUB_REF_NAME}"
-      #     mv bin/lotustab.exe bin/${NAME}.exe
-      #     (cd bin && shasum -a 256 lotustab-* > SHA256SUMS)
+      - name: Build Windows
+        if: matrix.target == 'windows'
+        run: |
+          wails3 task windows:build
+          NAME="lotustab-${{ matrix.target }}-${{ matrix.arch }}-${GITHUB_REF_NAME}"
+          mv bin/lotustab.exe bin/${NAME}.exe
+          (cd bin && (command -v sha256sum >/dev/null && sha256sum lotustab-* || shasum -a 256 lotustab-*) > SHA256SUMS)
 
       # - name: Build Linux
       #   if: matrix.target == 'linux'
@@ -89,11 +92,39 @@ jobs:
             bin/SHA256SUMS
           if-no-files-found: error
 
-      - name: Attach to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+  # One release upload so Mac/Windows do not race on SHA256SUMS.
+  publish:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: lotustab-*
+          merge-multiple: false
+
+      - name: Merge checksums and stage assets
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          : > release/SHA256SUMS
+          for dir in dist/lotustab-*; do
+            [ -d "$dir" ] || continue
+            if [ -f "$dir/SHA256SUMS" ]; then
+              cat "$dir/SHA256SUMS" >> release/SHA256SUMS
+            fi
+            shopt -s nullglob
+            for f in "$dir"/lotustab-*; do
+              mv "$f" release/
+            done
+          done
+          echo "--- staged ---"
+          ls -la release
+          echo "--- SHA256SUMS ---"
+          cat release/SHA256SUMS
+
+      - uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: |
-            bin/lotustab-*
-            bin/SHA256SUMS
+          files: release/*
