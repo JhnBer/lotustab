@@ -5,12 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
-	"strings"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/updater"
-
-	"lotustab/internal/secrets"
 )
 
 // AboutInfo is the static identity shown on Settings → About.
@@ -20,7 +17,6 @@ type AboutInfo struct {
 	Goarch         string `json:"goarch"`
 	UpdatesEnabled bool   `json:"updatesEnabled"`
 	State          string `json:"state"`
-	HasGitHubToken bool   `json:"hasGitHubToken"`
 }
 
 // UpdateCheckResult is the outcome of a GitHub Releases check.
@@ -37,12 +33,11 @@ type UpdateCheckResult struct {
 type AboutService struct {
 	version        string
 	updatesEnabled bool
-	secrets        *secrets.Store
 }
 
 // NewAboutService constructs the Wails about/updater service.
-func NewAboutService(version string, updatesEnabled bool, secretStore *secrets.Store) *AboutService {
-	return &AboutService{version: version, updatesEnabled: updatesEnabled, secrets: secretStore}
+func NewAboutService(version string, updatesEnabled bool) *AboutService {
+	return &AboutService{version: version, updatesEnabled: updatesEnabled}
 }
 
 // Info returns the running version, architecture, and updater state.
@@ -53,28 +48,11 @@ func (s *AboutService) Info() AboutInfo {
 		Goarch:         runtime.GOARCH,
 		UpdatesEnabled: s.updatesEnabled,
 		State:          string(updater.StateUnconfigured),
-		HasGitHubToken: s.hasGitHubToken(),
 	}
 	if u, err := s.updater(); err == nil && u.State() != updater.StateUnconfigured {
 		info.State = string(u.State())
 	}
 	return info
-}
-
-// SetGitHubToken stores a PAT in the keychain. Empty value clears it.
-func (s *AboutService) SetGitHubToken(token string) error {
-	if s.secrets == nil {
-		return fmt.Errorf("secrets are not available")
-	}
-	return s.secrets.SetGitHubToken(strings.TrimSpace(token))
-}
-
-// ClearGitHubToken removes the PAT from the keychain.
-func (s *AboutService) ClearGitHubToken() error {
-	if s.secrets == nil {
-		return fmt.Errorf("secrets are not available")
-	}
-	return s.secrets.DeleteGitHubToken()
 }
 
 // Check asks GitHub Releases whether a newer build exists.
@@ -137,7 +115,7 @@ func (s *AboutService) ensureUpdater() (*updater.Updater, error) {
 	if appl == nil {
 		return nil, fmt.Errorf("application is not running")
 	}
-	if err := InitUpdater(appl, s.version, s.gitHubToken); err != nil {
+	if err := InitUpdater(appl, s.version); err != nil {
 		if errors.Is(err, updater.ErrAlreadyConfigured) {
 			return u, nil
 		}
@@ -155,21 +133,6 @@ func (s *AboutService) updater() (*updater.Updater, error) {
 		return nil, fmt.Errorf("updater is not available")
 	}
 	return appl.Updater, nil
-}
-
-func (s *AboutService) gitHubToken() string {
-	if s.secrets == nil {
-		return ""
-	}
-	token, err := s.secrets.GetGitHubToken()
-	if err != nil {
-		return ""
-	}
-	return token
-}
-
-func (s *AboutService) hasGitHubToken() bool {
-	return s.gitHubToken() != ""
 }
 
 func checkResult(rel *updater.Release) UpdateCheckResult {

@@ -17,7 +17,6 @@ const EMPTY_INFO: AboutInfo = {
   goarch: "",
   updatesEnabled: false,
   state: "",
-  hasGitHubToken: false,
 };
 
 type ProgressPayload = {

@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
-import { toast } from "vue-sonner";
+import { computed, onMounted } from "vue";
+import { Browser } from "@wailsio/runtime";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Item,
   ItemContent,
@@ -13,8 +12,6 @@ import {
 } from "@/components/ui/item";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { errorMessage } from "@/lib/errors";
-import { AboutService } from "@/lib/wails";
 import { useSettingsStore } from "@/stores/settings";
 import { useUpdatesStore } from "@/stores/updates";
 
@@ -22,11 +19,11 @@ import { useUpdatesStore } from "@/stores/updates";
 const productName = "LotusTab";
 /** Public asset; keep as a runtime URL so Vite does not rewrite it. */
 const logoSrc = "/logo.svg";
+const githubURL = "https://github.com/JhnBer/lotustab";
+const licenseURL = "https://github.com/JhnBer/lotustab/blob/main/LICENSE";
 
 const settings = useSettingsStore();
 const updates = useUpdatesStore();
-const tokenDraft = ref("");
-const tokenBusy = ref(false);
 
 const versionLine = computed(() => {
   const { version, goos, goarch } = updates.info;
@@ -36,10 +33,6 @@ const versionLine = computed(() => {
   return `${version} · ${goos}/${goarch}`;
 });
 
-const canSaveToken = computed(() => tokenDraft.value.trim().length > 0 && !tokenBusy.value);
-const canDeleteToken = computed(
-  () => !tokenBusy.value && (updates.info.hasGitHubToken || tokenDraft.value.length > 0),
-);
 const checkDisabled = computed(
   () => updates.busy || updates.phase === "downloading",
 );
@@ -55,36 +48,8 @@ function onAutoInstall(value: unknown) {
   settings.setAutoInstallUpdates(Boolean(value));
 }
 
-async function saveToken() {
-  const token = tokenDraft.value.trim();
-  if (!token) {
-    return;
-  }
-  tokenBusy.value = true;
-  try {
-    await AboutService.SetGitHubToken(token);
-    tokenDraft.value = "";
-    await updates.loadInfo();
-    toast.success("GitHub token saved.");
-  } catch (err) {
-    toast.error(errorMessage(err));
-  } finally {
-    tokenBusy.value = false;
-  }
-}
-
-async function deleteToken() {
-  tokenBusy.value = true;
-  try {
-    await AboutService.ClearGitHubToken();
-    tokenDraft.value = "";
-    await updates.loadInfo();
-    toast.success("GitHub token removed.");
-  } catch (err) {
-    toast.error(errorMessage(err));
-  } finally {
-    tokenBusy.value = false;
-  }
+function openExternal(url: string) {
+  void Browser.OpenURL(url);
 }
 
 function formatSize(bytes: number): string {
@@ -109,20 +74,19 @@ function formatSize(bytes: number): string {
       <img :src="logoSrc" alt="" width="64" height="64" class="size-16" />
       <p class="text-base font-medium">{{ productName }}</p>
       <p class="text-muted-foreground font-mono text-sm">{{ versionLine }}</p>
-    </div>
-
-    <div class="flex items-center justify-between gap-4">
-      <div class="min-w-0">
-        <Label for="about-auto-install">Install updates automatically</Label>
-        <p class="text-muted-foreground mt-1 text-xs">
-          Checks hourly and downloads in the background. Restart is always manual.
-        </p>
-      </div>
-      <Switch
-        id="about-auto-install"
-        :model-value="settings.autoInstallUpdates"
-        @update:model-value="onAutoInstall"
-      />
+      <p class="text-muted-foreground mt-1 text-xs">
+        <a
+          :href="githubURL"
+          class="hover:text-foreground underline-offset-4 hover:underline"
+          @click.prevent="openExternal(githubURL)"
+        >GitHub</a>
+        <span class="px-1.5">·</span>
+        <a
+          :href="licenseURL"
+          class="hover:text-foreground underline-offset-4 hover:underline"
+          @click.prevent="openExternal(licenseURL)"
+        >GPL-3.0 license</a>
+      </p>
     </div>
 
     <Item variant="outline" class="min-w-0">
@@ -191,23 +155,19 @@ function formatSize(bytes: number): string {
       <ItemSeparator />
 
       <ItemContent class="w-full min-w-0">
-        <Label for="about-github-token">GitHub token</Label>
-        <Input
-          id="about-github-token"
-          v-model="tokenDraft"
-          type="password"
-          size="xs"
-          class="mt-2 w-full min-w-0"
-          autocomplete="off"
-          :placeholder="updates.info.hasGitHubToken ? 'Saved in keychain' : 'PAT for private releases'"
-        />
-        <div class="mt-2 flex gap-2">
-          <Button size="sm" :disabled="!canSaveToken" @click="saveToken">Save</Button>
-          <Button size="sm" variant="outline" :disabled="!canDeleteToken" @click="deleteToken">
-            Delete
-          </Button>
+        <div class="flex items-center justify-between gap-4">
+          <div class="min-w-0">
+            <Label for="about-auto-install">Install updates automatically</Label>
+            <p class="text-muted-foreground mt-1 text-xs">
+              Checks hourly and downloads in the background. Restart is always manual.
+            </p>
+          </div>
+          <Switch
+            id="about-auto-install"
+            :model-value="settings.autoInstallUpdates"
+            @update:model-value="onAutoInstall"
+          />
         </div>
-        <p class="text-muted-foreground mt-2 text-xs">Stored in the OS keychain.</p>
       </ItemContent>
 
       <ItemFooter v-if="showInstallActions" class="flex-wrap justify-start">

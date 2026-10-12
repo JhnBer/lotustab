@@ -86,8 +86,8 @@ func TestAttachChecksumAndDownloadUseAssetAPI(t *testing.T) {
 	defer cdn.Close()
 
 	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Authorization") != "Bearer secret" {
-			t.Errorf("api auth: %q", r.Header.Get("Authorization"))
+		if got := r.Header.Get("Authorization"); got != "" {
+			t.Errorf("api auth: %q", got)
 		}
 		switch r.URL.Path {
 		case "/repos/JhnBer/lotustab/releases/tags/v0.0.19":
@@ -105,7 +105,7 @@ func TestAttachChecksumAndDownloadUseAssetAPI(t *testing.T) {
 	}))
 	defer api.Close()
 
-	p := &liveGitHubProvider{token: func() string { return "secret" }, apiBase: api.URL}
+	p := &liveGitHubProvider{apiBase: api.URL}
 	rel := &updater.Release{
 		Artifact: updater.Artifact{Filename: "app.zip", Size: 9},
 		Metadata: map[string]any{
@@ -134,9 +134,9 @@ func TestAttachChecksumAndDownloadUseAssetAPI(t *testing.T) {
 }
 
 func TestAboutServiceInfoDev(t *testing.T) {
-	s := NewAboutService("dev", true, nil)
+	s := NewAboutService("dev", true)
 	info := s.Info()
-	if info.Version != "dev" || !info.UpdatesEnabled || info.HasGitHubToken {
+	if info.Version != "dev" || !info.UpdatesEnabled {
 		t.Fatalf("unexpected info: %+v", info)
 	}
 	if _, err := s.Check(); err == nil {

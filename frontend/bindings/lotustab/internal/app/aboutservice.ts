@@ -22,13 +22,6 @@ export function Check(): $CancellablePromise<$models.UpdateCheckResult> {
 }
 
 /**
- * ClearGitHubToken removes the PAT from the keychain.
- */
-export function ClearGitHubToken(): $CancellablePromise<void> {
-    return $Call.ByID(2011219910);
-}
-
-/**
  * Info returns the running version, architecture, and updater state.
  */
 export function Info(): $CancellablePromise<$models.AboutInfo> {
@@ -54,11 +47,4 @@ export function InstallAndRestart(): $CancellablePromise<void> {
  */
 export function Restart(): $CancellablePromise<void> {
     return $Call.ByID(2347105828);
-}
-
-/**
- * SetGitHubToken stores a PAT in the keychain. Empty value clears it.
- */
-export function SetGitHubToken(token: string): $CancellablePromise<void> {
-    return $Call.ByID(2042186437, token);
 }

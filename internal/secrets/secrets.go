@@ -77,30 +77,8 @@ func (s *Store) Delete(profileID string) error {
 	return first
 }
 
-// GetGitHubToken returns the optional updater PAT. Missing entries yield "".
-func (s *Store) GetGitHubToken() (string, error) {
-	pw, err := keyring.Get(service, githubTokenAccount)
-	if err != nil {
-		if err == keyring.ErrNotFound {
-			return "", nil
-		}
-		return "", fmt.Errorf("keychain get: %w", err)
-	}
-	return pw, nil
-}
-
-// SetGitHubToken stores the updater PAT. An empty value deletes it.
-func (s *Store) SetGitHubToken(value string) error {
-	if value == "" {
-		return s.DeleteGitHubToken()
-	}
-	if err := keyring.Set(service, githubTokenAccount, value); err != nil {
-		return fmt.Errorf("keychain set: %w", err)
-	}
-	return nil
-}
-
-// DeleteGitHubToken removes the updater PAT. Missing entries are not an error.
+// DeleteGitHubToken removes a leftover updater PAT from when releases were
+// private. Missing entries are not an error.
 func (s *Store) DeleteGitHubToken() error {
 	if err := keyring.Delete(service, githubTokenAccount); err != nil && err != keyring.ErrNotFound {
 		return fmt.Errorf("keychain delete: %w", err)
