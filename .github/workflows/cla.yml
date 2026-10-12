@@ -24,7 +24,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          path-to-signatures: "signatures/version1/cla.json"
+          path-to-signatures: ".signatures/version1/cla.json"
           path-to-document: "https://github.com/JhnBer/lotustab/blob/main/CLA.md"
           branch: "main"
           allowlist: "dependabot[bot],bot*"
