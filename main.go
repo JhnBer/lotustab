@@ -45,6 +45,7 @@ func main() {
 		log.Fatal(err)
 	}
 	secretStore := secrets.New()
+	_ = secretStore.DeleteGitHubToken()
 	manager := connection.NewManager()
 
 	connections := app.NewConnectionsService(registry, store, secretStore, manager)
@@ -53,7 +54,7 @@ func main() {
 	drivers := app.NewDriversService(registry)
 	widths := app.NewColumnWidthsService(columnWidths)
 	windows := app.NewWindowsService()
-	about := app.NewAboutService(currentVersion, true, secretStore)
+	about := app.NewAboutService(currentVersion, true)
 
 	appl := application.New(application.Options{
 		Name:        "LotusTab",

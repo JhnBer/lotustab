@@ -17,7 +17,6 @@ export interface AboutInfo {
     "goarch": string;
     "updatesEnabled": boolean;
     "state": string;
-    "hasGitHubToken": boolean;
 }
 
 /**

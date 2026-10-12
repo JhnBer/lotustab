@@ -25,17 +25,15 @@ const (
 
 var _ updater.Provider = (*liveGitHubProvider)(nil)
 
-// InitUpdater configures app.Updater against GitHub Releases.
-// token is called on every Check/Download so a saved or deleted PAT applies
-// without restarting the app.
-func InitUpdater(appl *application.App, version string, token func() string) error {
+// InitUpdater configures app.Updater against public GitHub Releases.
+func InitUpdater(appl *application.App, version string) error {
 	if appl == nil {
 		return fmt.Errorf("application is not running")
 	}
 	if err := appl.Updater.Init(updater.Config{
 		CurrentVersion: version,
 		Window:         updater.WindowNone,
-		Providers:      []updater.Provider{&liveGitHubProvider{token: token}},
+		Providers:      []updater.Provider{&liveGitHubProvider{}},
 	}); err != nil {
 		return err
 	}
@@ -43,36 +41,20 @@ func InitUpdater(appl *application.App, version string, token func() string) err
 	return nil
 }
 
-// liveGitHubProvider rebuilds the GitHub client with the current keychain
-// token on each request so Save/Delete take effect immediately.
-//
-// Private release assets are fetched from the releases assets API. The
-// browser_download_url that the stock provider uses answers 404 for a
-// private repository even when the asset is listed.
+// liveGitHubProvider checks GitHub Releases and downloads assets by ID so the
+// SHA256SUMS sidecar can be attached. browser_download_url is not used.
 type liveGitHubProvider struct {
-	token   func() string
 	apiBase string
 	client  *http.Client
 }
 
 func (p *liveGitHubProvider) Name() string { return "github" }
 
-func (p *liveGitHubProvider) currentToken() string {
-	if p == nil || p.token == nil {
-		return ""
-	}
-	return p.token()
-}
-
 func (p *liveGitHubProvider) inner() (updater.Provider, error) {
-	cfg := github.Config{
+	return github.New(github.Config{
 		Repository:   githubReleasesRepo,
 		AssetMatcher: matchLotusAsset,
-	}
-	if tok := p.currentToken(); tok != "" {
-		cfg.Token = tok
-	}
-	return github.New(cfg)
+	})
 }
 
 func (p *liveGitHubProvider) Check(ctx context.Context, req updater.CheckRequest) (*updater.Release, error) {
@@ -80,11 +62,7 @@ func (p *liveGitHubProvider) Check(ctx context.Context, req updater.CheckRequest
 	if err != nil {
 		return nil, err
 	}
-	auth := "public"
-	if p.currentToken() != "" {
-		auth = "token"
-	}
-	log.Printf("updater: github %s (version %s, auth %s)", githubReleasesRepo, req.CurrentVersion, auth)
+	log.Printf("updater: github %s (version %s)", githubReleasesRepo, req.CurrentVersion)
 	rel, err := inner.Check(ctx, req)
 	if err != nil || rel == nil {
 		return rel, err
@@ -219,9 +197,6 @@ func (p *liveGitHubProvider) openAsset(ctx context.Context, id int64) (io.ReadCl
 
 func (p *liveGitHubProvider) setAPIHeaders(req *http.Request) {
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	if tok := p.currentToken(); tok != "" {
-		req.Header.Set("Authorization", "Bearer "+tok)
-	}
 }
 
 func (p *liveGitHubProvider) baseURL() string {
@@ -238,25 +213,8 @@ func (p *liveGitHubProvider) httpClient() *http.Client {
 	return http.DefaultClient
 }
 
-// do follows redirects and drops Authorization when the host changes, so the
-// PAT is not sent to the release-asset CDN.
 func (p *liveGitHubProvider) do(req *http.Request) (*http.Response, error) {
-	base := p.httpClient()
-	client := *base
-	prev := client.CheckRedirect
-	client.CheckRedirect = func(r *http.Request, via []*http.Request) error {
-		if len(via) > 0 && !strings.EqualFold(via[len(via)-1].URL.Host, r.URL.Host) {
-			r.Header.Del("Authorization")
-		}
-		if prev != nil {
-			return prev(r, via)
-		}
-		if len(via) >= 10 {
-			return errors.New("stopped after 10 redirects")
-		}
-		return nil
-	}
-	return client.Do(req)
+	return p.httpClient().Do(req)
 }
 
 func releaseAssetID(rel *updater.Release) (int64, error) {
