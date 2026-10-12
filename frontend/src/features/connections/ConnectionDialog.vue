@@ -70,6 +70,10 @@ const fieldRows = computed((): FieldRow[] => {
   return rows;
 });
 
+function fieldDefault(forDriverId: string, key: string): string {
+  return connections.specFor(forDriverId).find((field) => field.key === key)?.default ?? "";
+}
+
 function applyDriver(nextDriverId: string, existing?: Record<string, string>) {
   driverId.value = nextDriverId;
   const nextSpec = connections.specFor(nextDriverId);
@@ -105,7 +109,16 @@ watch(
 );
 
 function onDriverChange(value: unknown) {
-  applyDriver(String(value ?? ""), params);
+  const nextDriverId = String(value ?? "");
+  const prevDriverId = driverId.value;
+  const prevPortDefault = fieldDefault(prevDriverId, "port");
+  const currentPort = params.port ?? "";
+  const nextExisting = { ...params };
+  // Keep a custom port across driver switches; refresh when still empty/previous default.
+  if (!currentPort || currentPort === prevPortDefault) {
+    delete nextExisting.port;
+  }
+  applyDriver(nextDriverId, nextExisting);
 }
 
 function payload(): SaveProfileInput {
