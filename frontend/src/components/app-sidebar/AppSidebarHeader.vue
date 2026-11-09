@@ -30,7 +30,7 @@ onMounted(async () => {
 
 <template>
   <SidebarHeader :class="headerTint">
-    <div class="h-12 -m-2 flex items-center p-2">
+      <div class="h-12 -m-2 flex items-center p-2">
       <div v-if="selected" class="flex items-start gap-2 px-1 py-0.5">
         <span
           class="mt-1.5 size-2.5 shrink-0 rounded-full"

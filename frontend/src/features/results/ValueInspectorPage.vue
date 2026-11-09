@@ -3,12 +3,14 @@ import { onMounted, onBeforeUnmount, ref } from "vue";
 import { useRoute } from "vue-router";
 import { Events } from "@wailsio/runtime";
 import { toast } from "vue-sonner";
+import { useTitleBarHeight } from "@/composables/useTitleBarHeight";
 import ValueInspectorPanel from "@/features/results/ValueInspectorPanel.vue";
 import type { ValueInspectorPayload } from "@/features/results/valueInspector";
 import { errorMessage } from "@/lib/errors";
 import { WindowsService } from "@/lib/wails";
 
 const route = useRoute();
+const titlebarHeight = useTitleBarHeight();
 const payload = ref<ValueInspectorPayload | null>(null);
 const returnUnavailable = ref(false);
 const missing = ref(false);
@@ -123,7 +125,8 @@ onBeforeUnmount(() => {
 <template>
   <div class="bg-background flex h-full min-h-0 flex-col">
     <div
-      class="drag-region border-b shrink-0"
+      v-if="titlebarHeight > 0"
+      class="drag-region shrink-0"
       :style="{ height: 'var(--titlebar-height)' }"
     />
     <div class="min-h-0 flex-1" style="--wails-draggable: no-drag">

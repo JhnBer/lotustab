@@ -37,26 +37,17 @@ LotusTab is licensed under the [GNU General Public License v3.0](LICENSE).
 
 Contributions are accepted under MIT via the [CLA](CLA.md). See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Build from source
+## Build
 
-For contributors and packaging. Everyday installs should use [Releases](https://github.com/JhnBer/lotustab/releases/latest).
+Needs Go 1.25+ and [Wails v3](https://wails.io/): `go install github.com/wailsapp/wails/v3/cmd/wails3@latest`.
 
-Requires Go 1.25+ (toolchain auto-downloads) and [Wails v3](https://wails.io/):
-
-```bash
-go install github.com/wailsapp/wails/v3/cmd/wails3@latest
-wails3 dev
-```
+Run from the repo root. Version comes from the latest git tag (`v0.1.0` → `0.1.0`); override with `APP_VERSION=0.1.0`.
 
 ```bash
-wails3 build                 # binary → bin/
-wails3 task package          # host OS package (.app / installer / Linux packages)
+wails3 dev                              # local app
+wails3 task package                     # macOS .app → bin/lotustab.app
+wails3 task darwin:package:dmg          # macOS .dmg → bin/lotustab.dmg
+wails3 task darwin:package:universal    # Intel + Apple Silicon .app
 ```
 
-Release version comes from the latest git tag (`v0.1.0` → `0.1.0`) via `APP_VERSION`. Cross-compile and sign with the platform tasks under `build/` (`darwin:*`, `windows:*`, `linux:*`). Architecture notes live in `AGENTS.md` and the Taskfiles.
-
-```bash
-# example: stamp a release build from a tag
-git tag -a v0.1.0 -m "v0.1.0"
-wails3 task darwin:package:universal APP_VERSION=0.1.0
-```
+On Windows and Linux, `wails3 task package` builds that platform's installer instead of a `.app`.

@@ -69,3 +69,12 @@ export function TakeValueHandoff(token: string): $CancellablePromise<string> {
 export function TakeValueReturn(token: string): $CancellablePromise<string> {
     return $Call.ByID(1251180721, token);
 }
+
+/**
+ * TitleBarHeight is the CSS-pixel height of the overlay strip above the UI.
+ * macOS uses it so traffic lights sit in empty space; fullscreen and other
+ * platforms return 0 because they keep a native caption or hide the lights.
+ */
+export function TitleBarHeight(): $CancellablePromise<number> {
+    return $Call.ByID(1302153417);
+}

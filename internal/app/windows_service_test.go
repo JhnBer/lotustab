@@ -1,6 +1,7 @@
 package app
 
 import (
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -91,6 +92,31 @@ func TestParkAndTakeValueDraft(t *testing.T) {
 	}
 	if got := s.TakeValueDraft("t1"); got != "" {
 		t.Fatalf("second take should be empty, got %q", got)
+	}
+}
+
+func TestTitleBarHeightWithoutApp(t *testing.T) {
+	got := NewWindowsService().TitleBarHeight()
+	if runtime.GOOS == "darwin" {
+		if got <= 0 {
+			t.Fatalf("darwin should reserve a chrome row, got %v", got)
+		}
+		return
+	}
+	if got != 0 {
+		t.Fatalf("expected 0, got %v", got)
+	}
+}
+
+func TestInterpretTitleBarHeight(t *testing.T) {
+	if got := interpretTitleBarHeight(0); got != 0 {
+		t.Fatalf("fullscreen should be 0, got %v", got)
+	}
+	if got := interpretTitleBarHeight(-1); got != fallbackTitleBarHeight {
+		t.Fatalf("failed probe should fallback, got %v", got)
+	}
+	if got := interpretTitleBarHeight(52); got != 52 {
+		t.Fatalf("measured height should pass through, got %v", got)
 	}
 }
 

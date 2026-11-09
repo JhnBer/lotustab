@@ -23,6 +23,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { useBlockHistoryBackspace } from "@/composables/useBlockHistoryBackspace";
 import { useConnectionTint } from "@/composables/useConnectionTint";
 import { useExportData } from "@/composables/useExportData";
+import { useTitleBarHeight } from "@/composables/useTitleBarHeight";
 import { useWorkspaceShortcuts } from "@/composables/useWorkspaceShortcuts";
 import ExportDataDialog from "@/features/export/ExportDataDialog.vue";
 import { errorMessage } from "@/lib/errors";
@@ -43,6 +44,7 @@ const { open: exportDataOpen, presetProfileId, presetDatabase, openExportData } 
   useExportData();
 useWorkspaceShortcuts();
 useBlockHistoryBackspace();
+const titlebarHeight = useTitleBarHeight();
 
 const pageTitle = computed(() => {
   const title = route.meta.title;
@@ -122,7 +124,8 @@ onMounted(async () => {
     </template>
     <template v-else>
       <div
-        class="drag-region bg-background border-b shrink-0"
+        v-if="titlebarHeight > 0"
+        class="drag-region bg-background shrink-0"
         :style="{ height: 'var(--titlebar-height)' }"
       />
       <SidebarProvider
