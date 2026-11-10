@@ -29,21 +29,22 @@ export function Info(): $CancellablePromise<$models.AboutInfo> {
 }
 
 /**
- * Install downloads and stages the pending release without restarting.
+ * Install downloads the pending release and stores it for the next launch.
  */
 export function Install(): $CancellablePromise<void> {
     return $Call.ByID(3280269752);
 }
 
 /**
- * InstallAndRestart stages the pending release and swaps the binary.
+ * InstallAndRestart stores the pending release if needed and restarts the app.
+ * The swap happens on the next launch, the same way as quitting and opening again.
  */
 export function InstallAndRestart(): $CancellablePromise<void> {
     return $Call.ByID(1734499352);
 }
 
 /**
- * Restart swaps in an already staged update.
+ * Restart starts the app again. A stored update is applied on that launch.
  */
 export function Restart(): $CancellablePromise<void> {
     return $Call.ByID(2347105828);

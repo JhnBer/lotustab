@@ -6,6 +6,7 @@ import (
 	"runtime"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/updater"
 
 	"lotustab/internal/app"
 	"lotustab/internal/core/connection"
@@ -25,6 +26,11 @@ var assets embed.FS
 var currentVersion = "dev"
 
 func main() {
+	updater.HandleHelperMode()
+	if app.ApplyPendingUpdate(currentVersion) {
+		return
+	}
+
 	registry := driver.NewRegistry()
 	if err := registry.Register(postgres.New()); err != nil {
 		log.Fatal(err)

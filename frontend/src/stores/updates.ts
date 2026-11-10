@@ -187,7 +187,7 @@ export const useUpdatesStore = defineStore("updates", () => {
         if (source === "automatic" && settings.autoInstallUpdates) {
           await installLater();
           if (!error.value) {
-            toast.success(`Update ${result.version} downloaded. Restart when ready.`);
+            toast.success(`Update ${result.version} downloaded. It applies the next time LotusTab starts.`);
           }
         }
       } else {

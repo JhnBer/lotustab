@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"sync"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/updater"
@@ -33,6 +34,9 @@ type UpdateCheckResult struct {
 type AboutService struct {
 	version        string
 	updatesEnabled bool
+
+	mu             sync.Mutex
+	checkedVersion string
 }
 
 // NewAboutService constructs the Wails about/updater service.
@@ -65,22 +69,31 @@ func (s *AboutService) Check() (UpdateCheckResult, error) {
 	if err != nil {
 		return UpdateCheckResult{}, err
 	}
+	s.mu.Lock()
 	if rel == nil || !releaseIsNewer(rel.Version, s.version) {
+		s.checkedVersion = ""
+		s.mu.Unlock()
 		return UpdateCheckResult{}, nil
 	}
+	s.checkedVersion = rel.Version
+	s.mu.Unlock()
 	return checkResult(rel), nil
 }
 
-// Install downloads and stages the pending release without restarting.
+// Install downloads the pending release and stores it for the next launch.
 func (s *AboutService) Install() error {
 	u, err := s.ensureUpdater()
 	if err != nil {
 		return err
 	}
-	return u.DownloadAndInstall(context.Background())
+	if err := u.DownloadAndInstall(context.Background()); err != nil {
+		return err
+	}
+	return s.persistDownloaded(u)
 }
 
-// InstallAndRestart stages the pending release and swaps the binary.
+// InstallAndRestart stores the pending release if needed and restarts the app.
+// The swap happens on the next launch, the same way as quitting and opening again.
 func (s *AboutService) InstallAndRestart() error {
 	u, err := s.ensureUpdater()
 	if err != nil {
@@ -91,16 +104,35 @@ func (s *AboutService) InstallAndRestart() error {
 			return err
 		}
 	}
-	return u.Restart(context.Background())
+	if u.DownloadedPath() != "" {
+		if err := s.persistDownloaded(u); err != nil {
+			return err
+		}
+	}
+	return Relaunch()
 }
 
-// Restart swaps in an already staged update.
+// Restart starts the app again. A stored update is applied on that launch.
 func (s *AboutService) Restart() error {
-	u, err := s.updater()
+	return Relaunch()
+}
+
+func (s *AboutService) persistDownloaded(u *updater.Updater) error {
+	path := u.DownloadedPath()
+	if path == "" {
+		return fmt.Errorf("downloaded update has no path")
+	}
+	s.mu.Lock()
+	version := s.checkedVersion
+	s.mu.Unlock()
+	if version == "" {
+		return fmt.Errorf("update version is unknown")
+	}
+	root, err := pendingRoot()
 	if err != nil {
 		return err
 	}
-	return u.Restart(context.Background())
+	return stagePending(root, version, path)
 }
 
 func (s *AboutService) ensureUpdater() (*updater.Updater, error) {

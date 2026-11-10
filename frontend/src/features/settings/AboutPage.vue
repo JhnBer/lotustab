@@ -145,7 +145,7 @@ function formatSize(bytes: number): string {
         </div>
         <p v-else-if="updates.phase === 'ready'" class="mt-2 text-sm">
           Update{{ updates.available?.version ? ` ${updates.available.version}` : "" }} is downloaded.
-          Restart to apply it.
+          It applies the next time LotusTab starts, including if you quit and open it again.
         </p>
         <p v-else-if="updates.phase === 'error'" class="text-destructive mt-2 text-xs">
           {{ updates.error || "Update failed" }}
@@ -159,7 +159,7 @@ function formatSize(bytes: number): string {
           <div class="min-w-0">
             <Label for="about-auto-install">Install updates automatically</Label>
             <p class="text-muted-foreground mt-1 text-xs">
-              Checks hourly and downloads in the background. Restart is always manual.
+              Checks hourly and downloads in the background. The update applies the next time the app starts.
             </p>
           </div>
           <Switch
