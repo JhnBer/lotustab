@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { watchDebounced } from "@vueuse/core";
 import { readJson, writeJson } from "@/lib/persist";
+import { planClose, type CloseSide } from "@/features/editor/closeTabs";
 import {
   afterPaint,
   isQueryTab,
@@ -299,27 +300,37 @@ export const useWorkspaceStore = defineStore("query", () => {
     return tab;
   }
 
-  function close(id: string) {
-    cancel(id);
-    const index = tabs.value.findIndex((t) => t.id === id);
-    if (index < 0) {
+  function applyClose(anchorId: string, side: CloseSide) {
+    const plan = planClose(tabs.value, activeTabId.value, anchorId, side);
+    if (plan.closedIds.length === 0) {
       return;
     }
-    const profileId = tabs.value[index]!.profileId;
-    const groupIndex = tabs.value.filter((t) => t.profileId === profileId).findIndex((t) => t.id === id);
-    tabs.value.splice(index, 1);
-    forgetRecent(id);
-    if (activeTabId.value !== id) {
+    const profileId = tabs.value.find((t) => t.id === anchorId)?.profileId ?? "";
+    for (const id of plan.closedIds) {
+      cancel(id);
+    }
+    const closed = new Set(plan.closedIds);
+    tabs.value = tabs.value.filter((t) => !closed.has(t.id));
+    recentTabIds.value = recentTabIds.value.filter((id) => !closed.has(id));
+    if (profileId && tabs.value.every((t) => t.profileId !== profileId)) {
+      forgetProfile(profileId);
+    }
+    if (plan.activeId === activeTabId.value) {
       return;
     }
-    const group = tabs.value.filter((t) => t.profileId === profileId);
-    const next = group[groupIndex] ?? group[groupIndex - 1];
-    if (next) {
-      selectTab(next.id);
+    if (plan.activeId) {
+      selectTab(plan.activeId);
       return;
     }
     activeTabId.value = "";
-    forgetProfile(profileId);
+  }
+
+  function close(id: string) {
+    applyClose(id, "one");
+  }
+
+  function closeFrom(id: string, side: Exclude<CloseSide, "one">) {
+    applyClose(id, side);
   }
 
   function snapshotForProfile(profileId: string): WorkspaceSnapshot {
@@ -434,6 +445,7 @@ export const useWorkspaceStore = defineStore("query", () => {
     add,
     openTable,
     close,
+    closeFrom,
     snapshotForProfile,
     removeForProfile,
     restore,

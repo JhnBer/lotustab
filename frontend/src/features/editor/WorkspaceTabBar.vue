@@ -8,9 +8,11 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { useClipboardText } from "@/composables/useClipboardText";
+import { planClose, type CloseSide } from "@/features/editor/closeTabs";
 import { useConnectionsStore } from "@/stores/connections";
 import { useQueryStore, type WorkspaceTab } from "@/stores/query";
 import { useSettingsStore } from "@/stores/settings";
@@ -45,6 +47,10 @@ function addTab() {
 
 async function copyName(title: string) {
   await writeClipboard(title);
+}
+
+function closeDisabled(id: string, side: Exclude<CloseSide, "one">) {
+  return planClose(queries.tabs, queries.activeTabId, id, side).closedIds.length === 0;
 }
 </script>
 
@@ -102,6 +108,22 @@ async function copyName(title: string) {
             </ContextMenuItem>
             <ContextMenuItem @select="queries.close(tab.id)">
               Close
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              :disabled="closeDisabled(tab.id, 'left')"
+              @select="queries.closeFrom(tab.id, 'left')"
+            >
+              Close Tabs to the Left
+            </ContextMenuItem>
+            <ContextMenuItem
+              :disabled="closeDisabled(tab.id, 'right')"
+              @select="queries.closeFrom(tab.id, 'right')"
+            >
+              Close Tabs to the Right
+            </ContextMenuItem>
+            <ContextMenuItem @select="queries.closeFrom(tab.id, 'all')">
+              Close All Tabs
             </ContextMenuItem>
           </ContextMenuContent>
         </ContextMenu>
