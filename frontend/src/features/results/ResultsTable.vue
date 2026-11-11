@@ -1242,6 +1242,10 @@ async function pasteCell() {
                       <input
                         v-if="isEditing(item.index, col.index)"
                         v-model="editInput"
+                        autocapitalize="none"
+                        autocorrect="off"
+                        autocomplete="off"
+                        spellcheck="false"
                         class="h-full w-full truncate bg-transparent px-0 font-mono text-xs not-italic outline-none select-text"
                         @keydown.enter.prevent="commitEdit"
                         @keydown.escape.prevent="cancelEdit"
