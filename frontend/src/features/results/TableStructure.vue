@@ -150,7 +150,7 @@ function rowAt(index: number): DraftColumn | undefined {
     </div>
     <div v-else class="relative min-h-0 flex-1">
       <div ref="scrollRef" class="absolute inset-0 overflow-auto">
-        <div class="w-max min-w-full text-sm">
+        <div class="w-max min-w-full text-sm select-none">
           <div class="bg-background sticky top-0 z-10 flex border-b" role="row">
             <div class="h-9 w-8 shrink-0" />
             <div class="text-foreground flex h-9 min-w-40 flex-1 items-center px-2 font-medium">Name</div>

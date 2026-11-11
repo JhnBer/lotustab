@@ -15,7 +15,7 @@ const { selected } = storeToRefs(connections);
 </script>
 
 <template>
-  <Sidebar collapsible="none" class="bg-sidebar h-full min-h-0 w-full! overflow-hidden">
+  <Sidebar collapsible="none" class="bg-sidebar h-full min-h-0 w-full! overflow-hidden select-none">
     <AppSidebarHeader />
 
     <SidebarSeparator class="m-0 -translate-y-full" />

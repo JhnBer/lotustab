@@ -793,6 +793,25 @@ function onRowPointerDown(event: PointerEvent, rowIndex: number) {
   startDrag("rows");
 }
 
+function onGridMouseDown(event: MouseEvent) {
+  if (event.button !== 0) {
+    return;
+  }
+  const target = event.target;
+  if (target instanceof Element && target.closest("input, textarea")) {
+    return;
+  }
+  event.preventDefault();
+}
+
+function onGridSelectStart(event: Event) {
+  const target = event.target;
+  if (target instanceof Element && target.closest("input, textarea")) {
+    return;
+  }
+  event.preventDefault();
+}
+
 function onCellPointerDown(event: PointerEvent, rowIndex: number, colIndex: number) {
   if (event.button !== 0) {
     return;
@@ -1096,7 +1115,13 @@ async function pasteCell() {
           >
             <div class="relative h-full min-h-0">
         <ContextMenu>
-          <div ref="scrollRef" class="absolute inset-0 overflow-auto" @contextmenu.capture="onContextMenu">
+          <div
+            ref="scrollRef"
+            class="absolute inset-0 overflow-auto select-none"
+            @mousedown="onGridMouseDown"
+            @selectstart="onGridSelectStart"
+            @contextmenu.capture="onContextMenu"
+          >
             <ContextMenuTrigger as-child>
               <div
                 role="table"
@@ -1251,7 +1276,7 @@ async function pasteCell() {
                         @keydown.escape.prevent="cancelEdit"
                         @blur="commitEdit"
                       >
-                      <span v-else class="block truncate">
+                      <span v-else class="block truncate select-none">
                         {{ cellText(cellValue(item.index, col.index)) }}
                       </span>
                     </div>
