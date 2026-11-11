@@ -35,6 +35,7 @@ export interface BatchExportRequest {
     "prefix": string;
     "prefixEnabled": boolean;
     "force": boolean;
+    "content": string;
     "includeCreate": boolean;
     "includeDrop": boolean;
     "insertBatchSize": number;
@@ -92,6 +93,7 @@ export interface ExportTableRequest {
     "gzip": boolean;
     "chunkSize": number;
     "whereSQL": string;
+    "content": string;
     "includeCreate": boolean;
     "includeDrop": boolean;
     "insertBatchSize": number;

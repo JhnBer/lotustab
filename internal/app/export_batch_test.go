@@ -36,6 +36,14 @@ func TestExportTablesValidatesInput(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "table") {
 		t.Fatalf("expected table error, got %v", err)
 	}
+	_, err = s.ExportTables(context.Background(), BatchExportRequest{
+		ProfileID: "abc",
+		Tables:    []driver.TableRef{{Name: "t"}},
+		Content:   "nope",
+	})
+	if err == nil || !strings.Contains(err.Error(), "content") {
+		t.Fatalf("expected content error, got %v", err)
+	}
 }
 
 func TestCheckOutput(t *testing.T) {

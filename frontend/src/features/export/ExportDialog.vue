@@ -3,7 +3,6 @@ import { computed, onUnmounted, ref, watch } from "vue";
 import { Events } from "@wailsio/runtime";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -12,26 +11,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupInput,
-} from "@/components/ui/input-group";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Spinner } from "@/components/ui/spinner";
 import LotusLoader from "@/components/LotusLoader.vue";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
-import { formatBytes, formatDuration, formatRows, isDirNotEmptyError, suggestedExportFileName, suggestedExportFolderName, withExportExt } from "@/features/export/format";
+import ExportOutputForm from "@/features/export/ExportOutputForm.vue";
+import { formatBytes, formatDuration, formatRows, isDirNotEmptyError, isSchemaExport, suggestedExportFileName, suggestedExportFolderName } from "@/features/export/format";
 import { errorMessage, isCanceled } from "@/lib/errors";
 import { ExportService, type ExportTableRequest } from "@/lib/wails";
 import { useSettingsStore } from "@/stores/settings";
@@ -42,6 +24,7 @@ export type ExportTarget = {
   database: string;
   schema: string;
   name: string;
+  type?: string;
 };
 
 const props = defineProps<{
@@ -61,6 +44,7 @@ const transfers = useTransfersStore();
 let lastExportDir = "";
 
 const format = ref("sql");
+const content = ref("");
 const gzip = ref(false);
 const chunkSize = ref("0");
 const customWhere = ref(false);
@@ -88,6 +72,8 @@ const exportStartedAt = ref(0);
 const elapsedMs = ref(0);
 let tick: ReturnType<typeof setInterval> | null = null;
 
+const schemaExport = computed(() => isSchemaExport(content.value));
+const schemaDisabled = computed(() => props.target?.type === "view");
 const canExport = computed(() => {
   if (outputDir.value.trim().length === 0) {
     return false;
@@ -122,6 +108,7 @@ watch(
       return;
     }
     format.value = "sql";
+    content.value = "";
     gzip.value = false;
     chunkSize.value = "0";
     customWhere.value = false;
@@ -156,13 +143,6 @@ watch(customWhere, (on) => {
   if (!on) {
     checkedTotal.value = null;
   }
-});
-
-watch([format, gzip], ([nextFormat]) => {
-  if (nextFormat === "csv") {
-    folderMode.value = true;
-  }
-  fileName.value = withExportExt(fileName.value, format.value, gzip.value);
 });
 
 Events.On("export:progress", (ev) => {
@@ -222,6 +202,9 @@ function parseCount(value: string, fallback: number): number {
 }
 
 function rowsProgressLabel(): string {
+  if (schemaExport.value) {
+    return "Schema";
+  }
   const rows = formatRows(progress.value.rows);
   if (checkedTotal.value != null) {
     return `${rows} / ${formatRows(checkedTotal.value)} rows`;
@@ -302,7 +285,8 @@ async function startExport() {
     database: target.database,
     schema: target.schema,
     table: target.name,
-    format: format.value,
+    format: schemaExport.value ? "sql" : format.value,
+    content: content.value,
     gzip: gzip.value,
     chunkSize: folderMode.value ? 0 : parseCount(chunkSize.value, 0),
     whereSQL: customWhere.value ? whereSQL.value.trim() : "",
@@ -326,7 +310,7 @@ async function startExport() {
 
   running.value = true;
   progress.value = { chunk: 0, rows: 0, bytes: 0, query: "" };
-  const id = transfers.start(target.name, checkedTotal.value);
+  const id = transfers.start(target.name, schemaExport.value ? null : checkedTotal.value);
   transferId.value = id;
   startClock();
   const call = ExportService.ExportTable(req);
@@ -352,9 +336,13 @@ async function startExport() {
     });
     const files = result.files?.length ?? 0;
     toast.success(
-      files > 1
-        ? `Exported ${formatRows(result.rows)} rows to ${files} files`
-        : `Exported ${formatRows(result.rows)} rows`,
+      schemaExport.value
+        ? files > 1
+          ? `Exported schema to ${files} files`
+          : "Exported schema"
+        : files > 1
+          ? `Exported ${formatRows(result.rows)} rows to ${files} files`
+          : `Exported ${formatRows(result.rows)} rows`,
     );
     emit("update:open", false);
   } catch (err) {
@@ -405,8 +393,8 @@ function cancelExport() {
           <span>{{ progress.rows === 0 && progress.chunk === 0 ? "Starting…" : "Exporting…" }}</span>
         </div>
         <p class="text-muted-foreground text-sm">
-          Chunk {{ progress.chunk || 1 }}
-          · {{ rowsProgressLabel() }}
+          <template v-if="schemaExport">Schema</template>
+          <template v-else>Chunk {{ progress.chunk || 1 }} · {{ rowsProgressLabel() }}</template>
           · {{ formatBytes(progress.bytes) }}
         </p>
         <p class="text-muted-foreground text-sm">
@@ -420,179 +408,32 @@ function cancelExport() {
       </div>
 
       <div v-else class="grid gap-3">
-        <div v-if="folderMode" class="grid gap-1.5">
-          <Label for="export-foldername">Folder name</Label>
-          <Input
-            id="export-foldername"
-            v-model="folderName"
-            placeholder="table_20260101"
-            spellcheck="false"
-          />
-          <p class="text-muted-foreground text-xs">
-            Each table is saved as a separate file.
-          </p>
-        </div>
-        <div v-else class="grid gap-1.5">
-          <Label for="export-filename">Filename</Label>
-          <Input
-            id="export-filename"
-            v-model="fileName"
-            placeholder="table.sql"
-            spellcheck="false"
-          />
-        </div>
-
-        <div class="grid gap-1.5">
-          <Label for="export-path">Path</Label>
-          <InputGroup>
-            <InputGroupInput
-              id="export-path"
-              v-model="outputDir"
-              placeholder="Choose a folder…"
-              spellcheck="false"
-            />
-            <InputGroupAddon align="inline-end">
-              <InputGroupButton :disabled="browsing" @click="choosePath">
-                <Spinner v-if="browsing" class="size-3.5" />
-                Browse…
-              </InputGroupButton>
-            </InputGroupAddon>
-          </InputGroup>
-        </div>
-
-        <div class="grid gap-1.5">
-          <Label>Format</Label>
-          <Select :model-value="format" @update:model-value="(v) => (format = String(v ?? 'sql'))">
-            <SelectTrigger class="w-full">
-              <SelectValue placeholder="Format" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="sql">SQL</SelectItem>
-              <SelectItem value="csv">CSV</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div v-if="format === 'sql'" class="flex items-center justify-between gap-4">
-          <Label for="export-folder-mode">Separate files in a folder</Label>
-          <Switch
-            id="export-folder-mode"
-            :model-value="folderMode"
-            @update:model-value="(v) => (folderMode = v === true)"
-          />
-        </div>
-
-        <div v-if="folderMode" class="flex items-center justify-between gap-4">
-          <Label for="export-prefix-on">Filename prefix</Label>
-          <Switch
-            id="export-prefix-on"
-            :model-value="prefixEnabled"
-            @update:model-value="(v) => (prefixEnabled = v === true)"
-          />
-        </div>
-        <div v-if="folderMode && prefixEnabled" class="grid gap-1.5">
-          <Input v-model="prefix" placeholder="prod_" spellcheck="false" />
-        </div>
-
-        <div v-if="!folderMode" class="grid gap-1.5">
-          <Label for="export-chunk">Chunk size (rows per file)</Label>
-          <Input
-            id="export-chunk"
-            v-model="chunkSize"
-            type="number"
-            min="0"
-            placeholder="0 = single file"
-          />
-        </div>
-
-        <div class="flex items-center justify-between gap-4">
-          <Label for="export-where-on">Custom where condition</Label>
-          <Switch
-            id="export-where-on"
-            :model-value="customWhere"
-            @update:model-value="(v) => (customWhere = v === true)"
-          />
-        </div>
-
-        <template v-if="customWhere">
-          <div class="grid gap-1.5">
-            <Textarea
-              id="export-where"
-              v-model="whereSQL"
-              placeholder="created_at >= NOW() - INTERVAL '7 days'"
-              class="font-mono text-xs"
-              rows="2"
-            />
-            <div v-if="whereSQL.trim()" class="flex items-center gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                :disabled="counting"
-                @click="checkCount"
-              >
-                <Spinner v-if="counting" class="size-3.5" />
-                Check count
-              </Button>
-              <span v-if="checkedTotal != null" class="text-muted-foreground text-xs">
-                ~{{ formatRows(checkedTotal) }} rows match
-              </span>
-            </div>
-          </div>
-        </template>
-
-        <div class="flex items-center gap-2">
-          <Checkbox
-            id="export-gzip"
-            :model-value="gzip"
-            @update:model-value="(v) => (gzip = Boolean(v))"
-          />
-          <Label for="export-gzip" class="font-normal">Compress with gzip</Label>
-        </div>
-
-        <template v-if="format === 'sql'">
-          <div class="flex items-center gap-2">
-            <Checkbox
-              id="export-create"
-              :model-value="includeCreate"
-              @update:model-value="(v) => (includeCreate = Boolean(v))"
-            />
-            <Label for="export-create" class="font-normal">Include CREATE TABLE</Label>
-          </div>
-          <div class="flex items-center gap-2">
-            <Checkbox
-              id="export-drop"
-              :model-value="includeDrop"
-              @update:model-value="(v) => (includeDrop = Boolean(v))"
-            />
-            <Label for="export-drop" class="font-normal">Include DROP TABLE IF EXISTS</Label>
-          </div>
-          <div class="flex items-center gap-2">
-            <Checkbox
-              id="export-tx"
-              :model-value="wrapTransaction"
-              @update:model-value="(v) => (wrapTransaction = Boolean(v))"
-            />
-            <Label for="export-tx" class="font-normal">Wrap in a transaction</Label>
-          </div>
-          <div class="grid gap-1.5">
-            <Label for="export-batch">Insert batch size</Label>
-            <Input id="export-batch" v-model="insertBatchSize" type="number" min="1" />
-          </div>
-        </template>
-
-        <div class="flex items-center gap-2">
-          <Checkbox
-            id="export-delete-abort"
-            :model-value="settings.deleteOnAbortExport"
-            @update:model-value="(v) => settings.setDeleteOnAbortExport(Boolean(v))"
-          />
-          <Label for="export-delete-abort" class="font-normal">Delete files on abort/error</Label>
-        </div>
-
-        <p v-if="overwriteWarn" class="text-destructive text-xs">
-          Files in this destination will be overwritten.
-        </p>
+        <ExportOutputForm
+          v-model:format="format"
+          v-model:gzip="gzip"
+          v-model:folder-mode="folderMode"
+          v-model:file-name="fileName"
+          v-model:folder-name="folderName"
+          v-model:prefix-enabled="prefixEnabled"
+          v-model:prefix="prefix"
+          v-model:output-dir="outputDir"
+          v-model:content="content"
+          v-model:include-create="includeCreate"
+          v-model:include-drop="includeDrop"
+          v-model:wrap-transaction="wrapTransaction"
+          v-model:insert-batch-size="insertBatchSize"
+          v-model:chunk-size="chunkSize"
+          v-model:custom-where="customWhere"
+          v-model:where-sql="whereSQL"
+          variant="table"
+          :schema-disabled="schemaDisabled"
+          :browsing="browsing"
+          :counting="counting"
+          :checked-total="checkedTotal"
+          :overwrite-warn="overwriteWarn"
+          @browse="choosePath"
+          @check-count="checkCount"
+        />
       </div>
 
       <DialogFooter>

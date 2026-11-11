@@ -314,6 +314,229 @@ func TestRunMultiRequiresSQL(t *testing.T) {
 	}
 }
 
+func TestRunSchemaCreateSkipsRows(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "t.sql")
+	called := false
+	result, err := Run(t.Context(), func(fn func(cols []driver.Column, rows [][]any) error) error {
+		called = true
+		return fn(nil, [][]any{{int64(1)}})
+	}, Options{
+		Content:    ContentSchemaAdd,
+		Format:     FormatSQL,
+		Dialect:    DialectPostgres,
+		Schema:     "public",
+		Table:      "users",
+		DDL:        `CREATE TABLE "public"."users" (id int);`,
+		OutputPath: path,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if called {
+		t.Fatal("schema export streamed rows")
+	}
+	if result.Rows != 0 {
+		t.Fatalf("rows=%d", result.Rows)
+	}
+	got := readSQL(t, path)
+	if !strings.Contains(got, `CREATE TABLE IF NOT EXISTS "public"."users" (id int);`) {
+		t.Fatalf("create=%s", got)
+	}
+	for _, banned := range []string{"DROP", "INSERT", "FOREIGN_KEY_CHECKS", "CASCADE"} {
+		if strings.Contains(got, banned) {
+			t.Fatalf("unexpected %s in\n%s", banned, got)
+		}
+	}
+}
+
+func TestRunSchemaDropPostgres(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "t.sql")
+	_, err := Run(t.Context(), nil, Options{
+		Content:    ContentSchemaReplace,
+		Dialect:    DialectPostgres,
+		Schema:     "public",
+		Table:      "users",
+		DDL:        `CREATE TABLE "public"."users" (id int);`,
+		OutputPath: path,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := readSQL(t, path)
+	drop := `DROP TABLE IF EXISTS "public"."users";`
+	create := `CREATE TABLE "public"."users" (id int);`
+	if strings.Index(got, drop) < 0 || strings.Index(got, create) < strings.Index(got, drop) {
+		t.Fatalf("drop must precede create:\n%s", got)
+	}
+	if strings.Contains(got, "CASCADE") || strings.Contains(got, "FOREIGN_KEY_CHECKS") || strings.Contains(got, "INSERT") {
+		t.Fatalf("got %s", got)
+	}
+	if strings.Contains(got, "CREATE TABLE IF NOT EXISTS") {
+		t.Fatalf("drop should not rewrite create:\n%s", got)
+	}
+}
+
+func TestRunSchemaDropMySQLForeignKeys(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "t.sql")
+	_, err := Run(t.Context(), nil, Options{
+		Content:    ContentSchemaReplace,
+		Dialect:    DialectMySQL,
+		Database:   "app",
+		Table:      "child",
+		DDL:        "CREATE TABLE `child` (id int);",
+		OutputPath: path,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := readSQL(t, path)
+	if strings.Count(got, mysqlFKChecksOff) != 1 || strings.Count(got, mysqlFKChecksOn) != 1 {
+		t.Fatalf("expected one save/restore pair:\n%s", got)
+	}
+	if strings.Index(got, mysqlFKChecksOff) > strings.Index(got, "DROP TABLE") {
+		t.Fatalf("checks must be disabled before drop:\n%s", got)
+	}
+	if strings.Index(got, mysqlFKChecksOn) < strings.Index(got, "CREATE TABLE") {
+		t.Fatalf("checks must be restored after create:\n%s", got)
+	}
+	if strings.Contains(got, "CASCADE") {
+		t.Fatalf("got %s", got)
+	}
+}
+
+func TestRunSchemaDropClickHouse(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "t.sql")
+	_, err := Run(t.Context(), nil, Options{
+		Content:    ContentSchemaReplace,
+		Dialect:    DialectClickHouse,
+		Database:   "app",
+		Table:      "events",
+		DDL:        "CREATE TABLE `app`.`events` (id UInt64);",
+		OutputPath: path,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := readSQL(t, path)
+	if strings.Contains(got, "FOREIGN_KEY_CHECKS") {
+		t.Fatalf("clickhouse drop must not disable foreign keys:\n%s", got)
+	}
+	if !strings.Contains(got, "DROP TABLE IF EXISTS `app`.`events`;") {
+		t.Fatalf("got %s", got)
+	}
+}
+
+func TestRunMultiSchemaMySQLDropOnce(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "dump.sql")
+	called := false
+	result, err := RunMulti(t.Context(), []MultiTable{
+		{
+			Database: "app",
+			Table:    "child",
+			DDL:      "CREATE TABLE `child` (id int);",
+			Stream: func(fn func(cols []driver.Column, rows [][]any) error) error {
+				called = true
+				return nil
+			},
+		},
+		{
+			Database: "app",
+			Table:    "parent",
+			DDL:      "CREATE TABLE `parent` (id int);",
+		},
+	}, Options{
+		Content:    ContentSchemaReplace,
+		Dialect:    DialectMySQL,
+		OutputPath: path,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if called {
+		t.Fatal("schema export streamed rows")
+	}
+	if result.Rows != 0 {
+		t.Fatalf("rows=%d", result.Rows)
+	}
+	got := readSQL(t, path)
+	if strings.Count(got, mysqlFKChecksOff) != 1 || strings.Count(got, mysqlFKChecksOn) != 1 {
+		t.Fatalf("expected one save/restore pair:\n%s", got)
+	}
+	if strings.Index(got, "DROP TABLE IF EXISTS `child`;") > strings.Index(got, "DROP TABLE IF EXISTS `parent`;") {
+		t.Fatalf("catalog order changed:\n%s", got)
+	}
+	if strings.Contains(got, "INSERT") || strings.Contains(got, "CASCADE") {
+		t.Fatalf("got %s", got)
+	}
+}
+
+func TestRunMultiSchemaCreate(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "dump.sql")
+	_, err := RunMulti(t.Context(), []MultiTable{
+		{Table: "users", DDL: "CREATE TABLE `users` (id int);"},
+		{Table: "orders", DDL: "create table `orders` (id int)"},
+	}, Options{
+		Content:    ContentSchemaAdd,
+		Dialect:    DialectMySQL,
+		OutputPath: path,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := readSQL(t, path)
+	if !strings.Contains(got, "CREATE TABLE IF NOT EXISTS `users` (id int);") {
+		t.Fatalf("users=%s", got)
+	}
+	if !strings.Contains(got, "CREATE TABLE IF NOT EXISTS `orders` (id int);") {
+		t.Fatalf("orders=%s", got)
+	}
+	if strings.Count(got, "IF NOT EXISTS") != 2 {
+		t.Fatalf("if not exists count:\n%s", got)
+	}
+	if strings.Contains(got, "DROP") || strings.Contains(got, "FOREIGN_KEY_CHECKS") || strings.Contains(got, "INSERT") {
+		t.Fatalf("got %s", got)
+	}
+}
+
+func TestRunSchemaRejectsNonCreate(t *testing.T) {
+	_, err := Run(t.Context(), nil, Options{
+		Content:    ContentSchemaAdd,
+		Table:      "t",
+		DDL:        "SELECT 1",
+		OutputPath: filepath.Join(t.TempDir(), "t.sql"),
+	}, nil)
+	if err == nil || !strings.Contains(err.Error(), "CREATE TABLE") {
+		t.Fatalf("expected CREATE TABLE error, got %v", err)
+	}
+}
+
+func TestRunSchemaKeepsExistingIfNotExists(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "t.sql")
+	_, err := Run(t.Context(), nil, Options{
+		Content:    ContentSchemaAdd,
+		Dialect:    DialectMySQL,
+		Table:      "t",
+		DDL:        "CREATE TABLE IF NOT EXISTS `t` (id int);",
+		OutputPath: path,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := readSQL(t, path)
+	if strings.Count(got, "IF NOT EXISTS") != 1 {
+		t.Fatalf("doubled if not exists:\n%s", got)
+	}
+}
+
+func readSQL(t *testing.T, path string) string {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(raw)
+}
+
 func TestRunDeleteOnAbort(t *testing.T) {
 	dir := t.TempDir()
 	_, err := Run(t.Context(), func(fn func(cols []driver.Column, rows [][]any) error) error {

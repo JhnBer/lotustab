@@ -31,6 +31,7 @@ type ExportTableRequest struct {
 	Gzip            bool   `json:"gzip"`
 	ChunkSize       int    `json:"chunkSize"`
 	WhereSQL        string `json:"whereSQL"`
+	Content         string `json:"content"`
 	IncludeCreate   bool   `json:"includeCreate"`
 	IncludeDrop     bool   `json:"includeDrop"`
 	InsertBatchSize int    `json:"insertBatchSize"`
@@ -91,6 +92,13 @@ func (s *ExportService) ExportTable(ctx context.Context, req ExportTableRequest)
 	if req.Table == "" {
 		return nil, fmt.Errorf("table is required")
 	}
+	content, err := export.ParseContent(req.Content)
+	if err != nil {
+		return nil, err
+	}
+	if content.SchemaOnly() {
+		req.Format = export.FormatSQL
+	}
 	req.Format = strings.ToLower(strings.TrimSpace(req.Format))
 	if req.Format == "" {
 		req.Format = export.FormatSQL
@@ -149,8 +157,14 @@ func (s *ExportService) ExportTable(ctx context.Context, req ExportTableRequest)
 		WhereSQL: strings.TrimSpace(req.WhereSQL),
 	})
 
-	query := export.SelectQuery(dialect, streamReq.Database, streamReq.Schema, streamReq.Name, streamReq.WhereSQL)
-	log.Printf("export query: %s", query)
+	var query string
+	if content.SchemaOnly() {
+		query = "schema " + streamReq.Name
+		log.Printf("export schema: %s", streamReq.Name)
+	} else {
+		query = export.SelectQuery(dialect, streamReq.Database, streamReq.Schema, streamReq.Name, streamReq.WhereSQL)
+		log.Printf("export query: %s", query)
+	}
 	emitExportProgress(ExportProgress{Query: query})
 
 	suggested := exportFileName(req.Table, req.Format, req.Gzip)
@@ -166,6 +180,7 @@ func (s *ExportService) ExportTable(ctx context.Context, req ExportTableRequest)
 		Format:          req.Format,
 		Gzip:            req.Gzip,
 		ChunkSize:       req.ChunkSize,
+		Content:         content,
 		IncludeCreate:   req.IncludeCreate,
 		IncludeDrop:     req.IncludeDrop,
 		InsertBatchSize: req.InsertBatchSize,
@@ -187,16 +202,20 @@ func (s *ExportService) ExportTable(ctx context.Context, req ExportTableRequest)
 		if err != nil {
 			return nil, err
 		}
-		if opts.IncludeCreate {
+		if content.SchemaOnly() || opts.IncludeCreate {
 			ddl, ddlErr := conn.TableDDL(ctx, streamReq.TableRef)
 			if ddlErr != nil {
 				return nil, ddlErr
 			}
 			opts.DDL = ddl
 		}
-		return export.Run(ctx, func(fn func(cols []driver.Column, rows [][]any) error) error {
-			return conn.StreamTable(ctx, streamReq, fn)
-		}, opts, func(p export.Progress) {
+		var stream export.StreamFunc
+		if !content.SchemaOnly() {
+			stream = func(fn func(cols []driver.Column, rows [][]any) error) error {
+				return conn.StreamTable(ctx, streamReq, fn)
+			}
+		}
+		return export.Run(ctx, stream, opts, func(p export.Progress) {
 			emitExportProgress(ExportProgress{Chunk: p.Chunk, Rows: p.Rows, Bytes: p.Bytes, Query: query})
 		})
 	}()

@@ -281,6 +281,7 @@ function openExport(database: string, table: TableInfo) {
     database: tableDatabase(table, database),
     schema: table.schema,
     name: table.name,
+    type: table.type,
   };
   exportOpen.value = true;
 }

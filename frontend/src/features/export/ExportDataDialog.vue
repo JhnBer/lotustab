@@ -13,12 +13,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupInput,
-} from "@/components/ui/input-group";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -28,18 +22,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Spinner } from "@/components/ui/spinner";
 import LotusLoader from "@/components/LotusLoader.vue";
 import { Switch } from "@/components/ui/switch";
 import DatabaseCombobox from "@/components/DatabaseCombobox.vue";
+import ExportOutputForm from "@/features/export/ExportOutputForm.vue";
 import {
   formatBytes,
   formatDuration,
   formatRows,
   isDirNotEmptyError,
+  isSchemaExport,
   suggestedExportFileName,
   suggestedExportFolderName,
-  withExportExt,
 } from "@/features/export/format";
 import { filterTables, sortDatabases } from "@/features/explorer/catalogRows";
 import { errorMessage, isCanceled } from "@/lib/errors";
@@ -97,8 +91,9 @@ const tableError = ref("");
 const browsing = ref(false);
 
 const format = ref("sql");
-const singleFile = ref(true);
+const content = ref("");
 const gzip = ref(false);
+const folderMode = ref(false);
 const includeCreate = ref(true);
 const includeDrop = ref(false);
 const insertBatchSize = ref("500");
@@ -127,25 +122,31 @@ const elapsedMs = ref(0);
 let tick: ReturnType<typeof setInterval> | null = null;
 
 const running = computed(() => phase.value !== "form");
-const folderMode = computed(() => format.value === "csv" || !singleFile.value);
+const schemaExport = computed(() => isSchemaExport(content.value));
 const selectedProfile = computed(() => connections.profiles.find((p) => p.id === profileId.value));
 const showSchema = computed(
   () => new Set(tables.value.map((t) => t.schema).filter(Boolean)).size > 1,
 );
 const filteredTables = computed(() => filterTables(tables.value, tableQuery.value));
 const selectedTables = computed(() => {
-  if (exportFull.value) {
-    return tables.value;
+  const rows = exportFull.value
+    ? tables.value
+    : tables.value.filter((t) => selectedKeys.value[tableKey(t)]);
+  if (!schemaExport.value) {
+    return rows;
   }
-  return tables.value.filter((t) => selectedKeys.value[tableKey(t)]);
+  return rows.filter((t) => t.type !== "view");
 });
+const choosableTables = computed(() =>
+  filteredTables.value.filter((table) => !(schemaExport.value && table.type === "view")),
+);
 const allFilteredSelected = computed(
   () =>
-    filteredTables.value.length > 0 &&
-    filteredTables.value.every((t) => selectedKeys.value[tableKey(t)]),
+    choosableTables.value.length > 0 &&
+    choosableTables.value.every((t) => selectedKeys.value[tableKey(t)]),
 );
 const someFilteredSelected = computed(() =>
-  filteredTables.value.some((t) => selectedKeys.value[tableKey(t)]),
+  choosableTables.value.some((t) => selectedKeys.value[tableKey(t)]),
 );
 const canExport = computed(() => {
   if (!profileId.value || !database.value || selectedTables.value.length === 0) {
@@ -199,19 +200,17 @@ watch(
   },
 );
 
-watch(format, (value) => {
-  if (value === "csv") {
-    singleFile.value = false;
+watch(schemaExport, (on) => {
+  if (!on) {
+    return;
   }
-  if (fileName.value) {
-    fileName.value = withExportExt(fileName.value, value, gzip.value);
+  const next = { ...selectedKeys.value };
+  for (const table of tables.value) {
+    if (table.type === "view") {
+      next[tableKey(table)] = false;
+    }
   }
-});
-
-watch(gzip, (on) => {
-  if (fileName.value) {
-    fileName.value = withExportExt(fileName.value, format.value, on);
-  }
+  selectedKeys.value = next;
 });
 
 Events.On("export:batch-progress", (ev) => {
@@ -300,7 +299,8 @@ function resetForm(nextProfile: string, nextDatabase: string) {
   dbError.value = "";
   tableError.value = "";
   format.value = "sql";
-  singleFile.value = true;
+  content.value = "";
+  folderMode.value = false;
   gzip.value = false;
   includeCreate.value = true;
   includeDrop.value = false;
@@ -393,6 +393,10 @@ async function loadTables(id: string, db: string) {
 function toggleFiltered(on: boolean) {
   const next = { ...selectedKeys.value };
   for (const table of filteredTables.value) {
+    if (schemaExport.value && table.type === "view") {
+      next[tableKey(table)] = false;
+      continue;
+    }
     next[tableKey(table)] = on;
   }
   selectedKeys.value = next;
@@ -485,7 +489,6 @@ async function startExport() {
 
   const targets = asRefs(selectedTables.value);
   lastExportDir = outputDir.value.trim();
-  phase.value = "counting";
   countedTotal.value = null;
   progress.value = {
     tableIndex: 0,
@@ -498,33 +501,37 @@ async function startExport() {
   overwriteWarn.value = false;
   startClock();
 
-  const countCall = ExportService.CountTables({
-    profileId: profileId.value,
-    database: database.value,
-    tables: targets,
-  });
-  pending.value = countCall;
-  try {
-    const counts = (await countCall) ?? [];
-    if (pending.value !== countCall) {
+  let countCall: ReturnType<typeof ExportService.CountTables> | null = null;
+  if (!schemaExport.value) {
+    phase.value = "counting";
+    countCall = ExportService.CountTables({
+      profileId: profileId.value,
+      database: database.value,
+      tables: targets,
+    });
+    pending.value = countCall;
+    try {
+      const counts = (await countCall) ?? [];
+      if (pending.value !== countCall) {
+        stopClock();
+        phase.value = "form";
+        return;
+      }
+      countedTotal.value = counts.reduce((sum, row) => sum + (Number(row.rows) || 0), 0);
+    } catch (err) {
+      const mine = pending.value === countCall;
+      if (mine) {
+        pending.value = null;
+      }
       stopClock();
       phase.value = "form";
+      if (isCanceled(err) || !mine) {
+        emit("update:open", false);
+        return;
+      }
+      toast.error(errorMessage(err));
       return;
     }
-    countedTotal.value = counts.reduce((sum, row) => sum + (Number(row.rows) || 0), 0);
-  } catch (err) {
-    const mine = pending.value === countCall;
-    if (mine) {
-      pending.value = null;
-    }
-    stopClock();
-    phase.value = "form";
-    if (isCanceled(err) || !mine) {
-      emit("update:open", false);
-      return;
-    }
-    toast.error(errorMessage(err));
-    return;
   }
 
   phase.value = "exporting";
@@ -532,7 +539,8 @@ async function startExport() {
     profileId: profileId.value,
     database: database.value,
     tables: targets,
-    format: format.value,
+    format: schemaExport.value ? "sql" : format.value,
+    content: content.value,
     gzip: gzip.value,
     singleFile: !folderMode.value,
     outputDir: outputDir.value.trim(),
@@ -541,16 +549,16 @@ async function startExport() {
     prefix: prefix.value,
     prefixEnabled: folderMode.value && prefixEnabled.value,
     force: true,
-    includeCreate: format.value === "sql" && includeCreate.value,
-    includeDrop: format.value === "sql" && includeDrop.value,
+    includeCreate: !schemaExport.value && format.value === "sql" && includeCreate.value,
+    includeDrop: !schemaExport.value && format.value === "sql" && includeDrop.value,
     insertBatchSize: parseCount(insertBatchSize.value, 500) || 500,
-    wrapTransaction: format.value === "sql" && wrapTransaction.value,
+    wrapTransaction: !schemaExport.value && format.value === "sql" && wrapTransaction.value,
     deleteOnAbort: settings.deleteOnAbortExport,
   };
   const label = folderMode.value
     ? folderName.value.trim() || database.value
     : fileName.value.trim() || database.value;
-  const id = transfers.start(label, countedTotal.value);
+  const id = transfers.start(label, schemaExport.value ? null : countedTotal.value);
   transferId.value = id;
   const call = ExportService.ExportTables(req);
   pending.value = call;
@@ -575,9 +583,13 @@ async function startExport() {
     });
     const files = result.files?.length ?? 0;
     toast.success(
-      files > 1
-        ? `Exported ${formatRows(result.rows)} rows to ${files} files`
-        : `Exported ${formatRows(result.rows)} rows`,
+      schemaExport.value
+        ? files > 1
+          ? `Exported schema to ${files} files`
+          : "Exported schema"
+        : files > 1
+          ? `Exported ${formatRows(result.rows)} rows to ${files} files`
+          : `Exported ${formatRows(result.rows)} rows`,
     );
     emit("update:open", false);
   } catch (err) {
@@ -643,7 +655,8 @@ function cancelExport() {
         <p class="text-muted-foreground text-sm">
           {{ percent }}%
           ·
-          <template v-if="countedTotal != null">
+          <template v-if="schemaExport">Schema</template>
+          <template v-else-if="countedTotal != null">
             {{ formatRows(progress.totalRows) }} / {{ formatRows(countedTotal) }} rows
           </template>
           <template v-else>{{ formatRows(progress.totalRows) }} rows</template>
@@ -713,12 +726,15 @@ function cancelExport() {
         <p v-else-if="exportFull && database && tables.length === 0 && !loadingTables" class="text-muted-foreground text-xs">
           No tables in this database.
         </p>
+        <p v-if="schemaExport && tables.some((table) => table.type === 'view')" class="text-muted-foreground text-xs">
+          Views are not included in a schema export.
+        </p>
 
         <div v-if="!exportFull" class="grid gap-1.5">
           <div class="flex items-center gap-2">
             <Checkbox
               :model-value="allFilteredSelected ? true : someFilteredSelected ? 'indeterminate' : false"
-              :disabled="filteredTables.length === 0"
+              :disabled="choosableTables.length === 0"
               @update:model-value="() => toggleFiltered(!allFilteredSelected)"
             />
             <Label class="font-normal">Tables</Label>
@@ -737,10 +753,12 @@ function cancelExport() {
             <label
               v-for="table in filteredTables"
               :key="tableKey(table)"
-              class="hover:bg-accent flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm"
+              class="hover:bg-accent flex items-center gap-2 rounded-md px-2 py-1 text-sm"
+              :class="schemaExport && table.type === 'view' ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'"
             >
               <Checkbox
                 :model-value="Boolean(selectedKeys[tableKey(table)])"
+                :disabled="schemaExport && table.type === 'view'"
                 @update:model-value="
                   (v) => (selectedKeys = { ...selectedKeys, [tableKey(table)]: Boolean(v) })
                 "
@@ -752,132 +770,25 @@ function cancelExport() {
           </div>
         </div>
 
-        <div class="grid gap-1.5">
-          <Label>Format</Label>
-          <Select :model-value="format" @update:model-value="(v) => (format = String(v ?? 'sql'))">
-            <SelectTrigger class="w-full">
-              <SelectValue placeholder="Format" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="sql">SQL</SelectItem>
-              <SelectItem value="csv">CSV</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div v-if="format === 'sql'" class="flex items-center justify-between gap-4">
-          <Label for="export-single-file">Single file</Label>
-          <Switch
-            id="export-single-file"
-            :model-value="singleFile"
-            @update:model-value="(v) => (singleFile = v === true)"
-          />
-        </div>
-
-        <div v-if="folderMode" class="grid gap-1.5">
-          <Label for="export-foldername">Folder name</Label>
-          <Input
-            id="export-foldername"
-            v-model="folderName"
-            placeholder="database_20260101"
-            spellcheck="false"
-          />
-          <p class="text-muted-foreground text-xs">
-            Each table is saved as a separate file.
-          </p>
-        </div>
-        <div v-else class="grid gap-1.5">
-          <Label for="export-batch-filename">Filename</Label>
-          <Input
-            id="export-batch-filename"
-            v-model="fileName"
-            placeholder="database.sql"
-            spellcheck="false"
-          />
-        </div>
-
-        <div class="grid gap-1.5">
-          <Label for="export-batch-path">Path</Label>
-          <InputGroup>
-            <InputGroupInput
-              id="export-batch-path"
-              v-model="outputDir"
-              placeholder="Choose a folder…"
-              spellcheck="false"
-            />
-            <InputGroupAddon align="inline-end">
-              <InputGroupButton :disabled="browsing" @click="choosePath">
-                <Spinner v-if="browsing" class="size-3.5" />
-                Browse…
-              </InputGroupButton>
-            </InputGroupAddon>
-          </InputGroup>
-        </div>
-
-        <div v-if="folderMode" class="flex items-center justify-between gap-4">
-          <Label for="export-prefix-on">Filename prefix</Label>
-          <Switch
-            id="export-prefix-on"
-            :model-value="prefixEnabled"
-            @update:model-value="(v) => (prefixEnabled = v === true)"
-          />
-        </div>
-        <div v-if="folderMode && prefixEnabled" class="grid gap-1.5">
-          <Input v-model="prefix" placeholder="prod_" spellcheck="false" />
-        </div>
-
-        <div class="flex items-center gap-2">
-          <Checkbox
-            id="export-batch-gzip"
-            :model-value="gzip"
-            @update:model-value="(v) => (gzip = Boolean(v))"
-          />
-          <Label for="export-batch-gzip" class="font-normal">Compress with gzip</Label>
-        </div>
-
-        <template v-if="format === 'sql'">
-          <div class="flex items-center gap-2">
-            <Checkbox
-              id="export-batch-create"
-              :model-value="includeCreate"
-              @update:model-value="(v) => (includeCreate = Boolean(v))"
-            />
-            <Label for="export-batch-create" class="font-normal">Include CREATE TABLE</Label>
-          </div>
-          <div class="flex items-center gap-2">
-            <Checkbox
-              id="export-batch-drop"
-              :model-value="includeDrop"
-              @update:model-value="(v) => (includeDrop = Boolean(v))"
-            />
-            <Label for="export-batch-drop" class="font-normal">Include DROP TABLE IF EXISTS</Label>
-          </div>
-          <div class="flex items-center gap-2">
-            <Checkbox
-              id="export-batch-tx"
-              :model-value="wrapTransaction"
-              @update:model-value="(v) => (wrapTransaction = Boolean(v))"
-            />
-            <Label for="export-batch-tx" class="font-normal">Wrap in a transaction</Label>
-          </div>
-          <div class="grid gap-1.5">
-            <Label for="export-batch-batch">Insert batch size</Label>
-            <Input id="export-batch-batch" v-model="insertBatchSize" type="number" min="1" />
-          </div>
-        </template>
-
-        <div class="flex items-center gap-2">
-          <Checkbox
-            id="export-batch-delete-abort"
-            :model-value="settings.deleteOnAbortExport"
-            @update:model-value="(v) => settings.setDeleteOnAbortExport(Boolean(v))"
-          />
-          <Label for="export-batch-delete-abort" class="font-normal">Delete files on abort/error</Label>
-        </div>
-
-        <p v-if="overwriteWarn" class="text-destructive text-xs">
-          Files in this destination will be overwritten.
-        </p>
+        <ExportOutputForm
+          v-model:format="format"
+          v-model:gzip="gzip"
+          v-model:folder-mode="folderMode"
+          v-model:file-name="fileName"
+          v-model:folder-name="folderName"
+          v-model:prefix-enabled="prefixEnabled"
+          v-model:prefix="prefix"
+          v-model:output-dir="outputDir"
+          v-model:content="content"
+          v-model:include-create="includeCreate"
+          v-model:include-drop="includeDrop"
+          v-model:wrap-transaction="wrapTransaction"
+          v-model:insert-batch-size="insertBatchSize"
+          variant="batch"
+          :browsing="browsing"
+          :overwrite-warn="overwriteWarn"
+          @browse="choosePath"
+        />
       </div>
 
       <DialogFooter>

@@ -30,6 +30,13 @@ export function formatDuration(ms: number): string {
   return minRem ? `${hr}h ${minRem}m` : `${hr}h`;
 }
 
+export const exportContentCreate = "schemaAdd";
+export const exportContentDrop = "schemaReplace";
+
+export function isSchemaExport(content: string): boolean {
+  return content === exportContentCreate || content === exportContentDrop;
+}
+
 export function exportFileExt(format: string, gzipOn: boolean): string {
   const ext = format === "csv" ? ".csv" : format === "json" ? ".json" : ".sql";
   return gzipOn ? `${ext}.gz` : ext;

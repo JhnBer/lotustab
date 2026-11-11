@@ -13,6 +13,7 @@ type Options struct {
 	Format          string
 	Gzip            bool
 	ChunkSize       int
+	Content         Content
 	IncludeCreate   bool
 	IncludeDrop     bool
 	InsertBatchSize int
@@ -44,6 +45,13 @@ type Result struct {
 type StreamFunc func(fn func(cols []driver.Column, rows [][]any) error) error
 
 func Run(ctx context.Context, stream StreamFunc, opts Options, progress func(Progress)) (*Result, error) {
+	schema, err := opts.schemaOnly()
+	if err != nil {
+		return nil, err
+	}
+	if schema {
+		return runSchema(ctx, opts, progress)
+	}
 	if stream == nil {
 		return nil, fmt.Errorf("stream is required")
 	}
@@ -127,7 +135,7 @@ func Run(ctx context.Context, stream StreamFunc, opts Options, progress func(Pro
 		return nil
 	}
 
-	err := stream(func(nextCols []driver.Column, rows [][]any) error {
+	err = stream(func(nextCols []driver.Column, rows [][]any) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
@@ -202,6 +210,13 @@ type MultiTable struct {
 
 // RunMulti writes several tables into one SQL file (gzip optional).
 func RunMulti(ctx context.Context, tables []MultiTable, opts Options, progress func(Progress)) (*Result, error) {
+	schema, err := opts.schemaOnly()
+	if err != nil {
+		return nil, err
+	}
+	if schema {
+		return runSchemaMulti(ctx, tables, opts, progress)
+	}
 	if len(tables) == 0 {
 		return nil, fmt.Errorf("at least one table is required")
 	}

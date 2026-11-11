@@ -51,6 +51,7 @@ type BatchExportRequest struct {
 	Prefix          string            `json:"prefix"`
 	PrefixEnabled   bool              `json:"prefixEnabled"`
 	Force           bool              `json:"force"`
+	Content         string            `json:"content"`
 	IncludeCreate   bool              `json:"includeCreate"`
 	IncludeDrop     bool              `json:"includeDrop"`
 	InsertBatchSize int               `json:"insertBatchSize"`
@@ -146,6 +147,13 @@ func (s *ExportService) ExportTables(ctx context.Context, req BatchExportRequest
 	req.Tables = clampExportTables(req.Tables)
 	if len(req.Tables) == 0 {
 		return nil, fmt.Errorf("at least one table is required")
+	}
+	content, err := export.ParseContent(req.Content)
+	if err != nil {
+		return nil, err
+	}
+	if content.SchemaOnly() {
+		req.Format = export.FormatSQL
 	}
 	req.Format = strings.ToLower(strings.TrimSpace(req.Format))
 	if req.Format == "" {
@@ -244,6 +252,11 @@ func (s *ExportService) exportTablesSingleFile(
 	wrapTx bool,
 	database, destPath string,
 ) (*ExportResult, error) {
+	content, err := export.ParseContent(req.Content)
+	if err != nil {
+		return nil, err
+	}
+	schema := content.SchemaOnly()
 	tables := make([]export.MultiTable, 0, len(req.Tables))
 	for _, t := range req.Tables {
 		ref := t
@@ -254,15 +267,17 @@ func (s *ExportService) exportTablesSingleFile(
 			Database: ref.Database,
 			Schema:   ref.Schema,
 			Table:    ref.Name,
-			Stream: func(fn func(cols []driver.Column, rows [][]any) error) error {
+		}
+		if !schema {
+			item.Stream = func(fn func(cols []driver.Column, rows [][]any) error) error {
 				streamReq := driver.ClampStreamTable(driver.StreamTableRequest{TableRef: ref})
 				return conn.StreamTable(ctx, streamReq, fn)
-			},
+			}
 		}
-		if req.IncludeCreate {
-			ddl, err := conn.TableDDL(ctx, ref)
-			if err != nil {
-				return nil, err
+		if schema || req.IncludeCreate {
+			ddl, ddlErr := conn.TableDDL(ctx, ref)
+			if ddlErr != nil {
+				return nil, ddlErr
 			}
 			item.DDL = ddl
 		}
@@ -270,11 +285,15 @@ func (s *ExportService) exportTablesSingleFile(
 	}
 
 	query := fmt.Sprintf("export %d tables", len(req.Tables))
+	if schema {
+		query = fmt.Sprintf("schema %d tables", len(req.Tables))
+	}
 	emitExportBatchProgress(BatchExportProgress{TableIndex: 1, TableTotal: len(req.Tables), TableName: req.Tables[0].Name, Query: query})
 
 	out, err := export.RunMulti(ctx, tables, export.Options{
 		Format:          export.FormatSQL,
 		Gzip:            req.Gzip,
+		Content:         content,
 		IncludeCreate:   req.IncludeCreate,
 		IncludeDrop:     req.IncludeDrop,
 		InsertBatchSize: req.InsertBatchSize,
@@ -290,8 +309,12 @@ func (s *ExportService) exportTablesSingleFile(
 		if p.Chunk > 0 && p.Chunk <= len(req.Tables) {
 			name = req.Tables[p.Chunk-1].Name
 		}
+		tableIndex := 1
+		if schema && p.Chunk > 0 {
+			tableIndex = p.Chunk
+		}
 		emitExportBatchProgress(BatchExportProgress{
-			TableIndex: 1,
+			TableIndex: tableIndex,
 			TableTotal: len(req.Tables),
 			TableName:  name,
 			TableRows:  p.Rows,
@@ -345,8 +368,16 @@ func (s *ExportService) exportTablesFolder(
 		if strings.TrimSpace(ref.Database) == "" {
 			ref.Database = database
 		}
+		content, err := export.ParseContent(req.Content)
+		if err != nil {
+			return &ExportResult{Files: allFiles, Rows: totalRows, Bytes: totalBytes}, err
+		}
+		schema := content.SchemaOnly()
 		streamReq := driver.ClampStreamTable(driver.StreamTableRequest{TableRef: ref})
 		query := export.SelectQuery(dialect, streamReq.Database, streamReq.Schema, streamReq.Name, "")
+		if schema {
+			query = "schema " + streamReq.Name
+		}
 		emitExportBatchProgress(BatchExportProgress{
 			TableIndex: i + 1,
 			TableTotal: len(req.Tables),
@@ -361,6 +392,7 @@ func (s *ExportService) exportTablesFolder(
 		opts := export.Options{
 			Format:          req.Format,
 			Gzip:            req.Gzip,
+			Content:         content,
 			IncludeCreate:   req.Format == export.FormatSQL && req.IncludeCreate,
 			IncludeDrop:     req.Format == export.FormatSQL && req.IncludeDrop,
 			InsertBatchSize: req.InsertBatchSize,
@@ -373,18 +405,22 @@ func (s *ExportService) exportTablesFolder(
 			FileBase:        base,
 			DeleteOnAbort:   req.DeleteOnAbort,
 		}
-		if opts.IncludeCreate {
-			ddl, err := conn.TableDDL(ctx, streamReq.TableRef)
-			if err != nil {
-				return &ExportResult{Files: allFiles, Rows: totalRows, Bytes: totalBytes}, err
+		if schema || opts.IncludeCreate {
+			ddl, ddlErr := conn.TableDDL(ctx, streamReq.TableRef)
+			if ddlErr != nil {
+				return &ExportResult{Files: allFiles, Rows: totalRows, Bytes: totalBytes}, ddlErr
 			}
 			opts.DDL = ddl
 		}
 
 		var tableRows int64
-		out, err := export.Run(ctx, func(fn func(cols []driver.Column, rows [][]any) error) error {
-			return conn.StreamTable(ctx, streamReq, fn)
-		}, opts, func(p export.Progress) {
+		var stream export.StreamFunc
+		if !schema {
+			stream = func(fn func(cols []driver.Column, rows [][]any) error) error {
+				return conn.StreamTable(ctx, streamReq, fn)
+			}
+		}
+		out, err := export.Run(ctx, stream, opts, func(p export.Progress) {
 			tableRows = p.Rows
 			emitExportBatchProgress(BatchExportProgress{
 				TableIndex: i + 1,
