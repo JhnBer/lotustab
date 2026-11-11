@@ -15,7 +15,7 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as driver$0 from "../core/driver/models.js";
 
 /**
- * AlterTable applies accumulated column operations in a single request.
+ * AlterTable plans a structure draft against the live catalog and applies it.
  */
 export function AlterTable(profileID: string, req: driver$0.AlterTableRequest): $CancellablePromise<void> {
     return $Call.ByID(1524686696, profileID, req);

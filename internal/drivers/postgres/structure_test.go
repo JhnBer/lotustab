@@ -21,10 +21,13 @@ func TestSearchTablesEmpty(t *testing.T) {
 
 func TestPostgresAlterSQL(t *testing.T) {
 	def := "guest"
+	newName := "full_name"
+	newType := "text"
+	nullable := true
 	stmts, err := postgresAlterSQL(`"public"."users"`, []driver.ColumnOp{
 		{Kind: driver.ColumnOpDrop, Name: "legacy"},
 		{Kind: driver.ColumnOpAdd, Column: &driver.ColumnInfo{Name: "nickname", Type: "varchar(64)", Nullable: false, Default: &def}},
-		{Kind: driver.ColumnOpModify, Name: "name", Column: &driver.ColumnInfo{Name: "full_name", Type: "text", Nullable: true}},
+		{Kind: driver.ColumnOpModify, Name: "name", Patch: &driver.ColumnPatch{Name: &newName, Type: &newType, Nullable: &nullable}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -36,13 +39,28 @@ func TestPostgresAlterSQL(t *testing.T) {
 		`ALTER TABLE "public"."users" RENAME COLUMN "name" TO "full_name"`,
 		`ALTER TABLE "public"."users" ALTER COLUMN "full_name" TYPE text USING "full_name"::text`,
 		`ALTER TABLE "public"."users" ALTER COLUMN "full_name" DROP NOT NULL`,
-		`ALTER TABLE "public"."users" ALTER COLUMN "full_name" DROP DEFAULT`,
-		`COMMENT ON COLUMN "public"."users"."full_name" IS NULL`,
 	}
 	for _, part := range want {
 		if !strings.Contains(joined, part) {
 			t.Fatalf("missing %q in %s", part, joined)
 		}
+	}
+}
+
+func TestPostgresAlterSQLCommentDoesNotRetype(t *testing.T) {
+	comment := "display name"
+	stmts, err := postgresAlterSQL(`"public"."users"`, []driver.ColumnOp{
+		{Kind: driver.ColumnOpModify, Name: "name", Patch: &driver.ColumnPatch{Comment: &comment}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(stmts, "; ")
+	if strings.Contains(joined, " TYPE ") {
+		t.Fatalf("comment change rewrote the type: %s", joined)
+	}
+	if !strings.Contains(joined, `COMMENT ON COLUMN "public"."users"."name" IS 'display name'`) {
+		t.Fatalf("missing comment: %s", joined)
 	}
 }
 

@@ -5,7 +5,7 @@ import {
   emptyDraftColumn,
   isStructureDirty,
   nextColumnName,
-  structureOps,
+  structureDrafts,
   type DraftColumn,
 } from "@/features/results/structure";
 import { useConnectionsStore } from "@/stores/connections";
@@ -90,13 +90,13 @@ export function createTableStructure(ctx: QueryStoreCtx) {
     tab.structureDraft = draft.map((col, i) => (i === index ? { ...col, ...patch, key: col.key } : col));
   }
 
-  function addStructureColumn(id: string, driverId = "") {
+  function addStructureColumn(id: string, defaultType = "") {
     const tab = ctx.tableTab(id);
     if (!tab) {
       return;
     }
     const draft = ensureStructureDraft(tab);
-    tab.structureDraft = [...draft, emptyDraftColumn(nextColumnName(draft), driverId)];
+    tab.structureDraft = [...draft, emptyDraftColumn(nextColumnName(draft), defaultType)];
   }
 
   function toggleDropStructureColumn(id: string, key: string) {
@@ -140,15 +140,14 @@ export function createTableStructure(ctx: QueryStoreCtx) {
     if (!tab) {
       return;
     }
-    const ops = structureOps(tab.structure?.columns, tab.structureDraft, tab.structure?.canReorder ?? false);
-    if (ops.length === 0) {
+    if (!isStructureDirty(tab.structure?.columns, tab.structureDraft, tab.structure?.canReorder ?? false)) {
       return;
     }
     await QueryService.AlterTable(tab.profileId, {
       database: tab.database,
       schema: tab.schema,
       name: tab.name,
-      ops,
+      draft: structureDrafts(tab.structureDraft),
     });
     clearBrowse(tab);
     const dataTab = ctx.tabs.value.find(

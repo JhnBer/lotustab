@@ -26,6 +26,7 @@ func (d *stubDriver) DisplayName() string { return "Stub" }
 func (d *stubDriver) ConnectionSpec() []driver.Field {
 	return nil
 }
+func (d *stubDriver) ColumnTypes() []string { return nil }
 func (d *stubDriver) Open(context.Context, driver.ConnConfig) (driver.Conn, error) {
 	if d.delay > 0 {
 		time.Sleep(d.delay)

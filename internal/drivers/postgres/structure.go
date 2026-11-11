@@ -186,17 +186,17 @@ func postgresAlterStmts(qualified string, op driver.ColumnOp) ([]string, error) 
 		}
 		return stmts, nil
 	case driver.ColumnOpModify:
-		if op.Column == nil {
-			return nil, fmt.Errorf("modify requires a column definition")
+		if op.Patch == nil {
+			return nil, fmt.Errorf("modify requires a column patch")
 		}
 		oldName := op.Name
-		if oldName == "" {
+		if oldName == "" && op.Column != nil {
 			oldName = op.Column.Name
 		}
 		if oldName == "" {
 			return nil, fmt.Errorf("modify requires a column name")
 		}
-		return postgresModifyStmts(qualified, oldName, *op.Column), nil
+		return postgresModifyStmts(qualified, oldName, op.Patch)
 	case driver.ColumnOpReorder:
 		return nil, fmt.Errorf("column reorder is not supported on PostgreSQL")
 	default:
@@ -204,35 +204,37 @@ func postgresAlterStmts(qualified string, op driver.ColumnOp) ([]string, error) 
 	}
 }
 
-func postgresModifyStmts(qualified, oldName string, col driver.ColumnInfo) []string {
+func postgresModifyStmts(qualified, oldName string, patch *driver.ColumnPatch) ([]string, error) {
 	q := sqlutil.QuotePostgres
 	current := oldName
 	stmts := make([]string, 0, 4)
-	newName := col.Name
-	if newName == "" {
-		newName = oldName
+	if patch.Name != nil && *patch.Name != "" && *patch.Name != oldName {
+		stmts = append(stmts, "ALTER TABLE "+qualified+" RENAME COLUMN "+q(oldName)+" TO "+q(*patch.Name))
+		current = *patch.Name
 	}
-	if newName != oldName {
-		stmts = append(stmts, "ALTER TABLE "+qualified+" RENAME COLUMN "+q(oldName)+" TO "+q(newName))
-		current = newName
-	}
-	if col.Type != "" {
+	if patch.Type != nil && *patch.Type != "" {
 		quoted := q(current)
-		stmts = append(stmts, "ALTER TABLE "+qualified+" ALTER COLUMN "+quoted+" TYPE "+col.Type+" USING "+quoted+"::"+col.Type)
+		stmts = append(stmts, "ALTER TABLE "+qualified+" ALTER COLUMN "+quoted+" TYPE "+*patch.Type+" USING "+quoted+"::"+*patch.Type)
 	}
-	if col.Nullable {
-		stmts = append(stmts, "ALTER TABLE "+qualified+" ALTER COLUMN "+q(current)+" DROP NOT NULL")
-	} else {
-		stmts = append(stmts, "ALTER TABLE "+qualified+" ALTER COLUMN "+q(current)+" SET NOT NULL")
+	if patch.Nullable != nil {
+		if *patch.Nullable {
+			stmts = append(stmts, "ALTER TABLE "+qualified+" ALTER COLUMN "+q(current)+" DROP NOT NULL")
+		} else {
+			stmts = append(stmts, "ALTER TABLE "+qualified+" ALTER COLUMN "+q(current)+" SET NOT NULL")
+		}
 	}
-	if col.Default == nil {
+	if patch.ClearDefault {
 		stmts = append(stmts, "ALTER TABLE "+qualified+" ALTER COLUMN "+q(current)+" DROP DEFAULT")
-	} else {
-		def := sqlutil.FormatDefault(*col.Default)
-		stmts = append(stmts, "ALTER TABLE "+qualified+" ALTER COLUMN "+q(current)+" SET DEFAULT "+def)
+	} else if patch.Default != nil {
+		stmts = append(stmts, "ALTER TABLE "+qualified+" ALTER COLUMN "+q(current)+" SET DEFAULT "+sqlutil.FormatDefault(*patch.Default))
 	}
-	stmts = append(stmts, postgresCommentSQL(qualified, current, col.Comment))
-	return stmts
+	if patch.Comment != nil {
+		stmts = append(stmts, postgresCommentSQL(qualified, current, *patch.Comment))
+	}
+	if len(stmts) == 0 {
+		return nil, fmt.Errorf("modify changes nothing")
+	}
+	return stmts, nil
 }
 
 func postgresCommentSQL(qualified, name, comment string) string {

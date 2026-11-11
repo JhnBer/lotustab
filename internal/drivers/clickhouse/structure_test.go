@@ -36,6 +36,46 @@ func TestClickhouseAlterSQL(t *testing.T) {
 	}
 }
 
+func TestClickhouseAlterSQLTypeChangeKeepsDefaultAndComment(t *testing.T) {
+	def := "guest"
+	newType := "String"
+	stmts, err := clickhouseAlterSQL("`analytics`.`users`", []driver.ColumnOp{{
+		Kind: driver.ColumnOpModify,
+		Name: "name",
+		Column: &driver.ColumnInfo{
+			Name: "name", Type: "String", Default: &def, Comment: "aka",
+		},
+		Patch: &driver.ColumnPatch{Type: &newType},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(stmts, "; ")
+	want := "MODIFY COLUMN `name` String DEFAULT 'guest' COMMENT 'aka'"
+	if !strings.Contains(joined, want) {
+		t.Fatalf("missing %q in %s", want, joined)
+	}
+	if strings.Contains(joined, "REMOVE DEFAULT") {
+		t.Fatalf("type change removed the default: %s", joined)
+	}
+}
+
+func TestClickhouseAlterSQLClearDefault(t *testing.T) {
+	stmts, err := clickhouseAlterSQL("`analytics`.`users`", []driver.ColumnOp{{
+		Kind:   driver.ColumnOpModify,
+		Name:   "name",
+		Column: &driver.ColumnInfo{Name: "name", Type: "String", Comment: "aka"},
+		Patch:  &driver.ColumnPatch{ClearDefault: true},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(stmts, "; ")
+	if !strings.Contains(joined, "MODIFY COLUMN `name` REMOVE DEFAULT") {
+		t.Fatalf("missing explicit default removal: %s", joined)
+	}
+}
+
 func TestClickhouseAlterSQLRejectsEmpty(t *testing.T) {
 	if _, err := clickhouseAlterSQL("`t`", nil); err == nil {
 		t.Fatal("expected error")

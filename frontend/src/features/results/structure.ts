@@ -1,4 +1,4 @@
-import type { ColumnInfo, ColumnOp } from "@/lib/wails";
+import type { ColumnDraft, ColumnInfo, ColumnOp } from "@/lib/wails";
 
 export type TableView = "data" | "structure";
 
@@ -14,79 +14,30 @@ export type DraftColumn = {
   comment: string;
 };
 
-export const COMMON_COLUMN_TYPES = [
-  "int",
-  "bigint",
-  "varchar(255)",
-  "text",
-  "boolean",
-  "date",
-  "datetime",
-  "timestamp",
-  "timestamptz",
-  "numeric",
-  "decimal(10,2)",
-  "json",
-  "jsonb",
-  "uuid",
-  "bytea",
-  "blob",
-];
-
-export const CLICKHOUSE_COLUMN_TYPES = [
-  "String",
-  "FixedString(16)",
-  "Bool",
-  "Int8",
-  "Int16",
-  "Int32",
-  "Int64",
-  "Int128",
-  "Int256",
-  "UInt8",
-  "UInt16",
-  "UInt32",
-  "UInt64",
-  "UInt128",
-  "UInt256",
-  "Float32",
-  "Float64",
-  "Decimal(18,4)",
-  "Date",
-  "Date32",
-  "DateTime",
-  "DateTime64(3)",
-  "UUID",
-  "IPv4",
-  "IPv6",
-  "JSON",
-  "Array(String)",
-  "Map(String, String)",
-  "Tuple(String, Int32)",
-  "LowCardinality(String)",
-  "Enum8('a' = 1, 'b' = 2)",
-];
-
-export function columnTypesFor(driverId: string): string[] {
-  return driverId === "clickhouse" ? CLICKHOUSE_COLUMN_TYPES : COMMON_COLUMN_TYPES;
-}
-
-export function defaultColumnType(driverId: string): string {
-  return driverId === "clickhouse" ? "String" : "varchar(255)";
-}
-
-export function emptyDraftColumn(name = "column", driverId = ""): DraftColumn {
+export function emptyDraftColumn(name = "column", type = ""): DraftColumn {
   return {
     key: crypto.randomUUID(),
     originalName: null,
     dropped: false,
     name,
-    type: defaultColumnType(driverId),
+    type: type || "text",
     nullable: true,
     defaultValue: null,
     isPrimaryKey: false,
     comment: "",
   };
+}
+
+export function structureDrafts(draft: DraftColumn[] | null | undefined): ColumnDraft[] {
+  return (draft ?? []).map((col) => ({
+    originalName: col.originalName,
+    dropped: col.dropped,
+    name: col.name,
+    type: col.type,
+    nullable: col.nullable,
+    default: col.defaultValue,
+    comment: col.comment,
+  }));
 }
 
 export function nextColumnName(draft: DraftColumn[]): string {

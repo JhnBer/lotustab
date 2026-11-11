@@ -90,6 +90,23 @@ func ClampAlterTable(req AlterTableRequest) AlterTableRequest {
 	req.Database = strings.TrimSpace(req.Database)
 	req.Schema = strings.TrimSpace(req.Schema)
 	req.Name = strings.TrimSpace(req.Name)
+	for i := range req.Draft {
+		req.Draft[i].Name = strings.TrimSpace(req.Draft[i].Name)
+		req.Draft[i].Type = strings.TrimSpace(req.Draft[i].Type)
+		req.Draft[i].Comment = strings.TrimSpace(req.Draft[i].Comment)
+		if req.Draft[i].OriginalName != nil {
+			name := strings.TrimSpace(*req.Draft[i].OriginalName)
+			if name == "" {
+				req.Draft[i].OriginalName = nil
+			} else {
+				req.Draft[i].OriginalName = &name
+			}
+		}
+		if req.Draft[i].Default != nil {
+			value := strings.TrimSpace(*req.Draft[i].Default)
+			req.Draft[i].Default = &value
+		}
+	}
 	for i := range req.Ops {
 		req.Ops[i].Kind = strings.ToLower(strings.TrimSpace(req.Ops[i].Kind))
 		req.Ops[i].Name = strings.TrimSpace(req.Ops[i].Name)
@@ -103,10 +120,33 @@ func ClampAlterTable(req AlterTableRequest) AlterTableRequest {
 				req.Ops[i].Column.Default = &s
 			}
 		}
+		if req.Ops[i].Patch != nil {
+			req.Ops[i].Patch = clampPatch(req.Ops[i].Patch)
+		}
 		if req.Ops[i].After != nil {
 			s := strings.TrimSpace(*req.Ops[i].After)
 			req.Ops[i].After = &s
 		}
 	}
 	return req
+}
+
+func clampPatch(patch *ColumnPatch) *ColumnPatch {
+	if patch.Name != nil {
+		name := strings.TrimSpace(*patch.Name)
+		patch.Name = &name
+	}
+	if patch.Type != nil {
+		typ := strings.TrimSpace(*patch.Type)
+		patch.Type = &typ
+	}
+	if patch.Default != nil {
+		value := strings.TrimSpace(*patch.Default)
+		patch.Default = &value
+	}
+	if patch.Comment != nil {
+		comment := strings.TrimSpace(*patch.Comment)
+		patch.Comment = &comment
+	}
+	return patch
 }

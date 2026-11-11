@@ -37,6 +37,7 @@ const scrollRef = ref<HTMLElement | null>(null);
 const dragKey = ref("");
 
 const driverId = computed(() => connections.profileById(props.tab.profileId)?.driverId ?? "");
+const columnTypes = computed(() => connections.driverById(driverId.value)?.columnTypes ?? []);
 
 const draft = computed(() => props.tab.structureDraft ?? []);
 const visible = computed(() => filterDraftColumns(draft.value, query.value));
@@ -135,7 +136,7 @@ function rowAt(index: number): DraftColumn | undefined {
       <span class="text-muted-foreground min-w-0 flex-1 truncate text-xs">
         <template v-if="!tab.structure?.canReorder">Column order cannot be changed on this database.</template>
       </span>
-      <Button size="xs" variant="outline" :disabled="running" @click="queries.addStructureColumn(tab.id, driverId)">
+      <Button size="xs" variant="outline" :disabled="running" @click="queries.addStructureColumn(tab.id, columnTypes[0] ?? '')">
         <Plus class="size-3.5" />
         Column
       </Button>
@@ -149,7 +150,7 @@ function rowAt(index: number): DraftColumn | undefined {
     </div>
     <div v-else class="relative min-h-0 flex-1">
       <div ref="scrollRef" class="absolute inset-0 overflow-auto">
-        <div class="min-w-208 text-sm">
+        <div class="w-max min-w-full text-sm">
           <div class="bg-background sticky top-0 z-10 flex border-b" role="row">
             <div class="h-9 w-8 shrink-0" />
             <div class="text-foreground flex h-9 min-w-40 flex-1 items-center px-2 font-medium">Name</div>
@@ -180,6 +181,7 @@ function rowAt(index: number): DraftColumn | undefined {
               :running="running"
               :can-drag="canReorder"
               :driver-id="driverId"
+              :column-types="columnTypes"
               @reorderstart="onReorderStart($event, rowAt(item.index)!.key)"
               @reorderend="onReorderEnd"
               @reorderdrop="onReorderDrop($event, rowAt(item.index)!.key)"

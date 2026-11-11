@@ -27,6 +27,7 @@ export type {
   AlterTableRequest,
   ApplyEditsRequest,
   Column,
+  ColumnDraft,
   ColumnInfo,
   ColumnOp,
   DriverInfo,

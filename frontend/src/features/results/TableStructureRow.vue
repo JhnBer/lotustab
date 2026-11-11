@@ -18,7 +18,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  columnTypesFor,
   defaultsEqual,
   originalFor,
   type DraftColumn,
@@ -33,6 +32,7 @@ const props = defineProps<{
   running?: boolean;
   canDrag?: boolean;
   driverId?: string;
+  columnTypes?: string[];
 }>();
 
 const emit = defineEmits<{
@@ -44,7 +44,7 @@ const emit = defineEmits<{
 const queries = useQueryStore();
 
 const typeChoices = computed(() => {
-  const types = columnTypesFor(props.driverId ?? "");
+  const types = props.columnTypes ?? [];
   const current = props.col.type.trim();
   if (current && !types.includes(current)) {
     return [current, ...types];

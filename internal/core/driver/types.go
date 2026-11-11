@@ -174,29 +174,59 @@ type TableStructure struct {
 	CanReorder bool         `json:"canReorder"`
 }
 
-// ColumnOp is one pending schema change against a table.
-// After is the previous column's (new) name; empty string means FIRST; nil leaves position unchanged.
-type ColumnOp struct {
-	Kind    string      `json:"kind"`
-	Name    string      `json:"name"`
-	NewName string      `json:"newName,omitempty"`
-	Column  *ColumnInfo `json:"column,omitempty"`
-	After   *string     `json:"after"`
+// ColumnDraft is one editable column in a structure editor apply.
+// OriginalName is nil for a column that does not exist in the catalog yet.
+// A nil Default clears the default; an empty string sets the default to ”.
+type ColumnDraft struct {
+	OriginalName *string `json:"originalName"`
+	Dropped      bool    `json:"dropped"`
+	Name         string  `json:"name"`
+	Type         string  `json:"type"`
+	Nullable     bool    `json:"nullable"`
+	Default      *string `json:"default"`
+	Comment      string  `json:"comment"`
 }
 
-// AlterTableRequest applies accumulated column operations to a single table.
+// ColumnPatch is the subset of a column that a modify actually changes.
+// Nil pointers are unchanged. ClearDefault drops the default; a non-nil Default sets it.
+type ColumnPatch struct {
+	Name         *string `json:"name,omitempty"`
+	Type         *string `json:"type,omitempty"`
+	Nullable     *bool   `json:"nullable,omitempty"`
+	Default      *string `json:"default,omitempty"`
+	ClearDefault bool    `json:"clearDefault,omitempty"`
+	Comment      *string `json:"comment,omitempty"`
+}
+
+// ColumnOp is one pending schema change against a table.
+// After is the previous column's (new) name; empty string means FIRST; nil leaves position unchanged.
+// For modify, Column is the catalog column with the patch applied, and Patch lists what changed.
+// AutoIncrement, Extra, and IsPrimaryKey on Column stay as they were in the catalog.
+type ColumnOp struct {
+	Kind    string       `json:"kind"`
+	Name    string       `json:"name"`
+	NewName string       `json:"newName,omitempty"`
+	Column  *ColumnInfo  `json:"column,omitempty"`
+	Patch   *ColumnPatch `json:"patch,omitempty"`
+	After   *string      `json:"after"`
+}
+
+// AlterTableRequest applies a structure draft, or a planned op list, to one table.
+// The app service reads Draft and plans Ops. Engine adapters consume Ops.
 type AlterTableRequest struct {
-	Database string     `json:"database"`
-	Schema   string     `json:"schema"`
-	Name     string     `json:"name"`
-	Ops      []ColumnOp `json:"ops"`
+	Database string        `json:"database"`
+	Schema   string        `json:"schema"`
+	Name     string        `json:"name"`
+	Draft    []ColumnDraft `json:"draft,omitempty"`
+	Ops      []ColumnOp    `json:"ops,omitempty"`
 }
 
 // DriverInfo is the public description of a registered driver.
 type DriverInfo struct {
-	ID             string  `json:"id"`
-	DisplayName    string  `json:"displayName"`
-	ConnectionSpec []Field `json:"connectionSpec"`
+	ID             string   `json:"id"`
+	DisplayName    string   `json:"displayName"`
+	ConnectionSpec []Field  `json:"connectionSpec"`
+	ColumnTypes    []string `json:"columnTypes"`
 }
 
 // Param returns a connection parameter or a default.

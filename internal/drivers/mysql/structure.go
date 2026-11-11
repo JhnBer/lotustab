@@ -120,53 +120,62 @@ func mysqlAlterSQL(qualified string, ops []driver.ColumnOp) (string, error) {
 	}
 	clauses := make([]string, 0, len(ops))
 	for i, op := range ops {
-		clause, err := mysqlAlterClause(op)
+		parts, err := mysqlAlterClauses(op)
 		if err != nil {
 			return "", fmt.Errorf("op %d: %w", i, err)
 		}
-		clauses = append(clauses, clause)
+		clauses = append(clauses, parts...)
 	}
 	return "ALTER TABLE " + qualified + " " + strings.Join(clauses, ", "), nil
 }
 
-func mysqlAlterClause(op driver.ColumnOp) (string, error) {
+func mysqlAlterClauses(op driver.ColumnOp) ([]string, error) {
 	switch op.Kind {
 	case driver.ColumnOpDrop:
 		if op.Name == "" {
-			return "", fmt.Errorf("drop requires a column name")
+			return nil, fmt.Errorf("drop requires a column name")
 		}
-		return "DROP COLUMN " + sqlutil.QuoteMySQL(op.Name), nil
+		return []string{"DROP COLUMN " + sqlutil.QuoteMySQL(op.Name)}, nil
 	case driver.ColumnOpAdd:
 		if op.Column == nil {
-			return "", fmt.Errorf("add requires a column definition")
+			return nil, fmt.Errorf("add requires a column definition")
 		}
-		def, err := mysqlColumnDef(*op.Column)
+		def, err := mysqlColumnDef(*op.Column, false)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
-		return "ADD COLUMN " + def + mysqlPosition(op.After), nil
+		return []string{"ADD COLUMN " + def + mysqlPosition(op.After)}, nil
 	case driver.ColumnOpModify, driver.ColumnOpReorder:
 		if op.Column == nil {
-			return "", fmt.Errorf("%s requires a column definition", op.Kind)
+			return nil, fmt.Errorf("%s requires a column definition", op.Kind)
 		}
 		oldName := op.Name
 		if oldName == "" {
 			oldName = op.Column.Name
 		}
 		if oldName == "" {
-			return "", fmt.Errorf("%s requires a column name", op.Kind)
+			return nil, fmt.Errorf("%s requires a column name", op.Kind)
 		}
-		def, err := mysqlColumnDef(*op.Column)
+		clearComment := op.Patch != nil && op.Patch.Comment != nil && *op.Patch.Comment == ""
+		def, err := mysqlColumnDef(*op.Column, clearComment)
 		if err != nil {
-			return "", err
+			return nil, err
 		}
-		return "CHANGE COLUMN " + sqlutil.QuoteMySQL(oldName) + " " + def + mysqlPosition(op.After), nil
+		clauses := []string{"CHANGE COLUMN " + sqlutil.QuoteMySQL(oldName) + " " + def + mysqlPosition(op.After)}
+		if op.Patch != nil && op.Patch.ClearDefault {
+			name := op.Column.Name
+			if name == "" {
+				name = oldName
+			}
+			clauses = append(clauses, "ALTER COLUMN "+sqlutil.QuoteMySQL(name)+" DROP DEFAULT")
+		}
+		return clauses, nil
 	default:
-		return "", fmt.Errorf("unknown alter op %q", op.Kind)
+		return nil, fmt.Errorf("unknown alter op %q", op.Kind)
 	}
 }
 
-func mysqlColumnDef(col driver.ColumnInfo) (string, error) {
+func mysqlColumnDef(col driver.ColumnInfo, clearComment bool) (string, error) {
 	if col.Name == "" {
 		return "", fmt.Errorf("column name is required")
 	}
@@ -189,11 +198,32 @@ func mysqlColumnDef(col driver.ColumnInfo) (string, error) {
 	if col.AutoIncrement {
 		b.WriteString(" AUTO_INCREMENT")
 	}
-	if col.Comment != "" {
+	b.WriteString(mysqlPreservedExtra(col.Extra))
+	switch {
+	case col.Comment != "":
 		b.WriteString(" COMMENT ")
 		b.WriteString(sqlutil.QuoteString(col.Comment))
+	case clearComment:
+		b.WriteString(" COMMENT ''")
 	}
 	return b.String(), nil
+}
+
+// mysqlPreservedExtra repeats catalog phrases that CHANGE COLUMN would otherwise drop.
+func mysqlPreservedExtra(extra string) string {
+	lower := strings.ToLower(extra)
+	var b strings.Builder
+	switch {
+	case strings.Contains(lower, "virtual generated"):
+		b.WriteString(" VIRTUAL GENERATED")
+	case strings.Contains(lower, "stored generated"):
+		b.WriteString(" STORED GENERATED")
+	}
+	if idx := strings.Index(lower, "on update"); idx >= 0 {
+		b.WriteByte(' ')
+		b.WriteString(strings.TrimSpace(extra[idx:]))
+	}
+	return b.String()
 }
 
 func mysqlPosition(after *string) string {

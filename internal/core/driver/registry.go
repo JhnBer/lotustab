@@ -68,6 +68,7 @@ func (r *Registry) Infos() []DriverInfo {
 			ID:             d.ID(),
 			DisplayName:    d.DisplayName(),
 			ConnectionSpec: d.ConnectionSpec(),
+			ColumnTypes:    d.ColumnTypes(),
 		})
 	}
 	return out

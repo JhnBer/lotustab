@@ -255,7 +255,7 @@ func (s *QueryService) DescribeTable(ctx context.Context, profileID string, ref 
 	})
 }
 
-// AlterTable applies accumulated column operations in a single request.
+// AlterTable plans a structure draft against the live catalog and applies it.
 func (s *QueryService) AlterTable(ctx context.Context, profileID string, req driver.AlterTableRequest) error {
 	if strings.TrimSpace(profileID) == "" {
 		return fmt.Errorf("profile is required")
@@ -264,14 +264,38 @@ func (s *QueryService) AlterTable(ctx context.Context, profileID string, req dri
 	if req.Name == "" {
 		return fmt.Errorf("table is required")
 	}
-	if len(req.Ops) == 0 {
+	if req.Draft == nil {
 		return fmt.Errorf("no schema changes")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
 	_, err := withLiveConn(s, ctx, profileID, func(ctx context.Context, conn driver.Conn) (struct{}, error) {
-		return struct{}{}, conn.AlterTable(ctx, req)
+		structure, err := conn.DescribeTable(ctx, driver.TableRef{
+			Database: req.Database,
+			Schema:   req.Schema,
+			Name:     req.Name,
+		})
+		if err != nil {
+			return struct{}{}, err
+		}
+		columns := []driver.ColumnInfo(nil)
+		canReorder := false
+		if structure != nil {
+			columns = structure.Columns
+			canReorder = structure.CanReorder
+		}
+		ops, err := driver.PlanAlter(columns, req.Draft, canReorder)
+		if err != nil {
+			return struct{}{}, err
+		}
+		if len(ops) == 0 {
+			return struct{}{}, nil
+		}
+		planned := req
+		planned.Draft = nil
+		planned.Ops = ops
+		return struct{}{}, conn.AlterTable(ctx, planned)
 	})
 	return err
 }

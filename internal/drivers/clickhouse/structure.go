@@ -166,7 +166,7 @@ func clickhouseAlterStmts(qualified string, op driver.ColumnOp) ([]string, error
 		if oldName == "" {
 			return nil, fmt.Errorf("modify requires a column name")
 		}
-		return clickhouseModifyStmts(qualified, oldName, *op.Column, op.After)
+		return clickhouseModifyStmts(qualified, oldName, *op.Column, op.Patch, op.After)
 	case driver.ColumnOpReorder:
 		if op.Column == nil {
 			return nil, fmt.Errorf("reorder requires a column definition")
@@ -189,13 +189,16 @@ func clickhouseAlterStmts(qualified string, op driver.ColumnOp) ([]string, error
 	}
 }
 
-func clickhouseModifyStmts(qualified, oldName string, col driver.ColumnInfo, after *string) ([]string, error) {
+func clickhouseModifyStmts(qualified, oldName string, col driver.ColumnInfo, patch *driver.ColumnPatch, after *string) ([]string, error) {
 	q := sqlutil.QuoteClickHouse
 	current := oldName
-	stmts := make([]string, 0, 2)
+	stmts := make([]string, 0, 3)
 	newName := col.Name
 	if newName == "" {
 		newName = oldName
+	}
+	if patch != nil && patch.Name != nil && *patch.Name != "" {
+		newName = *patch.Name
 	}
 	if newName != oldName {
 		stmts = append(stmts, "ALTER TABLE "+qualified+" RENAME COLUMN "+q(oldName)+" TO "+q(newName))
@@ -204,14 +207,22 @@ func clickhouseModifyStmts(qualified, oldName string, col driver.ColumnInfo, aft
 	def := driver.ColumnInfo{
 		Name:    current,
 		Type:    col.Type,
-		Default: col.Default,
 		Comment: col.Comment,
+	}
+	if patch == nil || !patch.ClearDefault {
+		def.Default = col.Default
 	}
 	colDef, err := clickhouseColumnDef(def)
 	if err != nil {
 		return nil, err
 	}
 	stmts = append(stmts, "ALTER TABLE "+qualified+" MODIFY COLUMN "+colDef+clickhousePosition(after))
+	if patch != nil && patch.ClearDefault {
+		stmts = append(stmts, "ALTER TABLE "+qualified+" MODIFY COLUMN "+q(current)+" REMOVE DEFAULT")
+	}
+	if patch != nil && patch.Comment != nil && *patch.Comment == "" {
+		stmts = append(stmts, "ALTER TABLE "+qualified+" MODIFY COLUMN "+q(current)+" REMOVE COMMENT")
+	}
 	return stmts, nil
 }
 

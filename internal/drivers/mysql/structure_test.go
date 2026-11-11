@@ -49,6 +49,53 @@ func TestMysqlAlterSQL(t *testing.T) {
 	}
 }
 
+func TestMysqlAlterSQLTypeChangeKeepsDefaultAndIdentity(t *testing.T) {
+	def := "0"
+	newType := "bigint"
+	sql, err := mysqlAlterSQL("`app`.`users`", []driver.ColumnOp{{
+		Kind: driver.ColumnOpModify,
+		Name: "id",
+		Column: &driver.ColumnInfo{
+			Name: "id", Type: "bigint", Nullable: false, Default: &def, AutoIncrement: true,
+			Extra: "auto_increment",
+		},
+		Patch: &driver.ColumnPatch{Type: &newType},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, part := range []string{
+		"CHANGE COLUMN `id` `id` bigint NOT NULL DEFAULT 0 AUTO_INCREMENT",
+	} {
+		if !strings.Contains(sql, part) {
+			t.Fatalf("missing %q in %s", part, sql)
+		}
+	}
+	if strings.Contains(sql, "DROP DEFAULT") {
+		t.Fatalf("type change cleared the default: %s", sql)
+	}
+}
+
+func TestMysqlAlterSQLClearDefault(t *testing.T) {
+	sql, err := mysqlAlterSQL("`app`.`users`", []driver.ColumnOp{{
+		Kind:   driver.ColumnOpModify,
+		Name:   "name",
+		Column: &driver.ColumnInfo{Name: "name", Type: "varchar(255)", Nullable: true, Extra: "on update CURRENT_TIMESTAMP"},
+		Patch:  &driver.ColumnPatch{ClearDefault: true},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, part := range []string{
+		"CHANGE COLUMN `name` `name` varchar(255) NULL on update CURRENT_TIMESTAMP",
+		"ALTER COLUMN `name` DROP DEFAULT",
+	} {
+		if !strings.Contains(sql, part) {
+			t.Fatalf("missing %q in %s", part, sql)
+		}
+	}
+}
+
 func TestMysqlAlterSQLRejectsEmpty(t *testing.T) {
 	if _, err := mysqlAlterSQL("`t`", nil); err == nil {
 		t.Fatal("expected error")
