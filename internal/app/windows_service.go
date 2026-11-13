@@ -41,8 +41,8 @@ func WindowOptions(name, title, pageURL string) application.WebviewWindowOptions
 	return application.WebviewWindowOptions{
 		Name:   name,
 		Title:  title,
-		Width:  1280,
-		Height: 800,
+		Width:  1440,
+		Height: 900,
 		Mac: application.MacWindow{
 			Backdrop: application.MacBackdropTranslucent,
 			TitleBar: application.MacTitleBarHiddenInset,

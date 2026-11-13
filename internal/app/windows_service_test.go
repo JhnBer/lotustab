@@ -19,7 +19,7 @@ func TestWindowOptions(t *testing.T) {
 	if opts.Name != "main" || opts.Title != "LotusTab" || opts.URL != "/" {
 		t.Fatalf("unexpected options: %+v", opts)
 	}
-	if opts.Width != 1280 || opts.Height != 800 {
+	if opts.Width != 1440 || opts.Height != 900 {
 		t.Fatalf("unexpected size: %dx%d", opts.Width, opts.Height)
 	}
 }

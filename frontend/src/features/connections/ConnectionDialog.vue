@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -166,9 +165,6 @@ async function fetchDatabases() {
     <DialogContent v-if="open" class="max-h-[min(90vh,40rem)] overflow-y-auto sm:max-w-md">
       <DialogHeader>
         <DialogTitle>{{ isEdit ? "Edit connection" : "New connection" }}</DialogTitle>
-        <DialogDescription>
-          Driver fields come from the backend spec, so new engines do not need a custom form.
-        </DialogDescription>
       </DialogHeader>
 
       <form class="grid gap-3" @submit.prevent="onSave">

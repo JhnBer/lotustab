@@ -60,13 +60,13 @@ function onDeleteOnAbort(value: unknown) {
 </script>
 
 <template>
-  <section class="mx-auto flex h-full w-full max-w-lg flex-col gap-8 overflow-auto py-2">
+  <section class="mx-auto flex h-full w-full min-w-0 max-w-lg flex-col gap-8 overflow-x-hidden overflow-y-auto py-2">
     <h1 class="text-lg font-medium">Settings</h1>
 
     <div class="flex items-center justify-between gap-4">
-      <Label for="settings-theme">Theme</Label>
+      <Label for="settings-theme" class="min-w-0">Theme</Label>
       <Select :model-value="mode" @update:model-value="onTheme">
-        <SelectTrigger id="settings-theme" size="sm" class="w-36">
+        <SelectTrigger id="settings-theme" size="sm" class="w-36 shrink-0">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -78,7 +78,7 @@ function onDeleteOnAbort(value: unknown) {
     </div>
 
     <div class="flex items-center justify-between gap-4">
-      <Label for="settings-tint">Colored connection headers</Label>
+      <Label for="settings-tint" class="min-w-0">Colored connection headers</Label>
       <Switch
         id="settings-tint"
         :model-value="settings.connectionTint"
@@ -87,7 +87,7 @@ function onDeleteOnAbort(value: unknown) {
     </div>
 
     <div class="flex items-center justify-between gap-4">
-      <Label for="settings-show-all-dbs">Show all databases</Label>
+      <Label for="settings-show-all-dbs" class="min-w-0">Show all databases</Label>
       <Switch
         id="settings-show-all-dbs"
         :model-value="settings.showAllDatabases"
@@ -96,7 +96,7 @@ function onDeleteOnAbort(value: unknown) {
     </div>
 
     <div v-if="settings.showAllDatabases" class="flex items-center justify-between gap-4">
-      <Label for="settings-enable-db-choice">Enable database choice</Label>
+      <Label for="settings-enable-db-choice" class="min-w-0">Enable database choice</Label>
       <Switch
         id="settings-enable-db-choice"
         :model-value="settings.enableDatabaseChoice"
@@ -105,9 +105,9 @@ function onDeleteOnAbort(value: unknown) {
     </div>
 
     <div class="flex items-center justify-between gap-4">
-      <Label for="settings-tab-layout">Tab layout</Label>
+      <Label for="settings-tab-layout" class="min-w-0">Tab layout</Label>
       <Select :model-value="settings.tabLayout" @update:model-value="onTabLayout">
-        <SelectTrigger id="settings-tab-layout" size="sm" class="w-36">
+        <SelectTrigger id="settings-tab-layout" size="sm" class="w-36 shrink-0">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -118,9 +118,9 @@ function onDeleteOnAbort(value: unknown) {
     </div>
 
     <div class="flex items-center justify-between gap-4">
-      <Label for="settings-page-size">Default rows per page</Label>
+      <Label for="settings-page-size" class="min-w-0">Default rows per page</Label>
       <Select :model-value="String(settings.defaultPageSize)" @update:model-value="onPageSize">
-        <SelectTrigger id="settings-page-size" size="sm" class="w-36">
+        <SelectTrigger id="settings-page-size" size="sm" class="w-36 shrink-0">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -137,7 +137,7 @@ function onDeleteOnAbort(value: unknown) {
         <p class="text-muted-foreground mt-1 text-xs">Cancels a running query after this time. Off waits until you cancel.</p>
       </div>
       <Select :model-value="String(settings.queryTimeoutSeconds)" @update:model-value="onQueryTimeout">
-        <SelectTrigger id="settings-query-timeout" size="sm" class="w-36">
+        <SelectTrigger id="settings-query-timeout" size="sm" class="w-36 shrink-0">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
