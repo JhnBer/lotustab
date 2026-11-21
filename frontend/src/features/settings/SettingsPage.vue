@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import {
   isCellCopyLayout,
+  isSideViewMinTextLength,
   isTabLayout,
   PAGE_SIZES,
   QUERY_TIMEOUTS,
@@ -86,6 +87,21 @@ function onCustomCellDelimiter(value: string | number) {
 
 function onCustomRowDelimiter(value: string | number) {
   settings.setCustomRowDelimiter(String(value));
+}
+
+function onSideViewMinTextLength(value: string | number) {
+  if (value === "") {
+    return;
+  }
+  const length = Number(value);
+  if (!isSideViewMinTextLength(length)) {
+    return;
+  }
+  settings.setSideViewMinTextLength(length);
+}
+
+function onApplySideViewLengthToJson(value: unknown) {
+  settings.setApplySideViewLengthToJson(Boolean(value));
 }
 </script>
 
@@ -191,6 +207,43 @@ function onCustomRowDelimiter(value: string | number) {
         :model-value="settings.deleteOnAbortExport"
         @update:model-value="onDeleteOnAbort"
       />
+    </div>
+
+    <div class="flex flex-col gap-8 border-t pt-8">
+      <div>
+        <h2 class="text-sm font-medium">Cells</h2>
+        <p class="text-muted-foreground mt-1 text-xs">
+          Double-click edits a cell when its text is this long or shorter. Longer text opens the side view.
+        </p>
+      </div>
+
+      <div class="flex items-center justify-between gap-4">
+        <Label for="settings-side-view-min-length" class="min-w-0">Min text length to open side view</Label>
+        <Input
+          id="settings-side-view-min-length"
+          :model-value="settings.sideViewMinTextLength"
+          type="number"
+          min="0"
+          step="1"
+          size="xs"
+          class="w-20"
+          @update:model-value="onSideViewMinTextLength"
+        />
+      </div>
+
+      <div class="flex items-center justify-between gap-4">
+        <div class="min-w-0">
+          <Label for="settings-side-view-json">Also apply to JSON fields</Label>
+          <p class="text-muted-foreground mt-1 text-xs">
+            JSON columns always open the side view unless this is on.
+          </p>
+        </div>
+        <Switch
+          id="settings-side-view-json"
+          :model-value="settings.applySideViewLengthToJson"
+          @update:model-value="onApplySideViewLengthToJson"
+        />
+      </div>
     </div>
 
     <div class="flex flex-col gap-8 border-t pt-8">

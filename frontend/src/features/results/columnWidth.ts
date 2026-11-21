@@ -140,10 +140,3 @@ export function computeColumnWidths(
 export function columnSetKey(columns: { name: string }[]): string {
   return columns.map((column) => column.name).join("\0");
 }
-
-export function isLargeCell(type: string | undefined | null, value: unknown): boolean {
-  if (isLargeColumnType(type)) {
-    return true;
-  }
-  return cellDisplayText(value).length > LONG_VALUE_CHARS;
-}

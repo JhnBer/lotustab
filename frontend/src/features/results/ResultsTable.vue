@@ -51,7 +51,7 @@ import {
   columnSetKey,
   computeColumnWidths,
   DEFAULT_COL_WIDTH,
-  isLargeCell,
+  isBinaryColumnType,
   MIN_COL_WIDTH,
 } from "@/features/results/columnWidth";
 import {
@@ -629,10 +629,25 @@ async function openInspectorWindow() {
   }
 }
 
+function isJsonColumnType(type: string | undefined | null): boolean {
+  return !!type && /\bjsonb?\b/i.test(type);
+}
+
+/** Binary always opens the side view. JSON does too, unless the length setting applies to it. */
+function shouldOpenSideView(type: string | undefined | null, value: unknown): boolean {
+  if (isBinaryColumnType(type)) {
+    return true;
+  }
+  if (isJsonColumnType(type) && !settings.applySideViewLengthToJson) {
+    return true;
+  }
+  return editInputText(value).length > settings.sideViewMinTextLength;
+}
+
 function onCellDoubleClick(row: number, col: number) {
   const column = columns.value[col];
   const value = cellValue(row, col);
-  if (isLargeCell(column?.type, value)) {
+  if (shouldOpenSideView(column?.type, value)) {
     openInspector(row, col);
     return;
   }
@@ -1142,6 +1157,94 @@ async function pasteCell() {
     // clipboard may be denied in the webview
   }
 }
+
+type CellMenuSelection = "single" | "multiple";
+
+type CellMenuItem = {
+  id: string;
+  label: string;
+  /** Omit to show for any selection size. */
+  selection?: CellMenuSelection;
+  disabled?: boolean;
+  separatorBefore?: boolean;
+  action: () => void;
+};
+
+function matchesCellSelection(kind: CellMenuSelection | undefined) {
+  if (!kind) {
+    return true;
+  }
+  if (kind === "single") {
+    return selectedCellCount.value === 1;
+  }
+  return selectedCellCount.value > 1;
+}
+
+const cellMenuItems = computed((): CellMenuItem[] => {
+  const target = contextTarget.value;
+  const cell = target?.type === "cell" ? target : null;
+  const canEditCell = props.editable && cell != null && !isDeletedIndex(cell.row);
+  const items: CellMenuItem[] = [
+    {
+      id: "copy",
+      label: "Copy",
+      action: () => {
+        void copySelection(false);
+      },
+    },
+    {
+      id: "copy-json",
+      label: "Copy as JSON",
+      action: () => {
+        void copySelection(true);
+      },
+    },
+    {
+      id: "open-value",
+      label: "Open value",
+      selection: "single",
+      action: () => {
+        if (cell) {
+          openInspector(cell.row, cell.col);
+        }
+      },
+    },
+    {
+      id: "edit",
+      label: "Edit",
+      selection: "single",
+      disabled: !canEditCell,
+      action: () => {
+        if (cell) {
+          startEdit(cell.row, cell.col);
+        }
+      },
+    },
+    {
+      id: "set-null",
+      label: "Set NULL",
+      separatorBefore: true,
+      disabled: !selectionEditable(),
+      action: setNullSelection,
+    },
+    {
+      id: "set-value",
+      label: "Set value for selected",
+      disabled: !selectionEditable(),
+      action: openSetValue,
+    },
+    {
+      id: "paste",
+      label: "Paste",
+      selection: "single",
+      disabled: !selectionEditable(),
+      action: () => {
+        void pasteCell();
+      },
+    },
+  ];
+  return items.filter((item) => matchesCellSelection(item.selection));
+});
 </script>
 
 <template>
@@ -1387,32 +1490,12 @@ async function pasteCell() {
               </ContextMenuItem>
             </template>
             <template v-else-if="contextTarget?.type === 'cell'">
-              <ContextMenuItem @select="copySelection(false)">
-                Copy
-              </ContextMenuItem>
-              <ContextMenuItem @select="copySelection(true)">
-                Copy as JSON
-              </ContextMenuItem>
-              <ContextMenuItem
-                v-if="contextTarget"
-                @select="openInspector(contextTarget.row, contextTarget.col)"
-              >
-                Open value
-              </ContextMenuItem>
-              <ContextMenuSeparator />
-              <ContextMenuItem :disabled="!selectionEditable()" @select="setNullSelection">
-                Set NULL
-              </ContextMenuItem>
-              <ContextMenuItem :disabled="!selectionEditable()" @select="openSetValue">
-                Set value for selected
-              </ContextMenuItem>
-              <ContextMenuItem
-                v-if="isSingleCellSelected()"
-                :disabled="!selectionEditable()"
-                @select="pasteCell"
-              >
-                Paste
-              </ContextMenuItem>
+              <template v-for="item in cellMenuItems" :key="item.id">
+                <ContextMenuSeparator v-if="item.separatorBefore" />
+                <ContextMenuItem :disabled="item.disabled" @select="item.action()">
+                  {{ item.label }}
+                </ContextMenuItem>
+              </template>
             </template>
           </ContextMenuContent>
         </ContextMenu>

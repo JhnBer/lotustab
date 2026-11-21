@@ -17,6 +17,7 @@ export type CellCopyLayout = (typeof CELL_COPY_LAYOUTS)[number];
 export const DEFAULT_CELL_COPY_LAYOUT: CellCopyLayout = "grid";
 export const DEFAULT_CUSTOM_CELL_DELIMITER = "\\t";
 export const DEFAULT_CUSTOM_ROW_DELIMITER = "\\n";
+export const DEFAULT_SIDE_VIEW_MIN_TEXT_LENGTH = 64;
 
 export const UPDATE_CHECK_SOURCES = ["manual", "automatic"] as const;
 export type UpdateCheckSource = (typeof UPDATE_CHECK_SOURCES)[number];
@@ -33,6 +34,8 @@ const USE_CUSTOM_CELL_DELIMITER_KEY = "lotustab.useCustomCellDelimiter";
 const USE_CUSTOM_ROW_DELIMITER_KEY = "lotustab.useCustomRowDelimiter";
 const CUSTOM_CELL_DELIMITER_KEY = "lotustab.customCellDelimiter";
 const CUSTOM_ROW_DELIMITER_KEY = "lotustab.customRowDelimiter";
+const SIDE_VIEW_MIN_TEXT_LENGTH_KEY = "lotustab.sideViewMinTextLength";
+const APPLY_SIDE_VIEW_LENGTH_TO_JSON_KEY = "lotustab.applySideViewLengthToJson";
 const AUTO_INSTALL_KEY = "lotustab.autoInstallUpdates";
 const LAST_CHECK_AT_KEY = "lotustab.lastUpdateCheckAt";
 const LAST_CHECK_SOURCE_KEY = "lotustab.lastUpdateCheckSource";
@@ -113,6 +116,23 @@ function readCustomDelimiter(key: string, fallback: string): string {
   return v == null ? fallback : v;
 }
 
+export function isSideViewMinTextLength(n: number): boolean {
+  return Number.isInteger(n) && n >= 0;
+}
+
+function readSideViewMinTextLength(): number {
+  const raw = localStorage.getItem(SIDE_VIEW_MIN_TEXT_LENGTH_KEY);
+  if (raw == null || raw === "") {
+    return DEFAULT_SIDE_VIEW_MIN_TEXT_LENGTH;
+  }
+  const n = Number(raw);
+  return isSideViewMinTextLength(n) ? n : DEFAULT_SIDE_VIEW_MIN_TEXT_LENGTH;
+}
+
+function readApplySideViewLengthToJson(): boolean {
+  return localStorage.getItem(APPLY_SIDE_VIEW_LENGTH_TO_JSON_KEY) === "true";
+}
+
 export function isUpdateCheckSource(v: unknown): v is UpdateCheckSource {
   return (UPDATE_CHECK_SOURCES as readonly string[]).includes(v as string);
 }
@@ -144,6 +164,8 @@ type SettingsPayload = {
   useCustomRowDelimiter: boolean;
   customCellDelimiter: string;
   customRowDelimiter: string;
+  sideViewMinTextLength: number;
+  applySideViewLengthToJson: boolean;
   autoInstallUpdates: boolean;
   lastUpdateCheckAt: string | null;
   lastUpdateCheckSource: UpdateCheckSource | null;
@@ -162,6 +184,8 @@ export const useSettingsStore = defineStore("settings", () => {
   const useCustomRowDelimiter = ref(readUseCustomRowDelimiter());
   const customCellDelimiter = ref(readCustomDelimiter(CUSTOM_CELL_DELIMITER_KEY, DEFAULT_CUSTOM_CELL_DELIMITER));
   const customRowDelimiter = ref(readCustomDelimiter(CUSTOM_ROW_DELIMITER_KEY, DEFAULT_CUSTOM_ROW_DELIMITER));
+  const sideViewMinTextLength = ref(readSideViewMinTextLength());
+  const applySideViewLengthToJson = ref(readApplySideViewLengthToJson());
   const autoInstallUpdates = ref(readAutoInstallUpdates());
   const lastUpdateCheckAt = ref<string | null>(readLastUpdateCheckAt());
   const lastUpdateCheckSource = ref<UpdateCheckSource | null>(readLastUpdateCheckSource());
@@ -180,6 +204,8 @@ export const useSettingsStore = defineStore("settings", () => {
       useCustomRowDelimiter: useCustomRowDelimiter.value,
       customCellDelimiter: customCellDelimiter.value,
       customRowDelimiter: customRowDelimiter.value,
+      sideViewMinTextLength: sideViewMinTextLength.value,
+      applySideViewLengthToJson: applySideViewLengthToJson.value,
       autoInstallUpdates: autoInstallUpdates.value,
       lastUpdateCheckAt: lastUpdateCheckAt.value,
       lastUpdateCheckSource: lastUpdateCheckSource.value,
@@ -199,6 +225,8 @@ export const useSettingsStore = defineStore("settings", () => {
     localStorage.setItem(USE_CUSTOM_ROW_DELIMITER_KEY, String(useCustomRowDelimiter.value));
     localStorage.setItem(CUSTOM_CELL_DELIMITER_KEY, customCellDelimiter.value);
     localStorage.setItem(CUSTOM_ROW_DELIMITER_KEY, customRowDelimiter.value);
+    localStorage.setItem(SIDE_VIEW_MIN_TEXT_LENGTH_KEY, String(sideViewMinTextLength.value));
+    localStorage.setItem(APPLY_SIDE_VIEW_LENGTH_TO_JSON_KEY, String(applySideViewLengthToJson.value));
     localStorage.setItem(AUTO_INSTALL_KEY, String(autoInstallUpdates.value));
     if (lastUpdateCheckAt.value) {
       localStorage.setItem(LAST_CHECK_AT_KEY, lastUpdateCheckAt.value);
@@ -247,6 +275,13 @@ export const useSettingsStore = defineStore("settings", () => {
         typeof next.customCellDelimiter === "string" ? next.customCellDelimiter : customCellDelimiter.value,
       customRowDelimiter:
         typeof next.customRowDelimiter === "string" ? next.customRowDelimiter : customRowDelimiter.value,
+      sideViewMinTextLength: isSideViewMinTextLength(Number(next.sideViewMinTextLength))
+        ? Number(next.sideViewMinTextLength)
+        : sideViewMinTextLength.value,
+      applySideViewLengthToJson:
+        typeof next.applySideViewLengthToJson === "boolean"
+          ? next.applySideViewLengthToJson
+          : applySideViewLengthToJson.value,
       autoInstallUpdates: Boolean(next.autoInstallUpdates),
       lastUpdateCheckAt:
         typeof next.lastUpdateCheckAt === "string" && !Number.isNaN(Date.parse(next.lastUpdateCheckAt))
@@ -287,6 +322,13 @@ export const useSettingsStore = defineStore("settings", () => {
       typeof next.customCellDelimiter === "string" ? next.customCellDelimiter : customCellDelimiter.value;
     const rowDelimiter =
       typeof next.customRowDelimiter === "string" ? next.customRowDelimiter : customRowDelimiter.value;
+    const minTextLength = isSideViewMinTextLength(next.sideViewMinTextLength)
+      ? next.sideViewMinTextLength
+      : sideViewMinTextLength.value;
+    const applyLengthToJson =
+      typeof next.applySideViewLengthToJson === "boolean"
+        ? next.applySideViewLengthToJson
+        : applySideViewLengthToJson.value;
     if (
       connectionTint.value === next.connectionTint &&
       defaultPageSize.value === size &&
@@ -300,6 +342,8 @@ export const useSettingsStore = defineStore("settings", () => {
       useCustomRowDelimiter.value === customRow &&
       customCellDelimiter.value === cellDelimiter &&
       customRowDelimiter.value === rowDelimiter &&
+      sideViewMinTextLength.value === minTextLength &&
+      applySideViewLengthToJson.value === applyLengthToJson &&
       autoInstallUpdates.value === next.autoInstallUpdates &&
       lastUpdateCheckAt.value === next.lastUpdateCheckAt &&
       lastUpdateCheckSource.value === next.lastUpdateCheckSource
@@ -318,6 +362,8 @@ export const useSettingsStore = defineStore("settings", () => {
     useCustomRowDelimiter.value = customRow;
     customCellDelimiter.value = cellDelimiter;
     customRowDelimiter.value = rowDelimiter;
+    sideViewMinTextLength.value = minTextLength;
+    applySideViewLengthToJson.value = applyLengthToJson;
     autoInstallUpdates.value = next.autoInstallUpdates;
     lastUpdateCheckAt.value = next.lastUpdateCheckAt;
     lastUpdateCheckSource.value = next.lastUpdateCheckSource;
@@ -420,6 +466,22 @@ export const useSettingsStore = defineStore("settings", () => {
     commit();
   }
 
+  function setSideViewMinTextLength(length: number) {
+    if (!isSideViewMinTextLength(length) || sideViewMinTextLength.value === length) {
+      return;
+    }
+    sideViewMinTextLength.value = length;
+    commit();
+  }
+
+  function setApplySideViewLengthToJson(on: boolean) {
+    if (applySideViewLengthToJson.value === on) {
+      return;
+    }
+    applySideViewLengthToJson.value = on;
+    commit();
+  }
+
   function setAutoInstallUpdates(on: boolean) {
     if (autoInstallUpdates.value === on) {
       return;
@@ -455,6 +517,8 @@ export const useSettingsStore = defineStore("settings", () => {
     useCustomRowDelimiter,
     customCellDelimiter,
     customRowDelimiter,
+    sideViewMinTextLength,
+    applySideViewLengthToJson,
     autoInstallUpdates,
     lastUpdateCheckAt,
     lastUpdateCheckSource,
@@ -470,6 +534,8 @@ export const useSettingsStore = defineStore("settings", () => {
     setUseCustomRowDelimiter,
     setCustomCellDelimiter,
     setCustomRowDelimiter,
+    setSideViewMinTextLength,
+    setApplySideViewLengthToJson,
     setAutoInstallUpdates,
     recordUpdateCheck,
   };
