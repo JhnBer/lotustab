@@ -39,15 +39,4 @@ Contributions are accepted under MIT via the [CLA](CLA.md). See [CONTRIBUTING.md
 
 ## Build
 
-Needs Go 1.25+ and [Wails v3](https://wails.io/): `go install github.com/wailsapp/wails/v3/cmd/wails3@latest`.
-
-Run from the repo root. Version comes from the latest git tag (`v0.1.0` → `0.1.0`); override with `APP_VERSION=0.1.0`.
-
-```bash
-wails3 dev                              # local app
-wails3 task package                     # macOS .app → bin/lotustab.app
-wails3 task darwin:package:dmg          # macOS .dmg → bin/lotustab.dmg
-wails3 task darwin:package:universal    # Intel + Apple Silicon .app
-```
-
-On Windows and Linux, `wails3 task package` builds that platform's installer instead of a `.app`.
+Build, the local PostgreSQL, and the seed are described in [docs/development.md](docs/development.md).

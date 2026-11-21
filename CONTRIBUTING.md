@@ -35,6 +35,6 @@ Maintainers may, for architectural or business reasons, remove functionality fro
 
 ## Development pointers
 
-- Local setup and packaging: see [README.md](README.md).
+- Local setup and packaging: see [docs/development.md](docs/development.md).
 - Prefer small PRs with a clear description of what changed and how you checked it.
 - Do not commit secrets, credentials, or customer data.
