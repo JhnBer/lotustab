@@ -171,7 +171,7 @@ function formatSize(bytes: number): string {
         </div>
       </ItemContent>
 
-      <ItemFooter v-if="showInstallActions" class="flex-wrap justify-start">
+      <ItemFooter v-if="showInstallActions || updates.info.updateError" class="flex-wrap justify-start">
         <template v-if="updates.phase === 'available'">
           <Button size="sm" :disabled="updates.busy" @click="updates.installAndRestart()">
             Install and restart immediately
@@ -181,7 +181,7 @@ function formatSize(bytes: number): string {
           </Button>
         </template>
         <Button
-          v-else-if="updates.phase === 'ready'"
+          v-else-if="updates.phase === 'ready' || updates.info.updateError"
           size="sm"
           :disabled="updates.busy"
           @click="updates.restartNow()"

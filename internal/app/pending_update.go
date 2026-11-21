@@ -44,18 +44,20 @@ var (
 			appl.Quit()
 		}
 	}
-	sameDeviceFn = sameDevice
+	sameDeviceFn    = sameDevice
+	relaunchProcess = Relaunch
 )
 
 type pendingManifest struct {
 	Version  string `json:"version"`
 	Artifact string `json:"artifact"`
+	Relaunch int    `json:"relaunch,omitempty"`
 }
 
 // ApplyPendingUpdate starts the Wails updater helper when a newer staged
 // build is waiting. It reports whether the caller should exit so the helper
-// can swap the bundle. A missing or stale manifest is removed and startup
-// continues.
+// can swap the bundle. After that swap, a still-old process is opened once
+// more. A missing or stale manifest is removed and startup continues.
 func ApplyPendingUpdate(currentVersion string) bool {
 	waitForRelaunchParent()
 	root, err := pendingRoot()
@@ -182,8 +184,7 @@ func applyPending(root, current, self string, spawn func(*exec.Cmd) error) (bool
 		return false, nil
 	}
 	if _, err := os.Lstat(man.Artifact); err != nil {
-		_ = os.RemoveAll(root)
-		return false, nil
+		return relaunchSwappedApp(root, man)
 	}
 	resolvedRoot, err := filepath.EvalSymlinks(root)
 	if err != nil {
@@ -204,6 +205,47 @@ func applyPending(root, current, self string, spawn func(*exec.Cmd) error) (bool
 		return false, fmt.Errorf("start update helper: %w", err)
 	}
 	return true, nil
+}
+
+// relaunchSwappedApp runs when the staged file is already gone: the helper
+// renamed it onto the installed app, but this process is still the old build.
+// One extra open reads the new files. A second failure stays put so startup
+// can report it.
+func relaunchSwappedApp(root string, man pendingManifest) (bool, error) {
+	if man.Relaunch >= 1 {
+		return false, nil
+	}
+	man.Relaunch = 1
+	if err := writeManifest(root, man); err != nil {
+		return false, err
+	}
+	if err := relaunchProcess(); err != nil {
+		man.Relaunch = 0
+		_ = writeManifest(root, man)
+		return false, err
+	}
+	return true, nil
+}
+
+// pendingApplyError reports a swap that stayed on the old version after the
+// extra open. An empty string means there is nothing to show.
+func pendingApplyError(current string) string {
+	root, err := pendingRoot()
+	if err != nil {
+		return ""
+	}
+	return pendingApplyErrorIn(root, current)
+}
+
+func pendingApplyErrorIn(root, current string) string {
+	man, err := loadPending(root)
+	if err != nil || man.Relaunch < 1 || !releaseIsNewer(man.Version, current) {
+		return ""
+	}
+	if _, err := os.Lstat(man.Artifact); err == nil {
+		return ""
+	}
+	return fmt.Sprintf("Update %s did not start. Open About and try again.", man.Version)
 }
 
 func loadPending(root string) (pendingManifest, error) {
