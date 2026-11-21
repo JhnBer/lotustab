@@ -477,10 +477,6 @@ function rowStateClass(rowIndex: number) {
   return "";
 }
 
-function isSingleCellSelected() {
-  return selection.cellSelectionList.value.length === 1;
-}
-
 function cellHighlightClass(rowIndex: number, colIndex: number) {
   if (selection.isCellSelected(rowIndex, colIndex)) {
     return "bg-primary/10";
@@ -500,8 +496,16 @@ function hasToggleModifier(event: PointerEvent | KeyboardEvent | MouseEvent) {
 
 const toggleModifierHeld = ref(false);
 
+function isToggleModifierKey(event: KeyboardEvent) {
+  return event.key === "Meta" || event.key === "Control";
+}
+
 function syncToggleModifier(event: KeyboardEvent) {
-  toggleModifierHeld.value = hasToggleModifier(event);
+  if (!isToggleModifierKey(event)) {
+    toggleModifierHeld.value = false;
+    return;
+  }
+  toggleModifierHeld.value = event.type === "keydown";
 }
 
 function clearToggleModifier() {
@@ -658,6 +662,7 @@ onMounted(() => {
   window.addEventListener("keydown", syncToggleModifier);
   window.addEventListener("keydown", onCopyKey);
   window.addEventListener("keyup", syncToggleModifier);
+  window.addEventListener("paste", onPaste);
   window.addEventListener("blur", clearToggleModifier);
   void Window.Name()
     .then((name) => {
@@ -697,6 +702,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("keydown", syncToggleModifier);
   window.removeEventListener("keydown", onCopyKey);
   window.removeEventListener("keyup", syncToggleModifier);
+  window.removeEventListener("paste", onPaste);
   window.removeEventListener("blur", clearToggleModifier);
   offValueHandoff?.();
   offValueDraft?.();
@@ -873,7 +879,8 @@ function isCopyTypingTarget(target: EventTarget | null) {
 }
 
 function onCopyKey(event: KeyboardEvent) {
-  if (event.key.toLowerCase() !== "c" || event.altKey || event.shiftKey) {
+  const key = event.key.toLowerCase();
+  if ((key !== "c" && key !== "x") || event.altKey || event.shiftKey) {
     return;
   }
   if (!(event.metaKey || event.ctrlKey)) {
@@ -885,8 +892,31 @@ function onCopyKey(event: KeyboardEvent) {
   if (!gridIsVisible() || selection.mode.value === "none") {
     return;
   }
+  if (key === "c") {
+    event.preventDefault();
+    void copySelection(false);
+    return;
+  }
+  if (!selectionEditable()) {
+    return;
+  }
   event.preventDefault();
-  void copySelection(false);
+  void cutSelection();
+}
+
+function onPaste(event: ClipboardEvent) {
+  if (isCopyTypingTarget(event.target)) {
+    return;
+  }
+  if (!gridIsVisible() || selection.mode.value === "none" || !selectionEditable()) {
+    return;
+  }
+  const text = event.clipboardData?.getData("text/plain");
+  if (text == null) {
+    return;
+  }
+  event.preventDefault();
+  applyValueToSelection(text);
 }
 
 onBeforeUnmount(stopDrag);
@@ -1009,26 +1039,24 @@ function onContextMenu(event: MouseEvent) {
   contextTarget.value = null;
 }
 
-async function copySelection(asJson: boolean) {
+async function copySelection(asJson: boolean): Promise<boolean> {
   if (selection.mode.value === "rows") {
     const indexes = selectedRowIndexes();
     const last = indexes.at(-1);
     if (indexes[0] == null || last == null) {
-      return;
+      return false;
     }
     const extracted = extractGrid(indexes[0], last, 0, columns.value.length - 1);
-    await writeClipboard(
+    return writeClipboard(
       asJson ? cellRangeToJson(extracted.names, extracted.grid) : rowsClipboardText(extracted.grid),
     );
-    return;
   }
   const groups = selectedCellsByRow();
   if (groups.length === 0) {
-    return;
+    return false;
   }
   if (asJson) {
-    await writeClipboard(selectedCellsToJson(groups.map((row) => row.map(({ name, value }) => ({ name, value })))));
-    return;
+    return writeClipboard(selectedCellsToJson(groups.map((row) => row.map(({ name, value }) => ({ name, value })))));
   }
   const delimiters = cellCopyDelimiters({
     layout: settings.cellCopyLayout,
@@ -1037,12 +1065,22 @@ async function copySelection(asJson: boolean) {
     customCellDelimiter: settings.customCellDelimiter,
     customRowDelimiter: settings.customRowDelimiter,
   });
-  await writeClipboard(
+  return writeClipboard(
     selectedCellsClipboardText(
       groups.map((row) => row.map((cell) => cell.value)),
       delimiters,
     ),
   );
+}
+
+async function cutSelection() {
+  if (!selectionEditable()) {
+    return;
+  }
+  if (!(await copySelection(false))) {
+    return;
+  }
+  setNullSelection();
 }
 
 function cloneContextRows() {
@@ -1142,17 +1180,12 @@ function selectionEditable() {
   return selection.cellSelectionList.value.some((cell) => !isDeletedIndex(cell.row));
 }
 
-async function pasteCell() {
-  const cell = selection.cellSelectionList.value[0];
-  if (!props.editable || !cell || !isSingleCellSelected() || isDeletedIndex(cell.row)) {
-    return;
-  }
-  const name = columns.value[cell.col]?.name;
-  if (!name) {
+async function pasteSelection() {
+  if (!selectionEditable()) {
     return;
   }
   try {
-    emitCellChange(cell.row, name, await navigator.clipboard.readText());
+    applyValueToSelection(await navigator.clipboard.readText());
   } catch {
     // clipboard may be denied in the webview
   }
@@ -1236,10 +1269,9 @@ const cellMenuItems = computed((): CellMenuItem[] => {
     {
       id: "paste",
       label: "Paste",
-      selection: "single",
       disabled: !selectionEditable(),
       action: () => {
-        void pasteCell();
+        void pasteSelection();
       },
     },
   ];
