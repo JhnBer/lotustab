@@ -124,13 +124,6 @@ func TestApplyPendingClearsStaleOrBrokenManifest(t *testing.T) {
 		}
 		assertPendingCleared(t, root, "1.0.0")
 	})
-	t.Run("missing artifact", func(t *testing.T) {
-		root := t.TempDir()
-		if err := writeManifest(root, pendingManifest{Version: "9.0.0", Artifact: filepath.Join(root, "gone")}); err != nil {
-			t.Fatal(err)
-		}
-		assertPendingCleared(t, root, "1.0.0")
-	})
 	t.Run("outside root", func(t *testing.T) {
 		root := t.TempDir()
 		outside := filepath.Join(t.TempDir(), "other")
@@ -163,6 +156,94 @@ func TestApplyPendingRejectsSymlinkOutsideRoot(t *testing.T) {
 	assertPendingCleared(t, root, "1.0.0")
 	if _, err := os.Stat(outside); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestApplyPendingMissingArtifactRelaunchesOnce(t *testing.T) {
+	root := t.TempDir()
+	artifact := filepath.Join(root, "gone")
+	if err := writeManifest(root, pendingManifest{Version: "9.0.0", Artifact: artifact}); err != nil {
+		t.Fatal(err)
+	}
+	launches := 0
+	prev := relaunchProcess
+	relaunchProcess = func() error {
+		launches++
+		return nil
+	}
+	t.Cleanup(func() { relaunchProcess = prev })
+
+	exit, err := applyPending(root, "1.0.0", "/usr/local/bin/lotustab", func(*exec.Cmd) error {
+		t.Fatal("helper should not spawn after the file is already in place")
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !exit {
+		t.Fatal("the old process should exit so the second open can run")
+	}
+	if launches != 1 {
+		t.Fatalf("launches: got %d", launches)
+	}
+	man, err := loadPending(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if man.Relaunch != 1 || man.Version != "9.0.0" || man.Artifact != artifact {
+		t.Fatalf("manifest: %+v", man)
+	}
+
+	exit, err = applyPending(root, "1.0.0", "/usr/local/bin/lotustab", func(*exec.Cmd) error {
+		t.Fatal("helper should not spawn")
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exit {
+		t.Fatal("a second failure should keep this process running")
+	}
+	if launches != 1 {
+		t.Fatalf("launches after second open: got %d", launches)
+	}
+	if _, err := os.Stat(filepath.Join(root, manifestName)); err != nil {
+		t.Fatal(err)
+	}
+	got := pendingApplyErrorIn(root, "1.0.0")
+	if got != "Update 9.0.0 did not start. Open About and try again." {
+		t.Fatalf("error: got %q", got)
+	}
+	if pendingApplyErrorIn(root, "9.0.0") != "" {
+		t.Fatal("a matching version should not report a failure")
+	}
+}
+
+func TestApplyPendingRelaunchErrorKeepsRetry(t *testing.T) {
+	root := t.TempDir()
+	if err := writeManifest(root, pendingManifest{Version: "9.0.0", Artifact: filepath.Join(root, "gone")}); err != nil {
+		t.Fatal(err)
+	}
+	prev := relaunchProcess
+	relaunchProcess = func() error { return os.ErrPermission }
+	t.Cleanup(func() { relaunchProcess = prev })
+
+	exit, err := applyPending(root, "1.0.0", "/usr/local/bin/lotustab", func(*exec.Cmd) error {
+		t.Fatal("helper should not spawn")
+		return nil
+	})
+	if err == nil {
+		t.Fatal("expected relaunch error")
+	}
+	if exit {
+		t.Fatal("failed relaunch should keep the current process")
+	}
+	man, err := loadPending(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if man.Relaunch != 0 {
+		t.Fatalf("relaunch count: got %d", man.Relaunch)
 	}
 }
 

@@ -18,6 +18,7 @@ type AboutInfo struct {
 	Goarch         string `json:"goarch"`
 	UpdatesEnabled bool   `json:"updatesEnabled"`
 	State          string `json:"state"`
+	UpdateError    string `json:"updateError"`
 }
 
 // UpdateCheckResult is the outcome of a GitHub Releases check.
@@ -56,6 +57,7 @@ func (s *AboutService) Info() AboutInfo {
 	if u, err := s.updater(); err == nil && u.State() != updater.StateUnconfigured {
 		info.State = string(u.State())
 	}
+	info.UpdateError = pendingApplyError(s.version)
 	return info
 }
 

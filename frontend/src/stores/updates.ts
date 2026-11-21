@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import { Events } from "@wailsio/runtime";
 import { toast } from "vue-sonner";
 import { errorMessage } from "@/lib/errors";
@@ -17,7 +18,10 @@ const EMPTY_INFO: AboutInfo = {
   goarch: "",
   updatesEnabled: false,
   state: "",
+  updateError: "",
 };
+
+let applyFailureNotified = false;
 
 type ProgressPayload = {
   written?: number;
@@ -60,6 +64,7 @@ function releaseFromEvent(raw: unknown): UpdateCheckResult | null {
 
 export const useUpdatesStore = defineStore("updates", () => {
   const settings = useSettingsStore();
+  const router = useRouter();
 
   const info = ref<AboutInfo>({ ...EMPTY_INFO });
   const available = ref<UpdateCheckResult | null>(null);
@@ -157,10 +162,34 @@ export const useUpdatesStore = defineStore("updates", () => {
     });
   }
 
+  function downloadedMessage(version: string): string {
+    const name = version ? ` ${version}` : "";
+    return `Update${name} downloaded. It applies the next time LotusTab starts.`;
+  }
+
+  function notifyApplyFailure(message: string) {
+    if (applyFailureNotified || !message) {
+      return;
+    }
+    applyFailureNotified = true;
+    toast.error(message, {
+      action: {
+        label: "About",
+        onClick: () => {
+          void router.push("/settings/about");
+        },
+      },
+    });
+  }
+
   async function loadInfo() {
     try {
       info.value = await AboutService.Info();
-      if (info.value.state === "ready" && phase.value !== "ready") {
+      if (info.value.updateError) {
+        error.value = info.value.updateError;
+        phase.value = "error";
+        notifyApplyFailure(info.value.updateError);
+      } else if (info.value.state === "ready" && phase.value !== "ready") {
         phase.value = "ready";
       }
     } catch (err) {
@@ -186,9 +215,6 @@ export const useUpdatesStore = defineStore("updates", () => {
         phase.value = "available";
         if (source === "automatic" && settings.autoInstallUpdates) {
           await installLater();
-          if (!error.value) {
-            toast.success(`Update ${result.version} downloaded. It applies the next time LotusTab starts.`);
-          }
         }
       } else {
         available.value = null;
@@ -212,6 +238,7 @@ export const useUpdatesStore = defineStore("updates", () => {
     try {
       await AboutService.Install();
       phase.value = "ready";
+      toast.success(downloadedMessage(available.value?.version ?? ""));
     } catch (err) {
       error.value = errorMessage(err);
       phase.value = "error";
@@ -239,7 +266,7 @@ export const useUpdatesStore = defineStore("updates", () => {
   }
 
   async function restartNow() {
-    if (!info.value.updatesEnabled) {
+    if (!info.value.updatesEnabled && !info.value.updateError) {
       return;
     }
     busy.value = true;
