@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Pin, Plus, SquareArrowOutUpRight } from "@lucide/vue";
+import { Pencil, Pin, Plus, SquareArrowOutUpRight } from "@lucide/vue";
 import { storeToRefs } from "pinia";
 import { onMounted, ref } from "vue";
 import { Window } from "@wailsio/runtime";
@@ -15,7 +15,7 @@ import { useConnectionsStore } from "@/stores/connections";
 const connections = useConnectionsStore();
 const { selected } = storeToRefs(connections);
 const { togglePin, openInNewWindow } = useProfileActions();
-const { dialogOpen, editing, openCreate } = useConnectionDialog();
+const { dialogOpen, editing, openCreate, openEdit } = useConnectionDialog();
 const { tintClass: headerTint } = useConnectionTint();
 const isMainWindow = ref(true);
 
@@ -30,39 +30,45 @@ onMounted(async () => {
 
 <template>
   <SidebarHeader :class="headerTint">
-      <div class="h-12 -m-2 flex items-center p-2">
-      <div v-if="selected" class="flex items-start gap-2 px-1 py-0.5">
+      <div class="flex h-12 w-full min-w-0 items-center p-2 -m-2">
+      <div v-if="selected" class="flex w-full min-w-0 items-center gap-1 px-1">
         <span
-          class="mt-1.5 size-2.5 shrink-0 rounded-full"
+          class="size-2.5 shrink-0 rounded-full"
           :class="connBg(selected.color)"
         />
-        <div class="min-w-0 flex-1">
-          <div class="flex items-center gap-1">
-            <span class="truncate text-sm font-medium">{{ selected.name }}</span>
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              class="shrink-0"
-              :title="connections.isPinned(selected.id) ? 'Unpin' : 'Pin'"
-              @click="togglePin(selected)"
-            >
-              <Pin
-                class="size-3.5"
-                :class="connections.isPinned(selected.id) ? 'fill-current' : ''"
-              />
-            </Button>
-            <Button
-              v-if="isMainWindow"
-              size="icon-xs"
-              variant="ghost"
-              class="shrink-0"
-              title="Open in new window"
-              @click="openInNewWindow(selected)"
-            >
-              <SquareArrowOutUpRight class="size-3.5" />
-            </Button>
-          </div>
-        </div>
+        <span class="min-w-0 flex-1 truncate text-sm font-medium" :title="selected.name">{{ selected.name }}</span>
+        <Button
+          size="icon-xs"
+          variant="ghost"
+          class="shrink-0"
+          title="Edit"
+          aria-label="Edit"
+          @click="openEdit(selected)"
+        >
+          <Pencil class="size-3.5" />
+        </Button>
+        <Button
+          size="icon-xs"
+          variant="ghost"
+          class="shrink-0"
+          :title="connections.isPinned(selected.id) ? 'Unpin' : 'Pin'"
+          @click="togglePin(selected)"
+        >
+          <Pin
+            class="size-3.5"
+            :class="connections.isPinned(selected.id) ? 'fill-current' : ''"
+          />
+        </Button>
+        <Button
+          v-if="isMainWindow"
+          size="icon-xs"
+          variant="ghost"
+          class="shrink-0"
+          title="Open in new window"
+          @click="openInNewWindow(selected)"
+        >
+          <SquareArrowOutUpRight class="size-3.5" />
+        </Button>
       </div>
       <div v-else class="flex w-full items-center gap-1 px-2 py-1">
         <span class="min-w-0 flex-1 text-sm font-medium">Connections</span>
