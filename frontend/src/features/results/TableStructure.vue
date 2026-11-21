@@ -55,6 +55,14 @@ const dirty = computed(() =>
   isStructureDirty(props.tab.structure?.columns, props.tab.structureDraft, Boolean(props.tab.structure?.canReorder)),
 );
 
+const extraColumnWidth = computed(() => {
+  let longest = "Extra".length;
+  for (const col of props.tab.structure?.columns ?? []) {
+    longest = Math.max(longest, (col.extra ?? "").length);
+  }
+  return `max(14rem, ${longest + 2}ch)`;
+});
+
 const rowVirtualizer = useVirtualizer(
   computed(() => ({
     count: visible.value.length,
@@ -150,7 +158,7 @@ function rowAt(index: number): DraftColumn | undefined {
     </div>
     <div v-else class="relative min-h-0 flex-1">
       <div ref="scrollRef" class="absolute inset-0 overflow-auto">
-        <div class="w-max min-w-full text-sm select-none">
+        <div class="w-max min-w-full text-sm">
           <div class="bg-background sticky top-0 z-10 flex border-b" role="row">
             <div class="h-9 w-8 shrink-0" />
             <div class="text-foreground flex h-9 min-w-40 flex-1 items-center px-2 font-medium">Name</div>
@@ -158,7 +166,12 @@ function rowAt(index: number): DraftColumn | undefined {
             <div v-if="driverId !== 'clickhouse'" class="text-foreground flex h-9 w-20 shrink-0 items-center justify-center px-2 font-medium">Null</div>
             <div class="text-foreground flex h-9 min-w-36 flex-1 items-center px-2 font-medium">Default</div>
             <div class="text-foreground flex h-9 w-20 shrink-0 items-center justify-center px-2 font-medium">Primary</div>
-            <div class="text-foreground flex h-9 w-56 min-w-40 shrink-0 items-center px-2 font-medium">Extra</div>
+            <div
+              class="text-foreground flex h-9 shrink-0 items-center px-2 font-medium"
+              :style="{ width: extraColumnWidth }"
+            >
+              Extra
+            </div>
             <div class="text-foreground flex h-9 min-w-36 flex-1 items-center px-2 font-medium">Comment</div>
             <div class="h-9 w-10 shrink-0" />
           </div>
@@ -182,6 +195,7 @@ function rowAt(index: number): DraftColumn | undefined {
               :can-drag="canReorder"
               :driver-id="driverId"
               :column-types="columnTypes"
+              :extra-width="extraColumnWidth"
               @reorderstart="onReorderStart($event, rowAt(item.index)!.key)"
               @reorderend="onReorderEnd"
               @reorderdrop="onReorderDrop($event, rowAt(item.index)!.key)"

@@ -33,6 +33,7 @@ const props = defineProps<{
   canDrag?: boolean;
   driverId?: string;
   columnTypes?: string[];
+  extraWidth?: string;
 }>();
 
 const emit = defineEmits<{
@@ -169,9 +170,9 @@ function onHandleDragStart(event: DragEvent) {
     </div>
     <div v-if="showNullable" class="flex w-20 shrink-0 items-center justify-center px-1 py-1" :class="cellClass(fieldDirty('nullable'))">
       <Checkbox
-        :checked="col.nullable"
+        :model-value="col.nullable"
         :disabled="disabled"
-        @update:checked="patch({ nullable: Boolean($event) })"
+        @update:model-value="patch({ nullable: $event === true })"
       />
     </div>
     <div class="flex min-w-36 flex-1 items-center px-1 py-1" :class="cellClass(fieldDirty('defaultValue'))">
@@ -195,11 +196,11 @@ function onHandleDragStart(event: DragEvent) {
       </ContextMenu>
     </div>
     <div class="flex w-20 shrink-0 items-center justify-center px-1 py-1">
-      <Checkbox :checked="col.isPrimaryKey" disabled />
+      <Checkbox :model-value="col.isPrimaryKey" disabled />
     </div>
     <div
-      class="text-muted-foreground flex w-56 min-w-40 shrink-0 items-center truncate px-2 py-1"
-      :title="extra || undefined"
+      class="text-muted-foreground flex shrink-0 items-center px-2 py-1 whitespace-nowrap select-text"
+      :style="{ width: extraWidth }"
     >
       {{ extra }}
     </div>

@@ -15,7 +15,7 @@ const forwardedProps = useForwardProps(delegatedProps)
   <ContextMenuTrigger
     data-slot="context-menu-trigger"
     v-bind="forwardedProps"
-    :class="cn('select-none', props.class)"
+    :class="cn(props.class)"
   >
     <slot />
   </ContextMenuTrigger>

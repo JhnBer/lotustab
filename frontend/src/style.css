@@ -150,6 +150,13 @@
 .cm-editor {
   height: 100%;
   outline: none;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.cm-content {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .cm-scroller {

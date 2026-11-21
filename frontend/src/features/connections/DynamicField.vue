@@ -108,8 +108,8 @@ async function onFetch() {
     >
       <Checkbox
         :id="field.key"
-        :checked="modelValue === 'true'"
-        @update:checked="(checked) => setValue(checked ? 'true' : 'false')"
+        :model-value="modelValue === 'true'"
+        @update:model-value="(checked) => setValue(checked === true ? 'true' : 'false')"
       />
       <Label :for="field.key" class="font-normal">{{ field.label }}</Label>
     </div>

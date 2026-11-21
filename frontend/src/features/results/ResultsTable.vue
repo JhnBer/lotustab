@@ -641,6 +641,7 @@ function onCellDoubleClick(row: number, col: number) {
 
 onMounted(() => {
   window.addEventListener("keydown", syncToggleModifier);
+  window.addEventListener("keydown", onCopyKey);
   window.addEventListener("keyup", syncToggleModifier);
   window.addEventListener("blur", clearToggleModifier);
   void Window.Name()
@@ -679,6 +680,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", syncToggleModifier);
+  window.removeEventListener("keydown", onCopyKey);
   window.removeEventListener("keyup", syncToggleModifier);
   window.removeEventListener("blur", clearToggleModifier);
   offValueHandoff?.();
@@ -835,6 +837,41 @@ function onCellPointerDown(event: PointerEvent, rowIndex: number, colIndex: numb
     selection.selectCell(rowIndex, colIndex);
   }
   startDrag("cells");
+}
+
+function gridIsVisible() {
+  const el = scrollRef.value;
+  if (!el) {
+    return false;
+  }
+  return getComputedStyle(el).visibility !== "hidden";
+}
+
+function isCopyTypingTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+  if (target.isContentEditable) {
+    return true;
+  }
+  return Boolean(target.closest("input, textarea, .cm-editor"));
+}
+
+function onCopyKey(event: KeyboardEvent) {
+  if (event.key.toLowerCase() !== "c" || event.altKey || event.shiftKey) {
+    return;
+  }
+  if (!(event.metaKey || event.ctrlKey)) {
+    return;
+  }
+  if (isCopyTypingTarget(event.target)) {
+    return;
+  }
+  if (!gridIsVisible() || selection.mode.value === "none") {
+    return;
+  }
+  event.preventDefault();
+  void copySelection(false);
 }
 
 onBeforeUnmount(stopDrag);
