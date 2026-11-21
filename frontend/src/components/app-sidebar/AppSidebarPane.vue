@@ -36,6 +36,7 @@ import { Spinner } from "@/components/ui/spinner";
 import DatabaseCombobox from "@/components/DatabaseCombobox.vue";
 import { useProfileActions } from "@/composables/useProfileActions";
 import { useExportData } from "@/composables/useExportData";
+import DropTableDialog from "@/features/explorer/DropTableDialog.vue";
 import ExportDialog, { type ExportTarget } from "@/features/export/ExportDialog.vue";
 import {
   buildExplorerRows,
@@ -46,10 +47,10 @@ import {
   tableLabel,
 } from "@/features/explorer/catalogRows";
 import { errorMessage } from "@/lib/errors";
-import type { TableInfo } from "@/lib/wails";
+import type { TableInfo, TableRef } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
 import { useExplorerStore } from "@/stores/explorer";
-import { useQueryStore } from "@/stores/query";
+import { isTableTab, useQueryStore } from "@/stores/query";
 import { useSettingsStore } from "@/stores/settings";
 
 const router = useRouter();
@@ -285,6 +286,59 @@ function openExport(database: string, table: TableInfo) {
   };
   exportOpen.value = true;
 }
+
+const dropOpen = ref(false);
+const dropTarget = ref<TableRef | null>(null);
+
+function openDrop(database: string, table: TableInfo) {
+  if (!selected.value || table.type === "view") {
+    return;
+  }
+  dropTarget.value = {
+    database: tableDatabase(table, database),
+    schema: table.schema,
+    name: table.name,
+  };
+  dropOpen.value = true;
+}
+
+function closeDroppedTabs(ref: TableRef) {
+  const profileId = selected.value?.id;
+  if (!profileId) {
+    return;
+  }
+  const ids = queries.tabs
+    .filter(
+      (tab) =>
+        isTableTab(tab) &&
+        tab.profileId === profileId &&
+        tab.database === ref.database &&
+        tab.schema === ref.schema &&
+        tab.name === ref.name,
+    )
+    .map((tab) => tab.id);
+  for (const id of ids) {
+    queries.close(id);
+  }
+}
+
+async function onTableDropped() {
+  const target = dropTarget.value;
+  const profileId = selected.value?.id;
+  if (!target || !profileId) {
+    return;
+  }
+  closeDroppedTabs(target);
+  try {
+    await explorer.loadTables(profileId, target.database);
+    const query = tableQuery.value.trim();
+    if (query) {
+      await explorer.searchTables(profileId, query);
+    }
+  } catch (err) {
+    toast.error(errorMessage(err));
+  }
+}
 </script>
 
 <template>
@@ -420,6 +474,15 @@ function openExport(database: string, table: TableInfo) {
                 <ContextMenuItem @select="openExport(item.row.database, item.row.table)">
                   Export…
                 </ContextMenuItem>
+                <template v-if="item.row.table.type !== 'view'">
+                  <ContextMenuSeparator />
+                  <ContextMenuItem
+                    variant="destructive"
+                    @select="openDrop(item.row.database, item.row.table)"
+                  >
+                    Drop table
+                  </ContextMenuItem>
+                </template>
               </ContextMenuContent>
             </ContextMenu>
             <span
@@ -435,4 +498,10 @@ function openExport(database: string, table: TableInfo) {
   </SidebarGroup>
 
   <ExportDialog v-model:open="exportOpen" :target="exportTarget" />
+  <DropTableDialog
+    v-model:open="dropOpen"
+    :profile-id="selected?.id ?? ''"
+    :table="dropTarget"
+    @dropped="onTableDropped"
+  />
 </template>

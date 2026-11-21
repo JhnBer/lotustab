@@ -255,6 +255,24 @@ func (s *QueryService) DescribeTable(ctx context.Context, profileID string, ref 
 	})
 }
 
+// DropTable removes one table. Views are not dropped.
+func (s *QueryService) DropTable(ctx context.Context, profileID string, ref driver.TableRef) error {
+	if strings.TrimSpace(profileID) == "" {
+		return fmt.Errorf("profile is required")
+	}
+	ref = driver.ClampTableRef(ref)
+	if ref.Name == "" {
+		return fmt.Errorf("table is required")
+	}
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	_, err := withLiveConn(s, ctx, profileID, func(ctx context.Context, conn driver.Conn) (struct{}, error) {
+		return struct{}{}, conn.DropTable(ctx, ref)
+	})
+	return err
+}
+
 // AlterTable plans a structure draft against the live catalog and applies it.
 func (s *QueryService) AlterTable(ctx context.Context, profileID string, req driver.AlterTableRequest) error {
 	if strings.TrimSpace(profileID) == "" {

@@ -43,6 +43,13 @@ export function DescribeTable(profileID: string, ref: driver$0.TableRef): $Cance
 }
 
 /**
+ * DropTable removes one table. Views are not dropped.
+ */
+export function DropTable(profileID: string, ref: driver$0.TableRef): $CancellablePromise<void> {
+    return $Call.ByID(102999475, profileID, ref);
+}
+
+/**
  * Execute runs SQL for the given profile. The profile is connected if needed.
  * database is optional; empty uses the connection default catalog.
  * timeoutSeconds is 0 to wait until the caller cancels.
