@@ -56,6 +56,19 @@ func (c *conn) AlterTable(ctx context.Context, req driver.AlterTableRequest) err
 	})
 }
 
+func (c *conn) DropTable(ctx context.Context, ref driver.TableRef) error {
+	ref = driver.ClampTableRef(ref)
+	if ref.Name == "" {
+		return fmt.Errorf("table name is required")
+	}
+	dbName := clickhouseDBName(ref.Database, ref.Schema)
+	qualified := clickhouseQualified(dbName, ref.Name)
+	return c.withSession(ctx, func(session *sql.Conn) error {
+		_, err := session.ExecContext(ctx, "DROP TABLE "+qualified)
+		return err
+	})
+}
+
 func clickhouseDescribeColumns(ctx context.Context, q sqlutil.Querier, database, name string) ([]driver.ColumnInfo, error) {
 	var (
 		rows *sql.Rows

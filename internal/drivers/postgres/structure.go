@@ -75,6 +75,20 @@ func (c *conn) AlterTable(ctx context.Context, req driver.AlterTableRequest) err
 	return tx.Commit(ctx)
 }
 
+func (c *conn) DropTable(ctx context.Context, ref driver.TableRef) error {
+	ref = driver.ClampTableRef(ref)
+	if ref.Name == "" {
+		return fmt.Errorf("table name is required")
+	}
+	pool, cleanup, err := c.poolFor(ctx, ref.Database)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+	_, err = pool.Exec(ctx, "DROP TABLE "+postgresQualified(ref.Schema, ref.Name))
+	return err
+}
+
 func postgresDescribeColumns(ctx context.Context, pool *pgxpool.Pool, schema, name string) ([]driver.ColumnInfo, error) {
 	const q = `
 		SELECT
