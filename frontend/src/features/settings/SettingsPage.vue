@@ -9,7 +9,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { isTabLayout, PAGE_SIZES, QUERY_TIMEOUTS, queryTimeoutLabel, useSettingsStore } from "@/stores/settings";
+import { Input } from "@/components/ui/input";
+import {
+  isCellCopyLayout,
+  isTabLayout,
+  PAGE_SIZES,
+  QUERY_TIMEOUTS,
+  queryTimeoutLabel,
+  useSettingsStore,
+} from "@/stores/settings";
 
 const settings = useSettingsStore();
 const mode = useColorMode({ initialValue: "auto" });
@@ -57,10 +65,33 @@ function onQueryTimeout(value: unknown) {
 function onDeleteOnAbort(value: unknown) {
   settings.setDeleteOnAbortExport(Boolean(value));
 }
+
+function onCellCopyLayout(value: unknown) {
+  if (isCellCopyLayout(value)) {
+    settings.setCellCopyLayout(value);
+  }
+}
+
+function onUseCustomCellDelimiter(value: unknown) {
+  settings.setUseCustomCellDelimiter(Boolean(value));
+}
+
+function onUseCustomRowDelimiter(value: unknown) {
+  settings.setUseCustomRowDelimiter(Boolean(value));
+}
+
+function onCustomCellDelimiter(value: string | number) {
+  settings.setCustomCellDelimiter(String(value));
+}
+
+function onCustomRowDelimiter(value: string | number) {
+  settings.setCustomRowDelimiter(String(value));
+}
 </script>
 
 <template>
-  <section class="mx-auto flex h-full w-full min-w-0 max-w-lg flex-col gap-8 overflow-x-hidden overflow-y-auto py-2">
+  <div class="h-full overflow-y-auto">
+  <section class="mx-auto flex w-full min-w-0 max-w-lg flex-col gap-8 px-4 py-4">
     <h1 class="text-lg font-medium">Settings</h1>
 
     <div class="flex items-center justify-between gap-4">
@@ -161,5 +192,74 @@ function onDeleteOnAbort(value: unknown) {
         @update:model-value="onDeleteOnAbort"
       />
     </div>
+
+    <div class="flex flex-col gap-8 border-t pt-8">
+      <div>
+        <h2 class="text-sm font-medium">Copy</h2>
+        <p class="text-muted-foreground mt-1 text-xs">Separators used when copying selected cells.</p>
+      </div>
+
+      <div class="flex items-center justify-between gap-4">
+        <Label for="settings-cell-copy" class="min-w-0">Selected cells</Label>
+        <Select :model-value="settings.cellCopyLayout" @update:model-value="onCellCopyLayout">
+          <SelectTrigger id="settings-cell-copy" size="sm" class="w-48 shrink-0">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="grid">Per column and row</SelectItem>
+            <SelectItem value="line">Per row</SelectItem>
+            <SelectItem value="tab">Per column</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div v-if="settings.cellCopyLayout !== 'line'" class="flex items-center justify-between gap-4">
+        <Label for="settings-custom-cell-delimiter" class="min-w-0">Enable custom cell delimiter</Label>
+        <div class="flex shrink-0 items-center gap-2">
+          <Input
+            :model-value="settings.customCellDelimiter"
+            :disabled="!settings.useCustomCellDelimiter"
+            size="xs"
+            class="w-20 font-mono"
+            placeholder="\t"
+            aria-label="Cell delimiter"
+            @update:model-value="onCustomCellDelimiter"
+          />
+          <Switch
+            id="settings-custom-cell-delimiter"
+            :model-value="settings.useCustomCellDelimiter"
+            @update:model-value="onUseCustomCellDelimiter"
+          />
+        </div>
+      </div>
+
+      <div v-if="settings.cellCopyLayout !== 'tab'" class="flex items-center justify-between gap-4">
+        <Label for="settings-custom-row-delimiter" class="min-w-0">Enable custom row delimiter</Label>
+        <div class="flex shrink-0 items-center gap-2">
+          <Input
+            :model-value="settings.customRowDelimiter"
+            :disabled="!settings.useCustomRowDelimiter"
+            size="xs"
+            class="w-20 font-mono"
+            placeholder="\n"
+            aria-label="Row delimiter"
+            @update:model-value="onCustomRowDelimiter"
+          />
+          <Switch
+            id="settings-custom-row-delimiter"
+            :model-value="settings.useCustomRowDelimiter"
+            @update:model-value="onUseCustomRowDelimiter"
+          />
+        </div>
+      </div>
+
+      <p
+        v-if="(settings.cellCopyLayout !== 'line' && settings.useCustomCellDelimiter) || (settings.cellCopyLayout !== 'tab' && settings.useCustomRowDelimiter)"
+        class="text-muted-foreground -mt-4 text-xs"
+      >
+        Use \t for a tab, \n for a new line, and \r for a carriage return.
+      </p>
+    </div>
   </section>
+  </div>
 </template>

@@ -67,7 +67,8 @@ function formatSize(bytes: number): string {
 </script>
 
 <template>
-  <section class="mx-auto flex h-full w-full max-w-lg flex-col gap-8 overflow-auto py-2">
+  <div class="h-full overflow-y-auto">
+  <section class="mx-auto flex w-full max-w-lg flex-col gap-8 px-4 py-4">
     <h1 class="text-lg font-medium">About</h1>
 
     <div class="flex flex-col items-center gap-1.5">
@@ -190,4 +191,5 @@ function formatSize(bytes: number): string {
       </ItemFooter>
     </Item>
   </section>
+  </div>
 </template>

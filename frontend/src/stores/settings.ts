@@ -12,6 +12,12 @@ export const TAB_LAYOUTS = ["scroll", "wrap"] as const;
 export type TabLayout = (typeof TAB_LAYOUTS)[number];
 export const DEFAULT_TAB_LAYOUT: TabLayout = "scroll";
 
+export const CELL_COPY_LAYOUTS = ["grid", "line", "tab"] as const;
+export type CellCopyLayout = (typeof CELL_COPY_LAYOUTS)[number];
+export const DEFAULT_CELL_COPY_LAYOUT: CellCopyLayout = "grid";
+export const DEFAULT_CUSTOM_CELL_DELIMITER = "\\t";
+export const DEFAULT_CUSTOM_ROW_DELIMITER = "\\n";
+
 export const UPDATE_CHECK_SOURCES = ["manual", "automatic"] as const;
 export type UpdateCheckSource = (typeof UPDATE_CHECK_SOURCES)[number];
 
@@ -22,6 +28,11 @@ const ENABLE_DB_CHOICE_KEY = "lotustab.enableDatabaseChoice";
 const TAB_LAYOUT_KEY = "lotustab.tabLayout";
 const QUERY_TIMEOUT_KEY = "lotustab.queryTimeout";
 const DELETE_ON_ABORT_KEY = "lotustab.deleteOnAbortExport";
+const CELL_COPY_LAYOUT_KEY = "lotustab.cellCopyLayout";
+const USE_CUSTOM_CELL_DELIMITER_KEY = "lotustab.useCustomCellDelimiter";
+const USE_CUSTOM_ROW_DELIMITER_KEY = "lotustab.useCustomRowDelimiter";
+const CUSTOM_CELL_DELIMITER_KEY = "lotustab.customCellDelimiter";
+const CUSTOM_ROW_DELIMITER_KEY = "lotustab.customRowDelimiter";
 const AUTO_INSTALL_KEY = "lotustab.autoInstallUpdates";
 const LAST_CHECK_AT_KEY = "lotustab.lastUpdateCheckAt";
 const LAST_CHECK_SOURCE_KEY = "lotustab.lastUpdateCheckSource";
@@ -66,6 +77,10 @@ export function isTabLayout(v: unknown): v is TabLayout {
   return (TAB_LAYOUTS as readonly string[]).includes(v as string);
 }
 
+export function isCellCopyLayout(v: unknown): v is CellCopyLayout {
+  return (CELL_COPY_LAYOUTS as readonly string[]).includes(v as string);
+}
+
 function readTabLayout(): TabLayout {
   const v = localStorage.getItem(TAB_LAYOUT_KEY);
   return isTabLayout(v) ? v : DEFAULT_TAB_LAYOUT;
@@ -78,6 +93,24 @@ function readQueryTimeout(): number {
 
 function readDeleteOnAbortExport(): boolean {
   return localStorage.getItem(DELETE_ON_ABORT_KEY) !== "false";
+}
+
+function readCellCopyLayout(): CellCopyLayout {
+  const v = localStorage.getItem(CELL_COPY_LAYOUT_KEY);
+  return isCellCopyLayout(v) ? v : DEFAULT_CELL_COPY_LAYOUT;
+}
+
+function readUseCustomCellDelimiter(): boolean {
+  return localStorage.getItem(USE_CUSTOM_CELL_DELIMITER_KEY) === "true";
+}
+
+function readUseCustomRowDelimiter(): boolean {
+  return localStorage.getItem(USE_CUSTOM_ROW_DELIMITER_KEY) === "true";
+}
+
+function readCustomDelimiter(key: string, fallback: string): string {
+  const v = localStorage.getItem(key);
+  return v == null ? fallback : v;
 }
 
 export function isUpdateCheckSource(v: unknown): v is UpdateCheckSource {
@@ -106,6 +139,11 @@ type SettingsPayload = {
   tabLayout: TabLayout;
   queryTimeoutSeconds: number;
   deleteOnAbortExport: boolean;
+  cellCopyLayout: CellCopyLayout;
+  useCustomCellDelimiter: boolean;
+  useCustomRowDelimiter: boolean;
+  customCellDelimiter: string;
+  customRowDelimiter: string;
   autoInstallUpdates: boolean;
   lastUpdateCheckAt: string | null;
   lastUpdateCheckSource: UpdateCheckSource | null;
@@ -119,6 +157,11 @@ export const useSettingsStore = defineStore("settings", () => {
   const tabLayout = ref(readTabLayout());
   const queryTimeoutSeconds = ref(readQueryTimeout());
   const deleteOnAbortExport = ref(readDeleteOnAbortExport());
+  const cellCopyLayout = ref(readCellCopyLayout());
+  const useCustomCellDelimiter = ref(readUseCustomCellDelimiter());
+  const useCustomRowDelimiter = ref(readUseCustomRowDelimiter());
+  const customCellDelimiter = ref(readCustomDelimiter(CUSTOM_CELL_DELIMITER_KEY, DEFAULT_CUSTOM_CELL_DELIMITER));
+  const customRowDelimiter = ref(readCustomDelimiter(CUSTOM_ROW_DELIMITER_KEY, DEFAULT_CUSTOM_ROW_DELIMITER));
   const autoInstallUpdates = ref(readAutoInstallUpdates());
   const lastUpdateCheckAt = ref<string | null>(readLastUpdateCheckAt());
   const lastUpdateCheckSource = ref<UpdateCheckSource | null>(readLastUpdateCheckSource());
@@ -132,6 +175,11 @@ export const useSettingsStore = defineStore("settings", () => {
       tabLayout: tabLayout.value,
       queryTimeoutSeconds: queryTimeoutSeconds.value,
       deleteOnAbortExport: deleteOnAbortExport.value,
+      cellCopyLayout: cellCopyLayout.value,
+      useCustomCellDelimiter: useCustomCellDelimiter.value,
+      useCustomRowDelimiter: useCustomRowDelimiter.value,
+      customCellDelimiter: customCellDelimiter.value,
+      customRowDelimiter: customRowDelimiter.value,
       autoInstallUpdates: autoInstallUpdates.value,
       lastUpdateCheckAt: lastUpdateCheckAt.value,
       lastUpdateCheckSource: lastUpdateCheckSource.value,
@@ -146,6 +194,11 @@ export const useSettingsStore = defineStore("settings", () => {
     localStorage.setItem(TAB_LAYOUT_KEY, tabLayout.value);
     localStorage.setItem(QUERY_TIMEOUT_KEY, String(queryTimeoutSeconds.value));
     localStorage.setItem(DELETE_ON_ABORT_KEY, String(deleteOnAbortExport.value));
+    localStorage.setItem(CELL_COPY_LAYOUT_KEY, cellCopyLayout.value);
+    localStorage.setItem(USE_CUSTOM_CELL_DELIMITER_KEY, String(useCustomCellDelimiter.value));
+    localStorage.setItem(USE_CUSTOM_ROW_DELIMITER_KEY, String(useCustomRowDelimiter.value));
+    localStorage.setItem(CUSTOM_CELL_DELIMITER_KEY, customCellDelimiter.value);
+    localStorage.setItem(CUSTOM_ROW_DELIMITER_KEY, customRowDelimiter.value);
     localStorage.setItem(AUTO_INSTALL_KEY, String(autoInstallUpdates.value));
     if (lastUpdateCheckAt.value) {
       localStorage.setItem(LAST_CHECK_AT_KEY, lastUpdateCheckAt.value);
@@ -181,6 +234,19 @@ export const useSettingsStore = defineStore("settings", () => {
         typeof next.deleteOnAbortExport === "boolean"
           ? next.deleteOnAbortExport
           : deleteOnAbortExport.value,
+      cellCopyLayout: isCellCopyLayout(next.cellCopyLayout) ? next.cellCopyLayout : cellCopyLayout.value,
+      useCustomCellDelimiter:
+        typeof next.useCustomCellDelimiter === "boolean"
+          ? next.useCustomCellDelimiter
+          : useCustomCellDelimiter.value,
+      useCustomRowDelimiter:
+        typeof next.useCustomRowDelimiter === "boolean"
+          ? next.useCustomRowDelimiter
+          : useCustomRowDelimiter.value,
+      customCellDelimiter:
+        typeof next.customCellDelimiter === "string" ? next.customCellDelimiter : customCellDelimiter.value,
+      customRowDelimiter:
+        typeof next.customRowDelimiter === "string" ? next.customRowDelimiter : customRowDelimiter.value,
       autoInstallUpdates: Boolean(next.autoInstallUpdates),
       lastUpdateCheckAt:
         typeof next.lastUpdateCheckAt === "string" && !Number.isNaN(Date.parse(next.lastUpdateCheckAt))
@@ -208,6 +274,19 @@ export const useSettingsStore = defineStore("settings", () => {
       typeof next.deleteOnAbortExport === "boolean"
         ? next.deleteOnAbortExport
         : deleteOnAbortExport.value;
+    const copyLayout = isCellCopyLayout(next.cellCopyLayout) ? next.cellCopyLayout : cellCopyLayout.value;
+    const customCell =
+      typeof next.useCustomCellDelimiter === "boolean"
+        ? next.useCustomCellDelimiter
+        : useCustomCellDelimiter.value;
+    const customRow =
+      typeof next.useCustomRowDelimiter === "boolean"
+        ? next.useCustomRowDelimiter
+        : useCustomRowDelimiter.value;
+    const cellDelimiter =
+      typeof next.customCellDelimiter === "string" ? next.customCellDelimiter : customCellDelimiter.value;
+    const rowDelimiter =
+      typeof next.customRowDelimiter === "string" ? next.customRowDelimiter : customRowDelimiter.value;
     if (
       connectionTint.value === next.connectionTint &&
       defaultPageSize.value === size &&
@@ -216,6 +295,11 @@ export const useSettingsStore = defineStore("settings", () => {
       tabLayout.value === layout &&
       queryTimeoutSeconds.value === timeout &&
       deleteOnAbortExport.value === deleteOnAbort &&
+      cellCopyLayout.value === copyLayout &&
+      useCustomCellDelimiter.value === customCell &&
+      useCustomRowDelimiter.value === customRow &&
+      customCellDelimiter.value === cellDelimiter &&
+      customRowDelimiter.value === rowDelimiter &&
       autoInstallUpdates.value === next.autoInstallUpdates &&
       lastUpdateCheckAt.value === next.lastUpdateCheckAt &&
       lastUpdateCheckSource.value === next.lastUpdateCheckSource
@@ -229,6 +313,11 @@ export const useSettingsStore = defineStore("settings", () => {
     tabLayout.value = layout;
     queryTimeoutSeconds.value = timeout;
     deleteOnAbortExport.value = deleteOnAbort;
+    cellCopyLayout.value = copyLayout;
+    useCustomCellDelimiter.value = customCell;
+    useCustomRowDelimiter.value = customRow;
+    customCellDelimiter.value = cellDelimiter;
+    customRowDelimiter.value = rowDelimiter;
     autoInstallUpdates.value = next.autoInstallUpdates;
     lastUpdateCheckAt.value = next.lastUpdateCheckAt;
     lastUpdateCheckSource.value = next.lastUpdateCheckSource;
@@ -291,6 +380,46 @@ export const useSettingsStore = defineStore("settings", () => {
     commit();
   }
 
+  function setCellCopyLayout(layout: CellCopyLayout) {
+    if (cellCopyLayout.value === layout) {
+      return;
+    }
+    cellCopyLayout.value = layout;
+    commit();
+  }
+
+  function setUseCustomCellDelimiter(on: boolean) {
+    if (useCustomCellDelimiter.value === on) {
+      return;
+    }
+    useCustomCellDelimiter.value = on;
+    commit();
+  }
+
+  function setUseCustomRowDelimiter(on: boolean) {
+    if (useCustomRowDelimiter.value === on) {
+      return;
+    }
+    useCustomRowDelimiter.value = on;
+    commit();
+  }
+
+  function setCustomCellDelimiter(value: string) {
+    if (customCellDelimiter.value === value) {
+      return;
+    }
+    customCellDelimiter.value = value;
+    commit();
+  }
+
+  function setCustomRowDelimiter(value: string) {
+    if (customRowDelimiter.value === value) {
+      return;
+    }
+    customRowDelimiter.value = value;
+    commit();
+  }
+
   function setAutoInstallUpdates(on: boolean) {
     if (autoInstallUpdates.value === on) {
       return;
@@ -321,6 +450,11 @@ export const useSettingsStore = defineStore("settings", () => {
     tabLayout,
     queryTimeoutSeconds,
     deleteOnAbortExport,
+    cellCopyLayout,
+    useCustomCellDelimiter,
+    useCustomRowDelimiter,
+    customCellDelimiter,
+    customRowDelimiter,
     autoInstallUpdates,
     lastUpdateCheckAt,
     lastUpdateCheckSource,
@@ -331,6 +465,11 @@ export const useSettingsStore = defineStore("settings", () => {
     setTabLayout,
     setQueryTimeout,
     setDeleteOnAbortExport,
+    setCellCopyLayout,
+    setUseCustomCellDelimiter,
+    setUseCustomRowDelimiter,
+    setCustomCellDelimiter,
+    setCustomRowDelimiter,
     setAutoInstallUpdates,
     recordUpdateCheck,
   };

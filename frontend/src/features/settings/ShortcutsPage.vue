@@ -4,7 +4,8 @@ import ShortcutHint from "@/features/settings/ShortcutHint.vue";
 </script>
 
 <template>
-  <section class="mx-auto flex h-full w-full max-w-lg flex-col gap-8 overflow-auto py-2">
+  <div class="h-full overflow-y-auto">
+  <section class="mx-auto flex w-full max-w-lg flex-col gap-8 px-4 py-4">
     <h1 class="text-lg font-medium">Shortcuts</h1>
 
     <div class="flex flex-col gap-4">
@@ -18,4 +19,5 @@ import ShortcutHint from "@/features/settings/ShortcutHint.vue";
       </div>
     </div>
   </section>
+  </div>
 </template>

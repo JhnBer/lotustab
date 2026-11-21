@@ -1,4 +1,5 @@
 import type { Column } from "@/lib/wails";
+import type { CellCopyLayout } from "@/stores/settings";
 
 export const INSERT_ID_KEY = "__insertId";
 
@@ -95,6 +96,72 @@ export function rowClipboardText(values: unknown[]) {
 
 export function rowsClipboardText(grid: unknown[][]) {
   return grid.map((values) => rowClipboardText(values)).join("\n");
+}
+
+export function decodeCopyDelimiter(raw: string) {
+  let out = "";
+  for (let i = 0; i < raw.length; i++) {
+    if (raw[i] !== "\\" || i + 1 >= raw.length) {
+      out += raw[i];
+      continue;
+    }
+    const next = raw[i + 1];
+    if (next === "t") {
+      out += "\t";
+    } else if (next === "n") {
+      out += "\n";
+    } else if (next === "r") {
+      out += "\r";
+    } else if (next === "\\") {
+      out += "\\";
+    } else {
+      out += raw[i]! + next;
+    }
+    i++;
+  }
+  return out;
+}
+
+export type CellCopyOptions = {
+  layout: CellCopyLayout;
+  useCustomCellDelimiter: boolean;
+  useCustomRowDelimiter: boolean;
+  customCellDelimiter: string;
+  customRowDelimiter: string;
+};
+
+export function cellCopyDelimiters(options: CellCopyOptions) {
+  const perCell = options.layout !== "grid";
+  const cellDelimiter = options.useCustomCellDelimiter ? decodeCopyDelimiter(options.customCellDelimiter) : "\t";
+  const rowDelimiter = options.useCustomRowDelimiter ? decodeCopyDelimiter(options.customRowDelimiter) : "\n";
+  return {
+    perCell,
+    cellDelimiter: options.layout === "line" ? rowDelimiter : cellDelimiter,
+    rowDelimiter,
+  };
+}
+
+export function selectedCellsClipboardText(
+  rows: unknown[][],
+  delimiters: { perCell: boolean; cellDelimiter: string; rowDelimiter: string },
+) {
+  if (delimiters.perCell) {
+    return rows.flat().map((value) => editInputText(value)).join(delimiters.cellDelimiter);
+  }
+  return rows
+    .map((values) => values.map((value) => editInputText(value)).join(delimiters.cellDelimiter))
+    .join(delimiters.rowDelimiter);
+}
+
+export function selectedCellsToJson(rows: { name: string; value: unknown }[][]) {
+  const objects = rows.map((cells) => {
+    const row: Record<string, unknown> = {};
+    for (const cell of cells) {
+      row[cell.name] = cell.value ?? null;
+    }
+    return row;
+  });
+  return JSON.stringify(objects);
 }
 
 export function cellRangeToJson(colNames: string[], grid: unknown[][]) {

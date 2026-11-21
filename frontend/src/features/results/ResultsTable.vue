@@ -32,6 +32,7 @@ import {
 import { useClipboardText } from "@/composables/useClipboardText";
 import { usePointerResize } from "@/composables/usePointerResize";
 import {
+  cellCopyDelimiters,
   cellRangeToJson,
   draftLookup,
   editInputText,
@@ -41,8 +42,11 @@ import {
   layoutVisualRows,
   rowsClipboardText,
   rowKey,
+  selectedCellsClipboardText,
+  selectedCellsToJson,
   type CellDraft,
 } from "@/features/results/edits";
+import { useSettingsStore } from "@/stores/settings";
 import {
   columnSetKey,
   computeColumnWidths,
@@ -128,6 +132,7 @@ const scrollRef = ref<HTMLElement | null>(null);
 const bodyRef = ref<HTMLElement | null>(null);
 const editing = ref<{ row: number; col: number; start: string } | null>(null);
 const editInput = ref("");
+const settings = useSettingsStore();
 const selection = useTableSelection();
 const dragging = ref<"rows" | "cells" | null>(null);
 const contextTarget = ref<ContextTarget | null>(null);
@@ -892,7 +897,7 @@ function selectedRowIndexes() {
   return [...selection.selectedRows.value].sort((a, b) => a - b);
 }
 
-function extractGrid(r1: number, r2: number, c1: number, c2: number, maskUnselected = false) {
+function extractGrid(r1: number, r2: number, c1: number, c2: number) {
   const names: string[] = [];
   for (let c = c1; c <= c2; c++) {
     names.push(columns.value[c]?.name ?? "");
@@ -901,29 +906,32 @@ function extractGrid(r1: number, r2: number, c1: number, c2: number, maskUnselec
   for (let r = r1; r <= r2; r++) {
     const row: unknown[] = [];
     for (let c = c1; c <= c2; c++) {
-      row.push(maskUnselected && !selection.isCellSelected(r, c) ? null : cellValue(r, c));
+      row.push(cellValue(r, c));
     }
     grid.push(row);
   }
   return { names, grid };
 }
 
-function extractCellSelection() {
-  const cells = selection.cellSelectionList.value;
-  if (cells.length === 0) {
-    return null;
-  }
-  let r1 = cells[0]!.row;
-  let r2 = r1;
-  let c1 = cells[0]!.col;
-  let c2 = c1;
+function selectedCellsByRow() {
+  const cells = selection.cellSelectionList.value
+    .map((cell) => ({
+      row: cell.row,
+      col: cell.col,
+      name: columns.value[cell.col]?.name ?? "",
+      value: cellValue(cell.row, cell.col) ?? null,
+    }))
+    .sort((a, b) => a.row - b.row || a.col - b.col);
+  const groups: { row: number; name: string; value: unknown }[][] = [];
   for (const cell of cells) {
-    r1 = Math.min(r1, cell.row);
-    r2 = Math.max(r2, cell.row);
-    c1 = Math.min(c1, cell.col);
-    c2 = Math.max(c2, cell.col);
+    const last = groups.at(-1);
+    if (!last || last[0]!.row !== cell.row) {
+      groups.push([cell]);
+    } else {
+      last.push(cell);
+    }
   }
-  return extractGrid(r1, r2, c1, c2, true);
+  return groups;
 }
 
 function onContextMenu(event: MouseEvent) {
@@ -950,20 +958,39 @@ function onContextMenu(event: MouseEvent) {
 }
 
 async function copySelection(asJson: boolean) {
-  let extracted: { names: string[]; grid: unknown[][] } | null = null;
   if (selection.mode.value === "rows") {
     const indexes = selectedRowIndexes();
     const last = indexes.at(-1);
-    if (indexes[0] != null && last != null) {
-      extracted = extractGrid(indexes[0], last, 0, columns.value.length - 1);
+    if (indexes[0] == null || last == null) {
+      return;
     }
-  } else {
-    extracted = extractCellSelection();
-  }
-  if (!extracted) {
+    const extracted = extractGrid(indexes[0], last, 0, columns.value.length - 1);
+    await writeClipboard(
+      asJson ? cellRangeToJson(extracted.names, extracted.grid) : rowsClipboardText(extracted.grid),
+    );
     return;
   }
-  await writeClipboard(asJson ? cellRangeToJson(extracted.names, extracted.grid) : rowsClipboardText(extracted.grid));
+  const groups = selectedCellsByRow();
+  if (groups.length === 0) {
+    return;
+  }
+  if (asJson) {
+    await writeClipboard(selectedCellsToJson(groups.map((row) => row.map(({ name, value }) => ({ name, value })))));
+    return;
+  }
+  const delimiters = cellCopyDelimiters({
+    layout: settings.cellCopyLayout,
+    useCustomCellDelimiter: settings.useCustomCellDelimiter,
+    useCustomRowDelimiter: settings.useCustomRowDelimiter,
+    customCellDelimiter: settings.customCellDelimiter,
+    customRowDelimiter: settings.customRowDelimiter,
+  });
+  await writeClipboard(
+    selectedCellsClipboardText(
+      groups.map((row) => row.map((cell) => cell.value)),
+      delimiters,
+    ),
+  );
 }
 
 function cloneContextRows() {

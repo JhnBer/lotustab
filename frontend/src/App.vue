@@ -46,6 +46,8 @@ useWorkspaceShortcuts();
 useBlockHistoryBackspace();
 const titlebarHeight = useTitleBarHeight();
 
+const settingsPage = computed(() => route.path.startsWith("/settings"));
+
 const pageTitle = computed(() => {
   const title = route.meta.title;
   return typeof title === "string" ? title : "LotusTab";
@@ -158,7 +160,10 @@ onMounted(async () => {
               </Breadcrumb>
             </div>
           </header>
-          <div class="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
+          <div
+            class="flex min-h-0 flex-1 flex-col overflow-hidden"
+            :class="settingsPage ? '' : 'p-4'"
+          >
             <RouterView v-slot="{ Component }">
               <component :is="Component" class="h-full min-h-0 flex-1" />
             </RouterView>
