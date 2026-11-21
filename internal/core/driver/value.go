@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -56,12 +57,38 @@ func NormalizeValue(v any) any {
 		return NormalizeValue(rv.Elem().Interface())
 	}
 
+	if valuer, ok := v.(driver.Valuer); ok {
+		dv, err := valuer.Value()
+		if err == nil {
+			switch t := dv.(type) {
+			case nil:
+				return nil
+			case string:
+				return t
+			case []byte:
+				return string(t)
+			}
+		}
+	}
+
 	if s, ok := v.(fmt.Stringer); ok {
 		return s.String()
 	}
 
-	if _, err := json.Marshal(v); err != nil {
-		return fmt.Sprint(v)
+	if rv.IsValid() && rv.Kind() == reflect.Slice {
+		out := make([]any, rv.Len())
+		for i := range rv.Len() {
+			out[i] = NormalizeValue(rv.Index(i).Interface())
+		}
+		return out
+	}
+
+	// json/jsonb objects arrive as maps. Keep the map so the wire format is
+	// a JSON object; fmt.Sprint would print map[k:v].
+	if rv.IsValid() && rv.Kind() == reflect.Map {
+		if _, err := json.Marshal(v); err == nil {
+			return v
+		}
 	}
 	return fmt.Sprint(v)
 }

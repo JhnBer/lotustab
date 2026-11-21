@@ -18,6 +18,7 @@ func TestPrepareUpdatePostgres(t *testing.T) {
 		map[string]any{"name": "ada", "age": 36},
 		[]string{"id"},
 		map[string]any{"id": 7},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -39,6 +40,7 @@ func TestPrepareUpdateMySQLComposite(t *testing.T) {
 		map[string]any{"note": nil},
 		[]string{"a", "b"},
 		map[string]any{"a": 1, "b": "x"},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -60,6 +62,7 @@ func TestPrepareUpdateQuotesSpecialChars(t *testing.T) {
 		map[string]any{`a"b`: "1"},
 		[]string{`c"d`},
 		map[string]any{`c"d`: 2},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -70,20 +73,42 @@ func TestPrepareUpdateQuotesSpecialChars(t *testing.T) {
 	}
 }
 
+func TestPrepareUpdateCastsStringCells(t *testing.T) {
+	sql, args, err := sqlutil.PrepareUpdate(
+		sqlutil.QuotePostgres,
+		sqlutil.Dollar,
+		`"public"."orders"`,
+		map[string]any{"unit_price": "80.36", "qty": 2},
+		[]string{"id"},
+		map[string]any{"id": "7"},
+		map[string]string{"unit_price": "::numeric", "id": "::int8", "qty": "::int4"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `UPDATE "public"."orders" SET "qty"=$1, "unit_price"=$2::numeric WHERE "id"=$3::int8`
+	if sql != want {
+		t.Fatalf("sql=%q want %q", sql, want)
+	}
+	if len(args) != 3 || args[0] != 2 || args[1] != "80.36" || args[2] != "7" {
+		t.Fatalf("args=%v", args)
+	}
+}
+
 func TestPrepareUpdateErrors(t *testing.T) {
-	_, _, err := sqlutil.PrepareUpdate(sqlutil.QuotePostgres, sqlutil.Dollar, "", map[string]any{"n": 1}, []string{"id"}, map[string]any{"id": 1})
+	_, _, err := sqlutil.PrepareUpdate(sqlutil.QuotePostgres, sqlutil.Dollar, "", map[string]any{"n": 1}, []string{"id"}, map[string]any{"id": 1}, nil)
 	if err == nil {
 		t.Fatal("expected table error")
 	}
-	_, _, err = sqlutil.PrepareUpdate(sqlutil.QuotePostgres, sqlutil.Dollar, "t", map[string]any{"n": 1}, nil, map[string]any{"id": 1})
+	_, _, err = sqlutil.PrepareUpdate(sqlutil.QuotePostgres, sqlutil.Dollar, "t", map[string]any{"n": 1}, nil, map[string]any{"id": 1}, nil)
 	if err == nil {
 		t.Fatal("expected pk error")
 	}
-	_, _, err = sqlutil.PrepareUpdate(sqlutil.QuotePostgres, sqlutil.Dollar, "t", nil, []string{"id"}, map[string]any{"id": 1})
+	_, _, err = sqlutil.PrepareUpdate(sqlutil.QuotePostgres, sqlutil.Dollar, "t", nil, []string{"id"}, map[string]any{"id": 1}, nil)
 	if err == nil {
 		t.Fatal("expected cells error")
 	}
-	_, _, err = sqlutil.PrepareUpdate(sqlutil.QuotePostgres, sqlutil.Dollar, "t", map[string]any{"n": 1}, []string{"id"}, map[string]any{})
+	_, _, err = sqlutil.PrepareUpdate(sqlutil.QuotePostgres, sqlutil.Dollar, "t", map[string]any{"n": 1}, []string{"id"}, map[string]any{}, nil)
 	if err == nil {
 		t.Fatal("expected missing key error")
 	}
@@ -99,7 +124,7 @@ func TestApplyRowEditsAllOrNothingCount(t *testing.T) {
 		{Key: map[string]any{"id": 1}, Cells: map[string]any{"n": "a"}},
 		{Key: map[string]any{"id": 2}, Cells: map[string]any{}},
 		{Key: map[string]any{"id": 3}, Cells: map[string]any{"n": "b"}},
-	})
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +137,7 @@ func TestApplyRowEditsRejectsWrongAffected(t *testing.T) {
 	exec := func(context.Context, string, ...any) (int64, error) { return 0, nil }
 	err := sqlutil.ApplyRowEdits(context.Background(), exec, sqlutil.QuotePostgres, sqlutil.Dollar, `"t"`, []string{"id"}, []driver.RowEdit{
 		{Key: map[string]any{"id": 1}, Cells: map[string]any{"n": "a"}},
-	})
+	}, nil)
 	if err == nil {
 		t.Fatal("expected affected-count error")
 	}
@@ -125,6 +150,7 @@ func TestPrepareDelete(t *testing.T) {
 		`"public"."users"`,
 		[]string{"id"},
 		map[string]any{"id": 7},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -144,6 +170,7 @@ func TestPrepareInsert(t *testing.T) {
 		sqlutil.Question,
 		"`t`",
 		map[string]any{"name": "ada", "age": 36},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -166,7 +193,7 @@ func TestApplyRowEditsDeleteAndInsert(t *testing.T) {
 	err := sqlutil.ApplyRowEdits(context.Background(), exec, sqlutil.QuoteMySQL, sqlutil.Question, "`t`", []string{"id"}, []driver.RowEdit{
 		{Key: map[string]any{"id": 1}, Deleted: true},
 		{Cells: map[string]any{"n": "x"}, Inserted: true},
-	})
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

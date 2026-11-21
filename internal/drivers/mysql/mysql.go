@@ -334,7 +334,16 @@ func (c *conn) BrowseTable(ctx context.Context, req driver.TableBrowseRequest) (
 			return err
 		}
 
-		selectSQL := "SELECT * FROM " + qualified + where + sqlutil.OrderClause(sqlutil.QuoteMySQL, req.OrderBy, req.OrderDir) + " LIMIT ? OFFSET ?"
+		pk, err := mysqlPrimaryKey(ctx, session, dbName, req.Name)
+		if err != nil {
+			return err
+		}
+		order := sqlutil.OrderClause(sqlutil.QuoteMySQL, req.OrderBy, req.OrderDir)
+		if order == "" {
+			order = sqlutil.KeyOrderClause(sqlutil.QuoteMySQL, pk)
+		}
+
+		selectSQL := "SELECT * FROM " + qualified + where + order + " LIMIT ? OFFSET ?"
 		selectArgs := append(append([]any{}, args...), req.Limit, req.Offset)
 		result, err := sqlutil.QueryContext(ctx, session, req.Limit, selectSQL, selectArgs...)
 		if err != nil {
@@ -342,10 +351,6 @@ func (c *conn) BrowseTable(ctx context.Context, req driver.TableBrowseRequest) (
 		}
 		out = driver.BrowseFromQuery(result, total)
 		out.DurationMs = time.Since(start).Milliseconds()
-		pk, err := mysqlPrimaryKey(ctx, session, dbName, req.Name)
-		if err != nil {
-			return err
-		}
 		out.PrimaryKey = pk
 		return nil
 	})
@@ -386,7 +391,7 @@ func (c *conn) ApplyEdits(ctx context.Context, req driver.ApplyEditsRequest) err
 				return 0, execErr
 			}
 			return res.RowsAffected()
-		}, sqlutil.QuoteMySQL, sqlutil.Question, qualified, pk, req.Rows)
+		}, sqlutil.QuoteMySQL, sqlutil.Question, qualified, pk, req.Rows, nil)
 		if err != nil {
 			return err
 		}

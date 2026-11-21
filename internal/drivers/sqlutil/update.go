@@ -23,7 +23,7 @@ type ExecAffected func(ctx context.Context, sql string, args ...any) (int64, err
 
 // PrepareUpdate builds a parameterized UPDATE and its argument list.
 // SET columns are sorted for stable SQL. WHERE columns keep pk order.
-func PrepareUpdate(quote func(string) string, ph Placeholder, table string, cells map[string]any, pk []string, key map[string]any) (string, []any, error) {
+func PrepareUpdate(quote func(string) string, ph Placeholder, table string, cells map[string]any, pk []string, key map[string]any, casts map[string]string) (string, []any, error) {
 	if strings.TrimSpace(table) == "" {
 		return "", nil, fmt.Errorf("table name is required")
 	}
@@ -54,11 +54,11 @@ func PrepareUpdate(quote func(string) string, ph Placeholder, table string, cell
 		}
 		b.WriteString(quote(col))
 		b.WriteByte('=')
-		b.WriteString(ph(len(args) + 1))
+		b.WriteString(bindPlaceholder(ph, len(args)+1, col, cells[col], casts))
 		args = append(args, cells[col])
 	}
 
-	args, err := appendWhere(&b, quote, ph, pk, key, args)
+	args, err := appendWhere(&b, quote, ph, pk, key, args, casts)
 	if err != nil {
 		return "", nil, err
 	}
@@ -66,14 +66,14 @@ func PrepareUpdate(quote func(string) string, ph Placeholder, table string, cell
 }
 
 // PrepareDelete builds a parameterized DELETE ... WHERE pk.
-func PrepareDelete(quote func(string) string, ph Placeholder, table string, pk []string, key map[string]any) (string, []any, error) {
+func PrepareDelete(quote func(string) string, ph Placeholder, table string, pk []string, key map[string]any, casts map[string]string) (string, []any, error) {
 	if strings.TrimSpace(table) == "" {
 		return "", nil, fmt.Errorf("table name is required")
 	}
 	var b strings.Builder
 	b.WriteString("DELETE FROM ")
 	b.WriteString(table)
-	args, err := appendWhere(&b, quote, ph, pk, key, nil)
+	args, err := appendWhere(&b, quote, ph, pk, key, nil, casts)
 	if err != nil {
 		return "", nil, err
 	}
@@ -81,7 +81,7 @@ func PrepareDelete(quote func(string) string, ph Placeholder, table string, pk [
 }
 
 // PrepareInsert builds a parameterized INSERT. Column names are sorted for stable SQL.
-func PrepareInsert(quote func(string) string, ph Placeholder, table string, cells map[string]any) (string, []any, error) {
+func PrepareInsert(quote func(string) string, ph Placeholder, table string, cells map[string]any, casts map[string]string) (string, []any, error) {
 	if strings.TrimSpace(table) == "" {
 		return "", nil, fmt.Errorf("table name is required")
 	}
@@ -113,14 +113,14 @@ func PrepareInsert(quote func(string) string, ph Placeholder, table string, cell
 		if i > 0 {
 			b.WriteString(", ")
 		}
-		b.WriteString(ph(len(args) + 1))
+		b.WriteString(bindPlaceholder(ph, len(args)+1, col, cells[col], casts))
 		args = append(args, cells[col])
 	}
 	b.WriteByte(')')
 	return b.String(), args, nil
 }
 
-func appendWhere(b *strings.Builder, quote func(string) string, ph Placeholder, pk []string, key map[string]any, args []any) ([]any, error) {
+func appendWhere(b *strings.Builder, quote func(string) string, ph Placeholder, pk []string, key map[string]any, args []any, casts map[string]string) ([]any, error) {
 	if len(pk) == 0 {
 		return nil, fmt.Errorf("table has no primary key")
 	}
@@ -138,14 +138,23 @@ func appendWhere(b *strings.Builder, quote func(string) string, ph Placeholder, 
 		}
 		b.WriteString(quote(col))
 		b.WriteByte('=')
-		b.WriteString(ph(len(args) + 1))
+		b.WriteString(bindPlaceholder(ph, len(args)+1, col, v, casts))
 		args = append(args, v)
 	}
 	return args, nil
 }
 
+// bindPlaceholder appends a caller-supplied cast suffix only for string values.
+func bindPlaceholder(ph Placeholder, n int, col string, v any, casts map[string]string) string {
+	s := ph(n)
+	if _, ok := v.(string); !ok || casts == nil {
+		return s
+	}
+	return s + casts[col]
+}
+
 // ApplyRowEdits runs one INSERT/UPDATE/DELETE per row. Callers wrap this in a transaction.
-func ApplyRowEdits(ctx context.Context, exec ExecAffected, quote func(string) string, ph Placeholder, table string, pk []string, rows []driver.RowEdit) error {
+func ApplyRowEdits(ctx context.Context, exec ExecAffected, quote func(string) string, ph Placeholder, table string, pk []string, rows []driver.RowEdit, casts map[string]string) error {
 	if len(pk) == 0 {
 		return fmt.Errorf("table has no primary key")
 	}
@@ -159,16 +168,16 @@ func ApplyRowEdits(ctx context.Context, exec ExecAffected, quote func(string) st
 		)
 		switch {
 		case row.Deleted:
-			q, args, err = PrepareDelete(quote, ph, table, pk, row.Key)
+			q, args, err = PrepareDelete(quote, ph, table, pk, row.Key, casts)
 			verb = "deleted"
 		case row.Inserted:
-			q, args, err = PrepareInsert(quote, ph, table, row.Cells)
+			q, args, err = PrepareInsert(quote, ph, table, row.Cells, casts)
 			verb = "inserted"
 		default:
 			if len(row.Cells) == 0 {
 				continue
 			}
-			q, args, err = PrepareUpdate(quote, ph, table, row.Cells, pk, row.Key)
+			q, args, err = PrepareUpdate(quote, ph, table, row.Cells, pk, row.Key, casts)
 		}
 		if err != nil {
 			return err

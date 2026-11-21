@@ -82,7 +82,7 @@ func streamPool(ctx context.Context, q pgxQuerier, sqlText string, args []any, f
 	fields := rows.FieldDescriptions()
 	columns := make([]driver.Column, len(fields))
 	for i, f := range fields {
-		columns[i] = driver.Column{Name: f.Name, Type: typeName(f.DataTypeOID)}
+		columns[i] = driver.Column{Name: f.Name, Type: typeName(f.DataTypeOID, f.TypeModifier)}
 	}
 
 	batch := make([][]any, 0, streamBatchSize)
@@ -102,7 +102,9 @@ func streamPool(ctx context.Context, q pgxQuerier, sqlText string, args []any, f
 			return err
 		}
 		row := make([]any, len(values))
-		copy(row, values)
+		for i, v := range values {
+			row[i] = cellValue(uint32(fields[i].DataTypeOID), v)
+		}
 		batch = append(batch, row)
 		if len(batch) >= streamBatchSize {
 			if err := flush(); err != nil {

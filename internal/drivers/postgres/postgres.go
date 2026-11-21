@@ -322,8 +322,17 @@ func (c *conn) BrowseTable(ctx context.Context, req driver.TableBrowseRequest) (
 		return nil, err
 	}
 
+	pk, err := postgresPrimaryKey(ctx, pool, req.Schema, req.Name)
+	if err != nil {
+		return nil, err
+	}
+	order := sqlutil.OrderClause(sqlutil.QuotePostgres, req.OrderBy, req.OrderDir)
+	if order == "" {
+		order = sqlutil.KeyOrderClause(sqlutil.QuotePostgres, pk)
+	}
+
 	n := len(args)
-	selectSQL := "SELECT * FROM " + qualified + where + sqlutil.OrderClause(sqlutil.QuotePostgres, req.OrderBy, req.OrderDir) +
+	selectSQL := "SELECT * FROM " + qualified + where + order +
 		" LIMIT " + sqlutil.Dollar(n+1) + " OFFSET " + sqlutil.Dollar(n+2)
 	selectArgs := append(append([]any{}, args...), req.Limit, req.Offset)
 	result, err := queryPool(ctx, pool, req.Limit, selectSQL, selectArgs...)
@@ -332,10 +341,6 @@ func (c *conn) BrowseTable(ctx context.Context, req driver.TableBrowseRequest) (
 	}
 	out := driver.BrowseFromQuery(result, total)
 	out.DurationMs = time.Since(start).Milliseconds()
-	pk, err := postgresPrimaryKey(ctx, pool, req.Schema, req.Name)
-	if err != nil {
-		return nil, err
-	}
 	out.PrimaryKey = pk
 	return out, nil
 }
@@ -366,13 +371,17 @@ func (c *conn) ApplyEdits(ctx context.Context, req driver.ApplyEditsRequest) err
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	qualified := postgresQualified(req.Schema, req.Name)
+	casts, err := postgresColumnCasts(ctx, pool, req.Schema, req.Name, editColumnNames(pk, req.Rows))
+	if err != nil {
+		return err
+	}
 	err = sqlutil.ApplyRowEdits(ctx, func(ctx context.Context, q string, args ...any) (int64, error) {
 		tag, execErr := tx.Exec(ctx, q, args...)
 		if execErr != nil {
 			return 0, execErr
 		}
 		return tag.RowsAffected(), nil
-	}, sqlutil.QuotePostgres, sqlutil.Dollar, qualified, pk, req.Rows)
+	}, sqlutil.QuotePostgres, sqlutil.Dollar, qualified, pk, req.Rows, casts)
 	if err != nil {
 		return err
 	}
@@ -452,7 +461,7 @@ func queryPool(ctx context.Context, q pgxQuerier, maxRows int, sqlText string, a
 	for i, f := range fields {
 		columns[i] = driver.Column{
 			Name: f.Name,
-			Type: typeName(f.DataTypeOID),
+			Type: typeName(f.DataTypeOID, f.TypeModifier),
 		}
 	}
 
@@ -469,7 +478,7 @@ func queryPool(ctx context.Context, q pgxQuerier, maxRows int, sqlText string, a
 		}
 		row := make([]any, len(values))
 		for i, v := range values {
-			row[i] = driver.NormalizeValue(v)
+			row[i] = cellValue(uint32(fields[i].DataTypeOID), v)
 		}
 		out = append(out, row)
 	}
@@ -497,7 +506,7 @@ func queryPool(ctx context.Context, q pgxQuerier, maxRows int, sqlText string, a
 	}, nil
 }
 
-func typeName(oid uint32) string {
+func typeName(oid uint32, typmod int32) string {
 	switch oid {
 	case 16:
 		return "bool"
@@ -524,7 +533,7 @@ func typeName(oid uint32) string {
 	case 1184:
 		return "timestamptz"
 	case 1700:
-		return "numeric"
+		return numericTypeName(typmod)
 	case 2950:
 		return "uuid"
 	case 3802:
@@ -532,4 +541,16 @@ func typeName(oid uint32) string {
 	default:
 		return fmt.Sprintf("oid:%d", oid)
 	}
+}
+
+// numericTypeName formats a numeric column. Postgres stores an unconstrained
+// numeric as typmod -1. Otherwise typmod is ((precision << 16) | scale) + 4.
+func numericTypeName(typmod int32) string {
+	if typmod < 0 {
+		return "numeric"
+	}
+	mod := typmod - 4
+	precision := (mod >> 16) & 0xFFFF
+	scale := mod & 0xFFFF
+	return fmt.Sprintf("numeric(%d,%d)", precision, scale)
 }

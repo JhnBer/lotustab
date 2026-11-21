@@ -298,7 +298,16 @@ func (c *conn) BrowseTable(ctx context.Context, req driver.TableBrowseRequest) (
 			return err
 		}
 
-		selectSQL := "SELECT * FROM " + qualified + where + sqlutil.OrderClause(sqlutil.QuoteClickHouse, req.OrderBy, req.OrderDir) + " LIMIT ? OFFSET ?"
+		pk, err := clickhousePrimaryKey(ctx, session, dbName, req.Name)
+		if err != nil {
+			return err
+		}
+		order := sqlutil.OrderClause(sqlutil.QuoteClickHouse, req.OrderBy, req.OrderDir)
+		if order == "" {
+			order = sqlutil.KeyOrderClause(sqlutil.QuoteClickHouse, pk)
+		}
+
+		selectSQL := "SELECT * FROM " + qualified + where + order + " LIMIT ? OFFSET ?"
 		selectArgs := append(append([]any{}, args...), req.Limit, req.Offset)
 		result, err := sqlutil.QueryContext(ctx, session, req.Limit, selectSQL, selectArgs...)
 		if err != nil {
@@ -306,10 +315,6 @@ func (c *conn) BrowseTable(ctx context.Context, req driver.TableBrowseRequest) (
 		}
 		out = driver.BrowseFromQuery(result, total)
 		out.DurationMs = time.Since(start).Milliseconds()
-		pk, err := clickhousePrimaryKey(ctx, session, dbName, req.Name)
-		if err != nil {
-			return err
-		}
 		out.PrimaryKey = pk
 		return nil
 	})

@@ -91,6 +91,19 @@ func TestOrderClause(t *testing.T) {
 	}
 }
 
+func TestKeyOrderClause(t *testing.T) {
+	if got := sqlutil.KeyOrderClause(sqlutil.QuotePostgres, nil); got != "" {
+		t.Fatalf("empty key should be empty, got %q", got)
+	}
+	if got := sqlutil.KeyOrderClause(sqlutil.QuotePostgres, []string{"id"}); got != ` ORDER BY "id" ASC` {
+		t.Fatalf("got %q", got)
+	}
+	got := sqlutil.KeyOrderClause(sqlutil.QuotePostgres, []string{"tenant_id", "id"})
+	if got != ` ORDER BY "tenant_id" ASC, "id" ASC` {
+		t.Fatalf("got %q", got)
+	}
+}
+
 func TestLikeContains(t *testing.T) {
 	tests := []struct {
 		in, want string

@@ -125,3 +125,20 @@ func OrderClause(quote func(string) string, orderBy, orderDir string) string {
 	}
 	return " ORDER BY " + quote(orderBy) + " " + dir
 }
+
+// KeyOrderClause returns a leading ORDER BY fragment for key columns, each ASC.
+// An empty key returns an empty string. Browse uses this only when the user has
+// not chosen a sort column.
+func KeyOrderClause(quote func(string) string, key []string) string {
+	parts := make([]string, 0, len(key))
+	for _, col := range key {
+		if col == "" {
+			continue
+		}
+		parts = append(parts, quote(col)+" ASC")
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return " ORDER BY " + strings.Join(parts, ", ")
+}
