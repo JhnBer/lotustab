@@ -25,9 +25,9 @@ jobs:
           - os: windows-latest
             target: windows
             arch: amd64
-          # - os: ubuntu-latest
-          #   target: linux
-          #   arch: amd64
+          - os: ubuntu-latest
+            target: linux
+            arch: amd64
     runs-on: ${{ matrix.os }}
     defaults:
       run:
