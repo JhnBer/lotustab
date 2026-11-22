@@ -5,6 +5,14 @@
 <h1 align="center">LotusTab</h1>
 
 A desktop database client for **PostgreSQL**, **MySQL**, and **ClickHouse**. Open connections, browse tables, run SQL, and keep as many tabs as you need.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="showcase/screenshots/table_view_d.png">
+    <img alt="LotusTab table view" src="showcase/screenshots/table_view_l.png" width="960">
+  </picture>
+</p>
+
 - Unlimited connections
 - Unlimited tabs
 - Unlimited filters
