@@ -141,7 +141,16 @@
     @apply bg-background text-foreground font-sans;
     --wails-draggable: no-drag;
   }
+  html[lang="ja"] {
+    --font-sans: 'Inter', "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic", "Meiryo", "Noto Sans CJK JP", "Noto Sans JP", "PingFang SC", "Noto Sans SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+  }
+  html[lang="ja"] body,
+  html[lang="ja"] .cn-font-heading {
+    font-family: var(--font-sans);
+  }
 }
+
+/*maybe other font ?*/
 
 .drag-region {
   --wails-draggable: drag;

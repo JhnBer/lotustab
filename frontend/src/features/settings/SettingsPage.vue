@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { isAppLocale } from "@/i18n";
+import { isAppLocale, LOCALE_OPTIONS } from "@/i18n";
 import {
   isCellCopyLayout,
   isSideViewMinTextLength,
@@ -135,8 +135,9 @@ function onApplySideViewLengthToJson(value: unknown) {
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="en">English</SelectItem>
-          <SelectItem value="zh-CN">简体中文</SelectItem>
+          <SelectItem v-for="item in LOCALE_OPTIONS" :key="item.id" :value="item.id">
+            {{ item.name }}
+          </SelectItem>
         </SelectContent>
       </Select>
     </div>

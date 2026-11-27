@@ -38,4 +38,4 @@ Maintainers may, for architectural or business reasons, remove functionality fro
 - Local setup and packaging: see [docs/development.md](docs/development.md).
 - Prefer small PRs with a clear description of what changed and how you checked it.
 - Do not commit secrets, credentials, or customer data.
-- A new database driver uses `field.common.*` only when the English text and the meaning match an existing shared connection field exactly. Anything else, including similar TLS/SSL options, gets `driver.<id>.field.*`. Add the key to both `frontend/src/locales/en.json` and `zh-CN.json`. The Go test `TestLocaleCatalogsMatchDriverKeys` checks that.
+- A new database driver uses `field.common.*` only when the English text and the meaning match an existing shared connection field exactly. Anything else, including similar TLS/SSL options, gets `driver.<id>.field.*`. Add the key to every file in `frontend/src/locales/`. The Go test `TestLocaleCatalogsMatchDriverKeys` checks that.

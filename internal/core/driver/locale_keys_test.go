@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"lotustab/internal/core/driver"
@@ -14,20 +15,30 @@ import (
 
 func TestLocaleCatalogsMatchDriverKeys(t *testing.T) {
 	root := repoRoot(t)
-	en := flattenLocale(t, filepath.Join(root, "frontend", "src", "locales", "en.json"))
-	zh := flattenLocale(t, filepath.Join(root, "frontend", "src", "locales", "zh-CN.json"))
-
+	dir := filepath.Join(root, "frontend", "src", "locales")
+	en := flattenLocale(t, filepath.Join(dir, "en.json"))
 	if len(en) == 0 {
 		t.Fatal("en.json has no message keys")
 	}
-	for key := range en {
-		if _, ok := zh[key]; !ok {
-			t.Errorf("zh-CN.json missing %s", key)
-		}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
 	}
-	for key := range zh {
-		if _, ok := en[key]; !ok {
-			t.Errorf("en.json missing %s", key)
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".json") || name == "en.json" {
+			continue
+		}
+		other := flattenLocale(t, filepath.Join(dir, name))
+		for key := range en {
+			if _, ok := other[key]; !ok {
+				t.Errorf("%s missing %s", name, key)
+			}
+		}
+		for key := range other {
+			if _, ok := en[key]; !ok {
+				t.Errorf("en.json missing %s from %s", key, name)
+			}
 		}
 	}
 
