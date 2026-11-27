@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "@lucide/vue";
 import { Events, Window } from "@wailsio/runtime";
@@ -74,6 +75,12 @@ export type ColumnWidthScope = {
   table: string;
 };
 
+const { t } = useI18n();
+
+function countNoun(n: number, one: string, many: string): string {
+  return n === 1 ? t(one, { n }) : t(many, { n });
+}
+
 const props = withDefaults(
   defineProps<{
     result: QueryResult | null;
@@ -95,7 +102,7 @@ const props = withDefaults(
     sortable: false,
     sortColumn: "",
     sortDir: "",
-    emptyHint: "Run a query to see results.",
+    emptyHint: "",
     showStatus: true,
     lotusLoader: false,
     rowOffset: 0,
@@ -1220,21 +1227,21 @@ const cellMenuItems = computed((): CellMenuItem[] => {
   const items: CellMenuItem[] = [
     {
       id: "copy",
-      label: "Copy",
+      label: t("common.copy"),
       action: () => {
         void copySelection(false);
       },
     },
     {
       id: "copy-json",
-      label: "Copy as JSON",
+      label: t("results.copyJson"),
       action: () => {
         void copySelection(true);
       },
     },
     {
       id: "open-value",
-      label: "Open value",
+      label: t("results.openValue"),
       selection: "single",
       action: () => {
         if (cell) {
@@ -1244,7 +1251,7 @@ const cellMenuItems = computed((): CellMenuItem[] => {
     },
     {
       id: "edit",
-      label: "Edit",
+      label: t("common.edit"),
       selection: "single",
       disabled: !canEditCell,
       action: () => {
@@ -1255,20 +1262,20 @@ const cellMenuItems = computed((): CellMenuItem[] => {
     },
     {
       id: "set-null",
-      label: "Set NULL",
+      label: t("results.setNull"),
       separatorBefore: true,
       disabled: !selectionEditable(),
       action: setNullSelection,
     },
     {
       id: "set-value",
-      label: "Set value for selected",
+      label: t("results.setValue"),
       disabled: !selectionEditable(),
       action: openSetValue,
     },
     {
       id: "paste",
-      label: "Paste",
+      label: t("results.paste"),
       disabled: !selectionEditable(),
       action: () => {
         void pasteSelection();
@@ -1282,28 +1289,28 @@ const cellMenuItems = computed((): CellMenuItem[] => {
 <template>
   <div class="flex h-full min-h-0 flex-col">
     <div v-if="running && !result" class="text-muted-foreground flex flex-1 items-center justify-center p-4">
-      <LotusLoader v-if="lotusLoader" class="size-8" label="Loading results" />
+      <LotusLoader v-if="lotusLoader" class="size-8" :label="t('results.loading')" />
       <Spinner v-else />
     </div>
     <div v-else-if="error" class="text-destructive overflow-auto p-4 font-mono text-sm whitespace-pre-wrap">
       {{ error }}
     </div>
     <div v-else-if="!result" class="text-muted-foreground p-4 text-sm">
-      {{ emptyHint }}
+      {{ emptyHint || t('query.runHint') }}
     </div>
     <template v-else>
       <div v-if="showStatus" class="text-muted-foreground flex items-center justify-between border-b px-3 py-2 text-xs">
         <span>
-          {{ rows.length }} row{{ rows.length === 1 ? "" : "s" }}
-          <span v-if="result.truncated"> (truncated)</span>
+          {{ countNoun(rows.length, 'common.rowOne', 'common.rowMany') }}
+          <span v-if="result.truncated"> {{ t('common.truncated') }}</span>
         </span>
-        <span>{{ result.durationMs }} ms<template v-if="result.affectedKnown"> · {{ result.rowsAffected }} affected</template></span>
+        <span>{{ t('common.durationMs', { n: result.durationMs }) }}<template v-if="result.affectedKnown"> · {{ t('common.affected', { n: result.rowsAffected }) }}</template></span>
       </div>
       <div v-if="columns.length === 0" class="text-muted-foreground p-4 text-sm">
         <template v-if="result.affectedKnown">
-          Statement completed. {{ result.rowsAffected }} row{{ result.rowsAffected === 1 ? "" : "s" }} affected.
+          {{ t('results.statementDoneAffected', { affected: countNoun(result.rowsAffected, 'common.affectedOne', 'common.affectedMany') }) }}
         </template>
-        <template v-else>Statement completed.</template>
+        <template v-else>{{ t('results.statementDone') }}</template>
       </div>
       <div v-else class="relative min-h-0 flex-1">
         <ResizablePanelGroup direction="horizontal" class="h-full">
@@ -1493,13 +1500,13 @@ const cellMenuItems = computed((): CellMenuItem[] => {
           <ContextMenuContent>
             <template v-if="contextTarget?.type === 'row'">
               <ContextMenuItem @select="copySelection(false)">
-                Copy {{ selectedRowCount === 1 ? "row" : "rows" }}
+                {{ t('results.copyRows', { count: countNoun(selectedRowCount, 'common.rowOne', 'common.rowMany') }) }}
               </ContextMenuItem>
               <ContextMenuItem @select="copySelection(true)">
-                Copy as JSON
+                {{ t('results.copyJson') }}
               </ContextMenuItem>
               <ContextMenuItem :disabled="!editable" @select="cloneContextRows">
-                Clone {{ selectedRowCount === 1 ? "row" : "rows" }}
+                {{ t('results.cloneRows', { count: countNoun(selectedRowCount, 'common.rowOne', 'common.rowMany') }) }}
               </ContextMenuItem>
               <ContextMenuItem
                 v-if="selectedRowDeleteState() !== 'all-deleted'"
@@ -1507,18 +1514,18 @@ const cellMenuItems = computed((): CellMenuItem[] => {
                 :disabled="!editable"
                 @select="deleteSelectedLiveRows"
               >
-                Delete {{ selectedRowCount === 1 ? "row" : "rows" }}
+                {{ t('results.deleteRows', { count: countNoun(selectedRowCount, 'common.rowOne', 'common.rowMany') }) }}
               </ContextMenuItem>
               <ContextMenuItem
                 v-if="selectedRowDeleteState() !== 'all-live'"
                 :disabled="!editable"
                 @select="restoreSelectedDeletedRows"
               >
-                Restore {{ selectedRowCount === 1 ? "row" : "rows" }}
+                {{ t('results.restoreRows', { count: countNoun(selectedRowCount, 'common.rowOne', 'common.rowMany') }) }}
               </ContextMenuItem>
               <ContextMenuSeparator />
               <ContextMenuItem :disabled="!selectionEditable()" @select="setNullSelection">
-                Set NULL
+                {{ t('results.setNull') }}
               </ContextMenuItem>
             </template>
             <template v-else-if="contextTarget?.type === 'cell'">
@@ -1550,7 +1557,7 @@ const cellMenuItems = computed((): CellMenuItem[] => {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>
-                Set value for {{ selectedCellCount }} {{ selectedCellCount === 1 ? "cell" : "cells" }}
+                {{ t('results.setValueFor', { count: countNoun(selectedCellCount, 'common.cellOne', 'common.cellMany') }) }}
               </DialogTitle>
             </DialogHeader>
             <Input
@@ -1559,8 +1566,8 @@ const cellMenuItems = computed((): CellMenuItem[] => {
               @keydown.enter.prevent="setValueSelection"
             />
             <DialogFooter>
-              <Button variant="outline" @click="setValueOpen = false">Cancel</Button>
-              <Button @click="setValueSelection">Confirm</Button>
+              <Button variant="outline" @click="setValueOpen = false">{{ t('common.cancel') }}</Button>
+              <Button @click="setValueSelection">{{ t('common.confirm') }}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

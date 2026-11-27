@@ -1,3 +1,4 @@
+import { translate } from "@/i18n";
 import type { TableInfo } from "@/lib/wails";
 
 export const SEARCH_TABLES_LIMIT = 500;
@@ -143,7 +144,7 @@ export function pushTables(
     return;
   }
   if (tables.length === 0) {
-    rows.push({ key: `empty:${database}`, kind: "status", text: "No tables", height: ROW_META });
+    rows.push({ key: `empty:${database}`, kind: "status", text: translate("connections.noTables"), height: ROW_META });
     return;
   }
   for (const table of tables) {
@@ -219,14 +220,14 @@ export function buildExplorerRows(input: ExplorerCatalogInput): ExplorerRow[] {
       });
     }
     if (input.search.loading || input.search.query !== q) {
-      rows.push({ key: "search-loading", kind: "status", text: "Searching…", height: ROW_META });
+      rows.push({ key: "search-loading", kind: "status", text: translate("common.searching"), height: ROW_META });
     } else if (input.search.error) {
       rows.push({ key: "search-error", kind: "status", text: input.search.error, height: ROW_META });
     } else if (input.search.truncated) {
       rows.push({
         key: "search-truncated",
         kind: "status",
-        text: `Showing first ${SEARCH_TABLES_LIMIT} table matches. Refine your search.`,
+        text: translate("connections.searchLimit", { n: SEARCH_TABLES_LIMIT }),
         height: ROW_META,
       });
     }
@@ -239,7 +240,7 @@ export function buildExplorerRows(input: ExplorerCatalogInput): ExplorerRow[] {
       return rows;
     }
     if (input.loadingTables[name] && !(name in input.tablesByDb)) {
-      rows.push({ key: `loading:${name}`, kind: "status", text: "Loading…", height: ROW_META });
+      rows.push({ key: `loading:${name}`, kind: "status", text: translate("common.loadingEllipsis"), height: ROW_META });
       return rows;
     }
     pushTables(rows, name, input.tablesByDb[name] ?? [], 0, false);
@@ -254,7 +255,7 @@ export function buildExplorerRows(input: ExplorerCatalogInput): ExplorerRow[] {
     }
     // Expanded state is persisted; tablesByDb is not — treat missing as loading.
     if (!(name in input.tablesByDb)) {
-      rows.push({ key: `loading:${name}`, kind: "status", text: "Loading…", height: ROW_META });
+      rows.push({ key: `loading:${name}`, kind: "status", text: translate("common.loadingEllipsis"), height: ROW_META });
       continue;
     }
     pushTables(rows, name, input.tablesByDb[name] ?? [], 1, false);

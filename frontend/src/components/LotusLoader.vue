@@ -1,16 +1,16 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import type { HTMLAttributes } from "vue";
+import { useI18n } from "vue-i18n";
 import { cn } from "@/lib/utils";
 
-const props = withDefaults(
-  defineProps<{
-    class?: HTMLAttributes["class"];
-    label?: string;
-  }>(),
-  {
-    label: "Loading",
-  },
-);
+const props = defineProps<{
+  class?: HTMLAttributes["class"];
+  label?: string;
+}>();
+
+const { t } = useI18n();
+const ariaLabel = computed(() => props.label || t("common.loading"));
 
 // old colors fill="#8d6e4e" fill="#4e578d" fill="#8d4e4e"
 </script>
@@ -20,7 +20,7 @@ const props = withDefaults(
     xmlns="http://www.w3.org/2000/svg"
     viewBox="0 -29.356 326.948 326.948"
     role="status"
-    :aria-label="props.label"
+    :aria-label="ariaLabel"
     :class="cn('lotus-loader size-8', props.class)"
   >
     <g data-name="Asset 8">

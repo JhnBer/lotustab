@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -10,6 +11,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SSH_AUTH_AGENT, SSH_AUTH_KEY, SSH_AUTH_PASSWORD } from "@/features/connections/ssh";
+
+const { t, locale } = useI18n();
 
 const props = defineProps<{
   params: Record<string, string>;
@@ -33,7 +36,7 @@ function onAuth(value: unknown) {
   <div class="grid gap-3">
     <div class="grid grid-cols-2 gap-2">
       <div class="grid min-w-0 gap-1.5">
-        <Label :for="`${prefix}-host`">Hostname</Label>
+        <Label :for="`${prefix}-host`">{{ t('ssh.hostname') }}</Label>
         <Input
           :id="`${prefix}-host`"
           v-model="params[key('Host')]"
@@ -43,7 +46,7 @@ function onAuth(value: unknown) {
         />
       </div>
       <div class="grid min-w-0 gap-1.5">
-        <Label :for="`${prefix}-port`">Port</Label>
+        <Label :for="`${prefix}-port`">{{ t('ssh.port') }}</Label>
         <Input
           :id="`${prefix}-port`"
           v-model="params[key('Port')]"
@@ -56,22 +59,22 @@ function onAuth(value: unknown) {
     </div>
 
     <div class="grid min-w-0 gap-1.5">
-      <Label :for="`${prefix}-auth`">SSH auth method</Label>
-      <Select :model-value="auth" @update:model-value="onAuth">
+      <Label :for="`${prefix}-auth`">{{ t('ssh.authMethod') }}</Label>
+      <Select :key="locale" :model-value="auth" @update:model-value="onAuth">
         <SelectTrigger :id="`${prefix}-auth`" class="w-full">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem :value="SSH_AUTH_KEY">Key file</SelectItem>
-          <SelectItem :value="SSH_AUTH_PASSWORD">Username & password</SelectItem>
-          <SelectItem :value="SSH_AUTH_AGENT">SSH agent</SelectItem>
+          <SelectItem :value="SSH_AUTH_KEY">{{ t('ssh.keyFile') }}</SelectItem>
+          <SelectItem :value="SSH_AUTH_PASSWORD">{{ t('ssh.usernamePassword') }}</SelectItem>
+          <SelectItem :value="SSH_AUTH_AGENT">{{ t('ssh.agent') }}</SelectItem>
         </SelectContent>
       </Select>
     </div>
 
     <template v-if="auth === SSH_AUTH_KEY">
       <div class="grid min-w-0 gap-1.5">
-        <Label :for="`${prefix}-user`">SSH username</Label>
+        <Label :for="`${prefix}-user`">{{ t('ssh.username') }}</Label>
         <Input
           :id="`${prefix}-user`"
           v-model="params[key('User')]"
@@ -82,7 +85,7 @@ function onAuth(value: unknown) {
       </div>
       <div class="grid grid-cols-2 gap-2">
         <div class="grid min-w-0 gap-1.5">
-          <Label :for="`${prefix}-key`">Private key file</Label>
+          <Label :for="`${prefix}-key`">{{ t('ssh.privateKey') }}</Label>
           <Input
             :id="`${prefix}-key`"
             v-model="params[key('KeyPath')]"
@@ -92,7 +95,7 @@ function onAuth(value: unknown) {
           />
         </div>
         <div class="grid min-w-0 gap-1.5">
-          <Label :for="`${prefix}-passphrase`">Passphrase</Label>
+          <Label :for="`${prefix}-passphrase`">{{ t('ssh.passphrase') }}</Label>
           <Input
             :id="`${prefix}-passphrase`"
             v-model="params[key('Passphrase')]"
@@ -106,7 +109,7 @@ function onAuth(value: unknown) {
 
     <div v-else-if="auth === SSH_AUTH_PASSWORD" class="grid grid-cols-2 gap-2">
       <div class="grid min-w-0 gap-1.5">
-        <Label :for="`${prefix}-user`">SSH username</Label>
+        <Label :for="`${prefix}-user`">{{ t('ssh.username') }}</Label>
         <Input
           :id="`${prefix}-user`"
           v-model="params[key('User')]"
@@ -116,7 +119,7 @@ function onAuth(value: unknown) {
         />
       </div>
       <div class="grid min-w-0 gap-1.5">
-        <Label :for="`${prefix}-password`">Password</Label>
+        <Label :for="`${prefix}-password`">{{ t('ssh.password') }}</Label>
         <Input
           :id="`${prefix}-password`"
           v-model="params[key('Password')]"
@@ -129,7 +132,7 @@ function onAuth(value: unknown) {
     </div>
 
     <div v-else class="grid min-w-0 gap-1.5">
-      <Label :for="`${prefix}-user`">SSH username</Label>
+      <Label :for="`${prefix}-user`">{{ t('ssh.username') }}</Label>
       <Input
         :id="`${prefix}-user`"
         v-model="params[key('User')]"

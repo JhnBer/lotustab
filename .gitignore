@@ -15,3 +15,9 @@ build/android/gen/
 AGENTS.md
 .idea
 .cursor
+skills-lock.json
+# Ignore local agent files. The locale skill is part of the repo.
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/work-with-locale/

@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import JsonTreeNode, { type JsonTreeNodeModel } from "@/features/results/JsonTreeNode.vue";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   value: unknown;
@@ -18,7 +21,7 @@ function buildNode(value: unknown, key?: string): JsonTreeNodeModel {
   if (Array.isArray(value)) {
     return {
       kind: "branch",
-      label: nodeLabel(key, `Array(${value.length})`),
+      label: nodeLabel(key, t("results.jsonArray", { n: value.length })),
       children: value.map((item, index) => buildNode(item, String(index))),
     };
   }
@@ -26,7 +29,7 @@ function buildNode(value: unknown, key?: string): JsonTreeNodeModel {
     const entries = Object.entries(value as Record<string, unknown>);
     return {
       kind: "branch",
-      label: nodeLabel(key, `Object(${entries.length})`),
+      label: nodeLabel(key, t("results.jsonObject", { n: entries.length })),
       children: entries.map(([childKey, child]) => buildNode(child, childKey)),
     };
   }
@@ -36,7 +39,10 @@ function buildNode(value: unknown, key?: string): JsonTreeNodeModel {
   return { kind: "scalar", label: nodeLabel(key, String(value)) };
 }
 
-const root = computed(() => buildNode(props.value));
+const root = computed(() => {
+  void t("results.jsonArray", { n: 0 });
+  return buildNode(props.value);
+});
 </script>
 
 <template>

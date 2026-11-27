@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { useNow } from "@vueuse/core";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
@@ -11,6 +12,7 @@ import {
 } from "@/stores/transfers";
 
 const transfers = useTransfersStore();
+const { t } = useI18n();
 const now = useNow({ interval: 1000 });
 
 const records = computed(() => transfers.records);
@@ -23,22 +25,23 @@ function elapsed(rec: TransferRecord): string {
 }
 
 function rowsLabel(rec: TransferRecord): string {
+  const rows = formatRows(rec.rows);
   if (rec.totalRows != null) {
-    return `${formatRows(rec.rows)} / ${formatRows(rec.totalRows)} rows`;
+    return t("common.rowsOf", { rows, total: formatRows(rec.totalRows) });
   }
-  return `${formatRows(rec.rows)} rows`;
+  return t("common.rows", { n: rows });
 }
 
 function statusLabel(status: TransferStatus): string {
   switch (status) {
     case "running":
-      return "Running";
+      return t("transfers.running");
     case "done":
-      return "Done";
+      return t("transfers.done");
     case "failed":
-      return "Failed";
+      return t("transfers.failed");
     case "canceled":
-      return "Canceled";
+      return t("transfers.canceled");
   }
 }
 
@@ -59,14 +62,14 @@ function statusVariant(status: TransferStatus): "default" | "secondary" | "destr
 <template>
   <section class="mx-auto flex h-full w-full max-w-2xl flex-col gap-6 overflow-auto py-2">
     <div>
-      <h1 class="text-lg font-medium">Exports</h1>
+      <h1 class="text-lg font-medium">{{ t('transfers.exports') }}</h1>
       <p class="text-muted-foreground mt-1 text-sm">
-        Active and recent exports in this session.
+        {{ t('transfers.subtitle') }}
       </p>
     </div>
 
     <p v-if="records.length === 0" class="text-muted-foreground text-sm">
-      No exports yet.
+      {{ t('transfers.empty') }}
     </p>
 
     <ul v-else class="flex flex-col gap-2">
@@ -96,7 +99,7 @@ function statusVariant(status: TransferStatus): "default" | "secondary" | "destr
     </ul>
 
     <p class="text-muted-foreground mt-auto text-xs">
-      This list is cleared when the app restarts.
+      {{ t('transfers.cleared') }}
     </p>
   </section>
 </template>

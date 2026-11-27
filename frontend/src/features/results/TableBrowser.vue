@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { ChevronDown, ChevronRight, Filter, Plus, RotateCw, X } from "@lucide/vue";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ const props = defineProps<{
 }>();
 
 const connections = useConnectionsStore();
+const { t } = useI18n();
 const queries = useQueryStore();
 const connected = computed(() => connections.isConnected(props.tab.profileId));
 const loading = computed(() => props.tab.running || connections.isConnecting(props.tab.profileId));
@@ -118,7 +120,7 @@ async function applyStructure() {
         size="icon-xs"
         variant="outline"
         :disabled="!tab.running && loading"
-        :aria-label="tab.running ? 'Cancel' : 'Refresh table'"
+        :aria-label="tab.running ? t('results.cancel') : t('results.refreshTable')"
         @click="tab.running ? queries.cancel(tab.id) : queries.loadTable(tab.id)"
       >
         <X v-if="tab.running" class="size-3.5" />
@@ -138,7 +140,7 @@ async function applyStructure() {
           size="icon-xs"
           variant="outline"
           class="aria-expanded:bg-muted"
-          :aria-label="tab.filtersOpen ? 'Hide filters' : 'Show filters'"
+          :aria-label="tab.filtersOpen ? t('results.hideFilters') : t('results.showFilters')"
           :aria-expanded="Boolean(tab.filtersOpen)"
           @click="queries.toggleFiltersOpen(tab.id)"
         >
@@ -149,7 +151,7 @@ async function applyStructure() {
           size="icon-xs"
           variant="outline"
           :model-value="Boolean(tab.filtersEnabled)"
-          aria-label="Filters"
+          :aria-label="t('results.filters')"
           @update:model-value="queries.setFiltersEnabled(tab.id, $event)"
         >
           <Filter class="size-3.5" />
@@ -158,7 +160,7 @@ async function applyStructure() {
           size="icon-xs"
           variant="outline"
           :disabled="!tab.filtersEnabled"
-          aria-label="Add filter"
+          :aria-label="t('results.addFilter')"
           @click="queries.addFilter(tab.id)"
         >
           <Plus class="size-3.5" />
@@ -168,7 +170,7 @@ async function applyStructure() {
           :disabled="!tab.filtersEnabled || loading"
           @click="queries.applyFilters(tab.id)"
         >
-          Apply
+          {{ t('common.apply') }}
         </Button>
       </div>
     </div>
@@ -188,10 +190,10 @@ async function applyStructure() {
         v-if="!loading && !tab.result && !tab.error && tab.manuallyCancelled"
         class="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-3 p-4"
       >
-        <span class="text-sm">Load cancelled.</span>
+        <span class="text-sm">{{ t('results.loadCancelled') }}</span>
         <Button size="sm" variant="outline" @click="queries.loadTable(tab.id)">
           <RotateCw class="mr-1.5 size-3.5" />
-          Click to reload
+          {{ t('results.clickToReload') }}
         </Button>
       </div>
       <ResultsTable
@@ -213,7 +215,7 @@ async function applyStructure() {
           schema: tab.schema,
           table: tab.name,
         }"
-        :empty-hint="connected ? 'Loading table…' : 'Connect to view this table.'"
+        :empty-hint="connected ? t('results.loadingTable') : t('results.connectToView')"
         @sort="queries.cycleSort(tab.id, $event)"
         @edit="onEdit"
         @edit-insert="(insertId, column, value) => queries.setInsertCell(tab.id, insertId, column, value)"
@@ -228,9 +230,9 @@ async function applyStructure() {
       :running="loading"
       :total="tab.total"
       :dirty="structureView ? structureDirty : (tab.edits?.length ?? 0) > 0"
-      :switch-label="structureView ? 'Table' : 'Structure'"
+      :switch-label="structureView ? t('results.table') : t('results.structure')"
       :compact="structureView"
-      :label="structureView ? `${columnCount} columns` : undefined"
+      :label="structureView ? (columnCount === 1 ? t('common.columnOne', { n: columnCount }) : t('common.columnMany', { n: columnCount })) : undefined"
       @page="queries.setPage(tab.id, $event)"
       @page-size="queries.setPageSize(tab.id, $event)"
       @apply="onApply"
@@ -241,14 +243,14 @@ async function applyStructure() {
     <Dialog :open="confirmDrop" @update:open="confirmDrop = $event">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Drop {{ dropCount }} {{ dropCount === 1 ? "column" : "columns" }}?</DialogTitle>
+          <DialogTitle>{{ t('results.dropColumnsTitle', { count: dropCount === 1 ? t('common.columnOne', { n: dropCount }) : t('common.columnMany', { n: dropCount }) }) }}</DialogTitle>
           <DialogDescription>
-            Dropping columns cannot be undone and will permanently delete their data.
+            {{ t('results.dropColumnsHelp') }}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button variant="outline" @click="confirmDrop = false">Cancel</Button>
-          <Button variant="destructive" @click="applyStructure">Apply</Button>
+          <Button variant="outline" @click="confirmDrop = false">{{ t('common.cancel') }}</Button>
+          <Button variant="destructive" @click="applyStructure">{{ t('common.apply') }}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -1,4 +1,5 @@
 import type { QueryTab, TableTab, WorkspaceTab } from "@/features/editor/tabs";
+import { translate } from "@/i18n";
 
 export type PersistedQueryTab = Pick<QueryTab, "kind" | "id" | "title" | "profileId" | "sql" | "page" | "pageSize"> & {
   database?: string;
@@ -67,7 +68,7 @@ export function restoreQueryTab(tab: PersistedQueryTab, defaultPageSize: number)
   return {
     kind: "query",
     id: tab.id,
-    title: tab.title || "Query",
+    title: tab.title || translate("nav.query"),
     profileId: tab.profileId,
     database: tab.database ?? "",
     sql: tab.sql,

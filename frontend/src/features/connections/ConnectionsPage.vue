@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { GripVertical, Pencil, Pin, Plug, Plus, Trash2, Unplug } from "@lucide/vue";
 import { VueDraggable } from "vue-draggable-plus";
 import { toast } from "vue-sonner";
@@ -33,6 +34,7 @@ import type { Profile } from "@/lib/wails";
 import { useConnectionsStore } from "@/stores/connections";
 
 const connections = useConnectionsStore();
+const { t } = useI18n();
 const { dialogOpen, editing, openCreate, openEdit } = useConnectionDialog();
 const { openExportData } = useExportData();
 const { activateProfile, connect, disconnect, togglePin, clone, remove } = useProfileActions();
@@ -69,14 +71,14 @@ async function onReorder() {
   <div class="flex h-full min-h-0 flex-col gap-4">
     <div class="flex items-center justify-between gap-2">
       <div>
-        <h1 class="text-lg font-semibold tracking-tight">Connections</h1>
+        <h1 class="text-lg font-semibold tracking-tight">{{ t('connections.title') }}</h1>
         <p class="text-muted-foreground text-sm">
-          Saved profiles. Passwords stay in the OS keychain.
+          {{ t('connections.subtitle') }}
         </p>
       </div>
       <Button size="sm" @click="openCreate">
         <Plus class="size-3.5" />
-        New connection
+        {{ t('connections.new') }}
       </Button>
     </div>
 
@@ -85,21 +87,21 @@ async function onReorder() {
         <TableHeader>
           <TableRow>
             <TableHead class="w-8" />
-            <TableHead>Name</TableHead>
-            <TableHead>Driver</TableHead>
-            <TableHead>Host</TableHead>
-            <TableHead>Port</TableHead>
-            <TableHead>Database</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead class="text-right">Actions</TableHead>
+            <TableHead>{{ t('common.name') }}</TableHead>
+            <TableHead>{{ t('common.driver') }}</TableHead>
+            <TableHead>{{ t('common.host') }}</TableHead>
+            <TableHead>{{ t('common.port') }}</TableHead>
+            <TableHead>{{ t('common.database') }}</TableHead>
+            <TableHead>{{ t('common.status') }}</TableHead>
+            <TableHead class="text-right">{{ t('common.actions') }}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody v-if="connections.profiles.length === 0">
           <TableEmpty :colspan="8">
             <div class="text-muted-foreground flex flex-col items-center gap-2">
-              <span>No connections yet.</span>
+              <span>{{ t('connections.empty') }}</span>
               <Button size="sm" variant="outline" @click="openCreate">
-                Add PostgreSQL, MySQL, or ClickHouse
+                {{ t('connections.emptyHint') }}
               </Button>
             </div>
           </TableEmpty>
@@ -121,11 +123,11 @@ async function onReorder() {
                   <button
                     type="button"
                     class="drag-handle text-muted-foreground hover:text-foreground flex cursor-grab items-center justify-center active:cursor-grabbing"
-                    title="Reorder"
+                    :title="t('connections.reorder')"
                     @click.stop
                   >
                     <GripVertical class="size-3.5" />
-                    <span class="sr-only">Reorder</span>
+                    <span class="sr-only">{{ t('connections.reorder') }}</span>
                   </button>
                 </TableCell>
                 <TableCell>
@@ -148,7 +150,7 @@ async function onReorder() {
                 <TableCell class="font-mono text-xs">{{ param(profile, "database") }}</TableCell>
                 <TableCell>
                   <Badge :variant="connections.isConnected(profile.id) ? 'default' : 'secondary'">
-                    {{ connections.isConnected(profile.id) ? "Connected" : "Offline" }}
+                    {{ connections.isConnected(profile.id) ? t('connections.connected') : t('connections.offline') }}
                   </Badge>
                 </TableCell>
                 <TableCell>
@@ -156,34 +158,34 @@ async function onReorder() {
                     <Button
                       size="icon-sm"
                       variant="ghost"
-                      :title="connections.isPinned(profile.id) ? 'Unpin' : 'Pin'"
+                      :title="connections.isPinned(profile.id) ? t('common.unpin') : t('common.pin')"
                       @click="togglePin(profile)"
                     >
                       <Pin
                         class="size-3.5"
                         :class="connections.isPinned(profile.id) ? 'fill-current' : ''"
                       />
-                      <span class="sr-only">{{ connections.isPinned(profile.id) ? "Unpin" : "Pin" }}</span>
+                      <span class="sr-only">{{ connections.isPinned(profile.id) ? t('common.unpin') : t('common.pin') }}</span>
                     </Button>
                     <Button
                       v-if="connections.isConnecting(profile.id)"
                       size="icon-sm"
                       variant="ghost"
-                      title="Cancel"
+                      :title="t('common.cancel')"
                       @click="connections.cancelConnect(profile.id)"
                     >
                       <Spinner class="size-3.5" />
-                      <span class="sr-only">Cancel</span>
+                      <span class="sr-only">{{ t('common.cancel') }}</span>
                     </Button>
                     <Button
                       v-else-if="!connections.isConnected(profile.id)"
                       size="icon-sm"
                       variant="ghost"
-                      title="Connect"
+                      :title="t('common.connect')"
                       @click="connectAndOpen(profile)"
                     >
                       <Plug class="size-3.5" />
-                      <span class="sr-only">Connect</span>
+                      <span class="sr-only">{{ t('common.connect') }}</span>
                     </Button>
                     <Button
                       v-else
@@ -192,15 +194,15 @@ async function onReorder() {
                       @click="disconnect(profile)"
                     >
                       <Unplug class="size-3.5" />
-                      <span class="sr-only">Disconnect</span>
+                      <span class="sr-only">{{ t('common.disconnect') }}</span>
                     </Button>
                     <Button size="icon-sm" variant="ghost" @click="openEdit(profile)">
                       <Pencil class="size-3.5" />
-                      <span class="sr-only">Edit</span>
+                      <span class="sr-only">{{ t('common.edit') }}</span>
                     </Button>
                     <Button size="icon-sm" variant="ghost" @click="remove(profile)">
                       <Trash2 class="size-3.5" />
-                      <span class="sr-only">Delete</span>
+                      <span class="sr-only">{{ t('common.delete') }}</span>
                     </Button>
                   </div>
                 </TableCell>
@@ -208,32 +210,32 @@ async function onReorder() {
             </ContextMenuTrigger>
             <ContextMenuContent>
               <ContextMenuItem v-if="connections.isConnected(profile.id)" @select="disconnect(profile)">
-                Disconnect
+                {{ t('common.disconnect') }}
               </ContextMenuItem>
               <ContextMenuItem
                 v-else-if="connections.isConnecting(profile.id)"
                 @select="connections.cancelConnect(profile.id)"
               >
-                Cancel connecting
+                {{ t('connections.cancelConnecting') }}
               </ContextMenuItem>
               <ContextMenuItem v-else @select="connectAndOpen(profile)">
-                Connect
+                {{ t('common.connect') }}
               </ContextMenuItem>
               <ContextMenuItem @select="togglePin(profile)">
-                {{ connections.isPinned(profile.id) ? "Unpin" : "Pin" }}
+                {{ connections.isPinned(profile.id) ? t('common.unpin') : t('common.pin') }}
               </ContextMenuItem>
               <ContextMenuItem @select="openEdit(profile)">
-                Edit
+                {{ t('common.edit') }}
               </ContextMenuItem>
               <ContextMenuItem @select="openExportData(profile.id)">
-                Export…
+                {{ t('common.export') }}
               </ContextMenuItem>
               <ContextMenuItem @select="clone(profile)">
-                Clone
+                {{ t('common.clone') }}
               </ContextMenuItem>
               <ContextMenuSeparator />
               <ContextMenuItem variant="destructive" @select="remove(profile)">
-                Delete
+                {{ t('common.delete') }}
               </ContextMenuItem>
             </ContextMenuContent>
           </ContextMenu>

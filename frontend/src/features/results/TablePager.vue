@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { ChevronLeft, ChevronRight } from "@lucide/vue";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,6 +11,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PAGE_SIZES } from "@/stores/settings";
+
+const { t, locale } = useI18n();
 
 const props = defineProps<{
   page: number;
@@ -70,12 +73,12 @@ const hasNext = computed(() => {
 
 const rangeLabel = computed(() => {
   if (props.total != null) {
-    return `${from.value}–${to.value} of ${props.total}`;
+    return t("common.rangeOf", { from: from.value, to: to.value, total: props.total });
   }
   if (props.truncated) {
-    return `${from.value}–${to.value} (truncated)`;
+    return t("common.rangeTruncated", { from: from.value, to: to.value });
   }
-  return `${from.value}–${to.value}`;
+  return t("common.range", { from: from.value, to: to.value });
 });
 
 function onPageSize(value: unknown) {
@@ -131,22 +134,22 @@ const multiStatement = computed(() => (props.statements?.length ?? 0) > 1);
       </Select>
       <span class="min-w-0 truncate">
         {{ label ?? rangeLabel }}
-        <template v-if="durationMs != null && !label"> · {{ durationMs }} ms</template>
+        <template v-if="durationMs != null && !label"> · {{ t('common.durationMs', { n: durationMs }) }}</template>
       </span>
     </div>
     <div v-if="dirty" class="flex items-center gap-1">
-      <Button size="xs" :disabled="running" @click="emit('apply')">Apply</Button>
-      <Button size="xs" variant="outline" :disabled="running" @click="emit('cancel')">Cancel</Button>
+      <Button size="xs" :disabled="running" @click="emit('apply')">{{ t('common.apply') }}</Button>
+      <Button size="xs" variant="outline" :disabled="running" @click="emit('cancel')">{{ t('common.cancel') }}</Button>
     </div>
     <slot name="actions" />
     <template v-if="!compact">
-      <Select :model-value="String(pageSize)" @update:model-value="onPageSize">
+      <Select :key="locale" :model-value="String(pageSize)" @update:model-value="onPageSize">
         <SelectTrigger size="xs" class="w-36">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
           <SelectItem v-for="size in PAGE_SIZES" :key="size" :value="String(size)">
-            {{ size }} / page
+            {{ t('common.perPage', { n: size }) }}
           </SelectItem>
         </SelectContent>
       </Select>

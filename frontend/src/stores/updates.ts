@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { Events } from "@wailsio/runtime";
 import { toast } from "vue-sonner";
+import { i18n, translate } from "@/i18n";
 import { errorMessage } from "@/lib/errors";
 import { AboutService } from "@/lib/wails";
 import type { AboutInfo, UpdateCheckResult } from "@/lib/wails";
@@ -86,14 +87,19 @@ export const useUpdatesStore = defineStore("updates", () => {
   });
 
   const lastCheckedLabel = computed(() => {
+    void i18n.global.locale.value;
     if (!settings.lastUpdateCheckAt) {
-      return "Never";
+      return translate("about.never");
     }
     const when = new Date(settings.lastUpdateCheckAt).toLocaleString();
     if (!settings.lastUpdateCheckSource) {
       return when;
     }
-    return `${when} (${settings.lastUpdateCheckSource})`;
+    const source =
+      settings.lastUpdateCheckSource === "automatic"
+        ? translate("about.sourceAutomatic")
+        : translate("about.sourceManual");
+    return translate("about.checkedAt", { when, source });
   });
 
   function bindEvents() {
@@ -156,15 +162,14 @@ export const useUpdatesStore = defineStore("updates", () => {
 
     Events.On("wails:updater:error", (ev) => {
       const next = unwrap<ErrorPayload>(ev.data);
-      error.value = typeof next?.message === "string" && next.message ? next.message : "Update failed";
+      error.value = typeof next?.message === "string" && next.message ? next.message : translate("about.failed");
       phase.value = "error";
       busy.value = false;
     });
   }
 
   function downloadedMessage(version: string): string {
-    const name = version ? ` ${version}` : "";
-    return `Update${name} downloaded. It applies the next time LotusTab starts.`;
+    return translate("about.downloaded", { version: version ? ` ${version}` : "" });
   }
 
   function notifyApplyFailure(message: string) {
@@ -174,7 +179,7 @@ export const useUpdatesStore = defineStore("updates", () => {
     applyFailureNotified = true;
     toast.error(message, {
       action: {
-        label: "About",
+        label: translate("about.openAbout"),
         onClick: () => {
           void router.push("/settings/about");
         },

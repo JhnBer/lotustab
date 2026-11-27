@@ -481,7 +481,7 @@ func (s *ConnectionsService) prepare(input SaveProfileInput, requireName bool) (
 			params[field.Key] = field.Default
 		}
 		if field.Required && strings.TrimSpace(params[field.Key]) == "" {
-			return nil, connection.Profile{}, nil, fmt.Errorf("%s is required", field.Label)
+			return nil, connection.Profile{}, nil, fmt.Errorf("%s is required", field.Key)
 		}
 	}
 

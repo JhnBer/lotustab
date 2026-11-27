@@ -1,4 +1,5 @@
 import { Events } from "@wailsio/runtime";
+import { translate } from "@/i18n";
 import { errorMessage, isCanceled } from "@/lib/errors";
 import { QueryService } from "@/lib/wails";
 import type { QueryBatch, QueryResult, StatementResult } from "@/lib/wails";
@@ -103,7 +104,7 @@ export function createQueryExec(ctx: QueryStoreCtx) {
     }
     const sql = tab.executedSql || tab.sql;
     if (!sql.trim()) {
-      tab.error = "Query is empty";
+      tab.error = translate("query.empty");
       return;
     }
     if (!tab.page || tab.page < 1) {

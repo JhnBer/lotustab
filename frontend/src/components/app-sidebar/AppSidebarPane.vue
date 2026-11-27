@@ -12,6 +12,7 @@ import {
 import { toast } from "vue-sonner";
 import { storeToRefs } from "pinia";
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import { watchDebounced } from "@vueuse/core";
@@ -58,6 +59,7 @@ const connections = useConnectionsStore();
 const explorer = useExplorerStore();
 const queries = useQueryStore();
 const settings = useSettingsStore();
+const { t } = useI18n();
 const { connect, disconnect } = useProfileActions();
 const { openExportData } = useExportData();
 const { selected } = storeToRefs(connections);
@@ -71,8 +73,9 @@ const tableQuery = ref("");
 const filtering = computed(() => tableQuery.value.trim().length > 0);
 const catalogScrollRef = ref<HTMLElement | null>(null);
 
-const explorerRows = computed(() =>
-  buildExplorerRows({
+const explorerRows = computed(() => {
+  void settings.locale;
+  return buildExplorerRows({
     query: tableQuery.value,
     databases: explorer.databases,
     tablesByDb: explorer.tablesByDb,
@@ -81,8 +84,8 @@ const explorerRows = computed(() =>
     showAllDatabases: settings.showAllDatabases,
     loadingTables: explorer.loadingTables,
     search: explorer.search,
-  }),
-);
+  });
+});
 
 const rowVirtualizer = useVirtualizer(
   computed(() => ({
@@ -352,7 +355,7 @@ async function onTableDropped() {
         @click="connections.cancelConnect(selected.id)"
       >
         <Spinner class="size-3.5" />
-        Cancel
+        {{ t('common.cancel') }}
       </Button>
       <Button
         v-else-if="currentConnected"
@@ -363,7 +366,7 @@ async function onTableDropped() {
       >
         <Spinner v-if="disconnecting" class="size-3.5" />
         <Unplug v-else class="size-3.5" />
-        Disconnect
+        {{ t('common.disconnect') }}
       </Button>
       <Button
         v-else
@@ -372,50 +375,50 @@ async function onTableDropped() {
         @click="connectSelected"
       >
         <Plug class="size-3.5" />
-        Connect
+        {{ t('common.connect') }}
       </Button>
     </SidebarGroupContent>
   </SidebarGroup>
 
   <SidebarGroup v-if="selected && currentConnected" class="min-h-0 flex-1 gap-1 overflow-hidden">
     <SidebarGroupLabel v-if="settings.showAllDatabases" class="bg-sidebar shrink-0">
-      Databases
+      {{ t('connections.databases') }}
     </SidebarGroupLabel>
     <div v-else class="flex h-8 shrink-0 items-center pr-8">
       <DatabaseCombobox
         class="h-7 w-full min-w-0"
         :model-value="explorer.activeDatabase"
         :options="explorer.databases"
-        placeholder="Select database"
+        :placeholder="t('connections.selectDatabasePlaceholder')"
         @update:model-value="onSelectDatabase"
       />
     </div>
     <SidebarGroupAction
       as="button"
-      title="Reload tables"
+      :title="t('connections.reloadTables')"
       :disabled="explorerRefreshing"
       @click="refreshExplorer"
     >
       <RefreshCw :class="explorerRefreshing ? 'animate-spin' : undefined" />
     </SidebarGroupAction>
     <div class="px-0 pb-1">
-      <SidebarInput v-model="tableQuery" placeholder="Filter tables…" />
+      <SidebarInput v-model="tableQuery" :placeholder="t('connections.filterTables')" />
     </div>
     <SidebarGroupContent class="min-h-0 flex-1 overflow-hidden">
       <p v-if="explorer.loadingDbs && explorer.databases.length === 0" class="text-muted-foreground px-2 py-2 text-xs">
-        Loading databases…
+        {{ t('connections.loadingDatabases') }}
       </p>
       <p v-else-if="explorer.error && explorer.databases.length === 0" class="text-destructive px-2 py-2 text-xs">
         {{ explorer.error }}
       </p>
       <p v-else-if="explorer.databases.length === 0" class="text-muted-foreground px-2 py-2 text-xs">
-        No databases.
+        {{ t('connections.noDatabasesList') }}
       </p>
       <p v-else-if="!settings.showAllDatabases && !explorer.activeDatabase" class="text-muted-foreground px-2 py-2 text-xs">
-        Select a database.
+        {{ t('connections.selectDatabase') }}
       </p>
       <p v-else-if="filtering && explorerRows.length === 0" class="text-muted-foreground px-2 py-2 text-xs">
-        No matching tables.
+        {{ t('connections.noMatchingTables') }}
       </p>
       <div v-else ref="catalogScrollRef" class="h-full overflow-auto">
         <div :style="{ height: `${catalogTotalSize}px`, position: 'relative' }">
@@ -440,7 +443,7 @@ async function onTableDropped() {
               </ContextMenuTrigger>
               <ContextMenuContent>
                 <ContextMenuItem @select="openExportData(selected?.id, item.row.name)">
-                  Export…
+                  {{ t('common.export') }}
                 </ContextMenuItem>
               </ContextMenuContent>
             </ContextMenu>
@@ -465,14 +468,14 @@ async function onTableDropped() {
               </ContextMenuTrigger>
               <ContextMenuContent>
                 <ContextMenuItem @select="openTable(item.row.database, item.row.table)">
-                  Open table
+                  {{ t('connections.openTable') }}
                 </ContextMenuItem>
                 <ContextMenuItem @select="openTable(item.row.database, item.row.table, 'structure')">
-                  Open structure
+                  {{ t('connections.openStructure') }}
                 </ContextMenuItem>
                 <ContextMenuSeparator />
                 <ContextMenuItem @select="openExport(item.row.database, item.row.table)">
-                  Export…
+                  {{ t('common.export') }}
                 </ContextMenuItem>
                 <template v-if="item.row.table.type !== 'view'">
                   <ContextMenuSeparator />
@@ -480,7 +483,7 @@ async function onTableDropped() {
                     variant="destructive"
                     @select="openDrop(item.row.database, item.row.table)"
                   >
-                    Drop table
+                    {{ t('connections.dropTable') }}
                   </ContextMenuItem>
                 </template>
               </ContextMenuContent>

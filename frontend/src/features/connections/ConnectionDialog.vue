@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,6 +38,7 @@ const emit = defineEmits<{
 }>();
 
 const connections = useConnectionsStore();
+const { t } = useI18n();
 const name = ref("");
 const driverId = ref("");
 const color = ref("blue");
@@ -134,7 +136,7 @@ async function onTest() {
   testing.value = true;
   try {
     await connections.test(payload());
-    toast.success("Connection succeeded");
+    toast.success(t("connections.succeeded"));
   } catch (err) {
     toast.error(errorMessage(err));
   } finally {
@@ -146,7 +148,7 @@ async function onSave() {
   saving.value = true;
   try {
     await connections.save(payload());
-    toast.success(isEdit.value ? "Connection saved" : "Connection created");
+    toast.success(isEdit.value ? t("connections.saved") : t("connections.created"));
     emit("update:open", false);
   } catch (err) {
     toast.error(errorMessage(err));
@@ -164,17 +166,17 @@ async function fetchDatabases() {
   <Dialog :open="open" @update:open="emit('update:open', $event)">
     <DialogContent v-if="open" class="max-h-[min(90vh,40rem)] overflow-y-auto sm:max-w-md">
       <DialogHeader>
-        <DialogTitle>{{ isEdit ? "Edit connection" : "New connection" }}</DialogTitle>
+        <DialogTitle>{{ isEdit ? t('connections.edit') : t('connections.new') }}</DialogTitle>
       </DialogHeader>
 
       <form class="grid gap-3" @submit.prevent="onSave">
         <div class="grid gap-1.5">
-          <Label for="connection-name">Name</Label>
-          <Input id="connection-name" v-model="name" placeholder="Production" required />
+          <Label for="connection-name">{{ t('common.name') }}</Label>
+          <Input id="connection-name" v-model="name" :placeholder="t('connections.namePlaceholder')" required />
         </div>
 
         <div class="grid gap-1.5">
-          <Label>Color</Label>
+          <Label>{{ t('common.color') }}</Label>
           <div class="flex flex-wrap gap-1.5">
             <button
               v-for="swatch in CONNECTION_COLORS"
@@ -191,10 +193,10 @@ async function fetchDatabases() {
         </div>
 
         <div class="grid gap-1.5">
-          <Label>Driver</Label>
+          <Label>{{ t('common.driver') }}</Label>
           <Select :model-value="driverId" @update:model-value="onDriverChange">
             <SelectTrigger class="w-full">
-              <SelectValue placeholder="Select a driver" />
+              <SelectValue :placeholder="t('connections.selectDriver')" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem v-for="driver in connections.drivers" :key="driver.id" :value="driver.id">
@@ -223,10 +225,10 @@ async function fetchDatabases() {
 
         <DialogFooter class="mt-2">
           <Button type="button" variant="outline" :disabled="testing || saving" @click="onTest">
-            {{ testing ? "Testing…" : "Test" }}
+            {{ testing ? t('common.testing') : t('common.test') }}
           </Button>
           <Button type="submit" :disabled="saving || testing">
-            {{ saving ? "Saving…" : "Save" }}
+            {{ saving ? t('common.saving') : t('common.save') }}
           </Button>
         </DialogFooter>
       </form>

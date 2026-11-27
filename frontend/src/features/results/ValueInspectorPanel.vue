@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { SquareArrowOutUpRight, X } from "@lucide/vue";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,6 +24,8 @@ import {
   tryParseJson,
   type ValueInspectorPayload,
 } from "@/features/results/valueInspector";
+
+const { t } = useI18n();
 
 const props = withDefaults(
   defineProps<{
@@ -99,7 +102,7 @@ function onCancel() {
 }
 
 const title = computed(() => {
-  const name = props.payload.columnName || "value";
+  const name = props.payload.columnName || t("results.valueFallback");
   const type = props.payload.columnType ? ` · ${props.payload.columnType}` : "";
   return `${name}${type}`;
 });
@@ -121,7 +124,7 @@ const title = computed(() => {
           v-if="!payload.editable"
           class="text-muted-foreground truncate text-[10px] leading-none"
         >
-          Read-only
+          {{ t('results.readOnly') }}
         </div>
       </div>
       <Button
@@ -132,7 +135,7 @@ const title = computed(() => {
         :disabled="!dirty"
         @click="onCancel"
       >
-        Cancel
+        {{ t('common.cancel') }}
       </Button>
       <Button
         v-if="windowMode"
@@ -141,7 +144,7 @@ const title = computed(() => {
         class="shrink-0"
         @click="emit('returnPanel')"
       >
-        Return to side panel
+        {{ t('results.returnPanel') }}
       </Button>
       <TooltipProvider v-else :delay-duration="600">
         <Tooltip>
@@ -150,14 +153,14 @@ const title = computed(() => {
               variant="outline"
               size="icon-xs"
               class="shrink-0"
-              aria-label="Open in new window"
+              :aria-label="t('results.openWindow')"
               @click="emit('openWindow')"
             >
               <SquareArrowOutUpRight class="size-3.5" />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" align="end">
-            Open in new window
+            {{ t('results.openWindow') }}
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -166,7 +169,7 @@ const title = computed(() => {
         variant="ghost"
         size="icon-xs"
         class="shrink-0"
-        aria-label="Close"
+        :aria-label="t('common.close')"
         @click="emit('close')"
       >
         <X class="size-3.5" />
@@ -176,7 +179,7 @@ const title = computed(() => {
       v-if="returnUnavailable"
       class="text-destructive border-b px-3 py-2 text-xs"
     >
-      Source window is closed. Nothing to return to.
+      {{ t('results.sourceClosed') }}
     </div>
     <div class="flex min-h-0 flex-1 flex-col p-3">
       <template v-if="mode === 'binary'">
@@ -187,13 +190,13 @@ const title = computed(() => {
       <template v-else-if="mode === 'tree'">
         <Tabs v-model="view" class="flex min-h-0 flex-1 flex-col gap-2">
           <TabsList class="w-fit">
-            <TabsTrigger value="tree">Tree</TabsTrigger>
-            <TabsTrigger value="raw">Raw</TabsTrigger>
+            <TabsTrigger value="tree">{{ t('results.tree') }}</TabsTrigger>
+            <TabsTrigger value="raw">{{ t('results.raw') }}</TabsTrigger>
           </TabsList>
           <TabsContent value="tree" class="min-h-0 flex-1 overflow-hidden rounded-md border">
             <JsonTree v-if="parsedJson !== undefined" :value="parsedJson" />
             <div v-else class="text-muted-foreground p-3 text-xs">
-              Value is not valid JSON. Switch to Raw to inspect or edit.
+              {{ t('results.invalidJson') }}
             </div>
           </TabsContent>
           <TabsContent value="raw" class="min-h-0 flex-1">

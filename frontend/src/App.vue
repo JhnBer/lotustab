@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
 import { useColorMode } from "@vueuse/core";
 import { useRoute, useRouter } from "vue-router";
 import { toast } from "vue-sonner";
@@ -35,6 +36,7 @@ import { useUpdatesStore } from "@/stores/updates";
 useColorMode({ initialValue: "dark" });
 
 const route = useRoute();
+const { t } = useI18n();
 const router = useRouter();
 const connections = useConnectionsStore();
 const queries = useQueryStore();
@@ -49,8 +51,8 @@ const titlebarHeight = useTitleBarHeight();
 const settingsPage = computed(() => route.path.startsWith("/settings"));
 
 const pageTitle = computed(() => {
-  const title = route.meta.title;
-  return typeof title === "string" ? title : "LotusTab";
+  const titleKey = route.meta.titleKey;
+  return typeof titleKey === "string" ? t(titleKey) : t("nav.product");
 });
 
 const minimalChrome = computed(() => route.meta.chrome === "minimal");
@@ -149,7 +151,7 @@ onMounted(async () => {
                 <BreadcrumbList>
                   <BreadcrumbItem class="hidden md:block">
                     <BreadcrumbLink as-child>
-                      <RouterLink to="/connections">LotusTab</RouterLink>
+                      <RouterLink to="/connections">{{ t('nav.product') }}</RouterLink>
                     </BreadcrumbLink>
                   </BreadcrumbItem>
                   <BreadcrumbSeparator class="hidden md:block" />

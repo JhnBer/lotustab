@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -57,6 +58,7 @@ const customWhere = defineModel<boolean>("customWhere", { default: false });
 const whereSQL = defineModel<string>("whereSql", { default: "" });
 
 const settings = useSettingsStore();
+const { t } = useI18n();
 const schemaMode = ref<"schemaAdd" | "schemaReplace">("schemaAdd");
 const rememberedFormat = ref(format.value);
 const schema = computed(() => isSchemaExport(content.value));
@@ -124,14 +126,14 @@ function onSchemaMode(value: unknown) {
 
 <template>
   <div class="grid gap-1.5">
-    <Label>Format</Label>
+    <Label>{{ t('export.format') }}</Label>
     <Select
       :model-value="format"
       :disabled="schema"
       @update:model-value="(v) => (format = String(v ?? 'sql'))"
     >
       <SelectTrigger class="w-full">
-        <SelectValue placeholder="Format" />
+        <SelectValue :placeholder="t('export.format')" />
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="sql">SQL</SelectItem>
@@ -142,7 +144,7 @@ function onSchemaMode(value: unknown) {
 
   <div class="flex items-center justify-between gap-4">
     <Label :for="variant === 'batch' ? 'export-single-file' : 'export-folder-mode'">
-      {{ variant === "batch" ? "Single file" : "Separate files in a folder" }}
+      {{ variant === "batch" ? t('export.singleFile') : t('export.separateFolder') }}
     </Label>
     <Switch
       :id="variant === 'batch' ? 'export-single-file' : 'export-folder-mode'"
@@ -155,22 +157,22 @@ function onSchemaMode(value: unknown) {
   </div>
 
   <div v-if="folderMode" class="grid gap-1.5">
-    <Label :for="`${variant}-export-foldername`">Folder name</Label>
+    <Label :for="`${variant}-export-foldername`">{{ t('export.folderName') }}</Label>
     <Input
       :id="`${variant}-export-foldername`"
       v-model="folderName"
       placeholder="export_20260101"
       spellcheck="false"
     />
-    <p class="text-muted-foreground text-xs">Each table is saved as a separate file.</p>
+    <p class="text-muted-foreground text-xs">{{ t('export.eachTableFile') }}</p>
   </div>
   <div v-else class="grid gap-1.5">
-    <Label :for="`${variant}-export-filename`">Filename</Label>
+    <Label :for="`${variant}-export-filename`">{{ t('export.filename') }}</Label>
     <Input :id="`${variant}-export-filename`" v-model="fileName" placeholder="export.sql" spellcheck="false" />
   </div>
 
   <div v-if="folderMode" class="flex items-center justify-between gap-4">
-    <Label :for="`${variant}-export-prefix-on`">Filename prefix</Label>
+    <Label :for="`${variant}-export-prefix-on`">{{ t('export.filenamePrefix') }}</Label>
     <Switch
       :id="`${variant}-export-prefix-on`"
       :model-value="prefixEnabled"
@@ -182,18 +184,18 @@ function onSchemaMode(value: unknown) {
   </div>
 
   <div class="grid gap-1.5">
-    <Label :for="`${variant}-export-path`">Path</Label>
+    <Label :for="`${variant}-export-path`">{{ t('export.path') }}</Label>
     <InputGroup>
       <InputGroupInput
         :id="`${variant}-export-path`"
         v-model="outputDir"
-        placeholder="Choose a folder…"
+        :placeholder="t('export.chooseFolder')"
         spellcheck="false"
       />
       <InputGroupAddon align="inline-end">
         <InputGroupButton :disabled="browsing" @click="emit('browse')">
           <Spinner v-if="browsing" class="size-3.5" />
-          Browse…
+          {{ t('common.browse') }}
         </InputGroupButton>
       </InputGroupAddon>
     </InputGroup>
@@ -201,24 +203,24 @@ function onSchemaMode(value: unknown) {
 
   <Tabs v-model="tab" class="gap-3">
     <TabsList class="grid w-full grid-cols-2">
-      <TabsTrigger value="data">Data</TabsTrigger>
-      <TabsTrigger value="schema" :disabled="schemaDisabled">Schema only</TabsTrigger>
+      <TabsTrigger value="data">{{ t('export.data') }}</TabsTrigger>
+      <TabsTrigger value="schema" :disabled="schemaDisabled">{{ t('export.schemaOnly') }}</TabsTrigger>
     </TabsList>
 
     <TabsContent value="data" class="grid gap-3">
       <template v-if="variant === 'table'">
         <div v-if="!folderMode" class="grid gap-1.5">
-          <Label :for="`${variant}-export-chunk`">Chunk size (rows per file)</Label>
+          <Label :for="`${variant}-export-chunk`">{{ t('export.chunkSize') }}</Label>
           <Input
             :id="`${variant}-export-chunk`"
             v-model="chunkSize"
             type="number"
             min="0"
-            placeholder="0 = single file"
+            :placeholder="t('export.chunkPlaceholder')"
           />
         </div>
         <div class="flex items-center justify-between gap-4">
-          <Label :for="`${variant}-export-where-on`">Custom where condition</Label>
+          <Label :for="`${variant}-export-where-on`">{{ t('export.where') }}</Label>
           <Switch
             :id="`${variant}-export-where-on`"
             :model-value="customWhere"
@@ -242,10 +244,10 @@ function onSchemaMode(value: unknown) {
               @click="emit('checkCount')"
             >
               <Spinner v-if="counting" class="size-3.5" />
-              Check count
+              {{ t('export.checkCount') }}
             </Button>
             <span v-if="checkedTotal != null" class="text-muted-foreground text-xs">
-              ~{{ formatRows(checkedTotal) }} rows match
+              {{ t('export.rowsMatch', { n: formatRows(checkedTotal) }) }}
             </span>
           </div>
         </div>
@@ -258,7 +260,7 @@ function onSchemaMode(value: unknown) {
             :model-value="includeCreate"
             @update:model-value="(v) => (includeCreate = Boolean(v))"
           />
-          <Label :for="`${variant}-export-create`" class="font-normal">Include CREATE TABLE</Label>
+          <Label :for="`${variant}-export-create`" class="font-normal">{{ t('export.includeCreate') }}</Label>
         </div>
         <div class="flex items-center gap-2">
           <Checkbox
@@ -266,7 +268,7 @@ function onSchemaMode(value: unknown) {
             :model-value="includeDrop"
             @update:model-value="(v) => (includeDrop = Boolean(v))"
           />
-          <Label :for="`${variant}-export-drop`" class="font-normal">Include DROP TABLE IF EXISTS</Label>
+          <Label :for="`${variant}-export-drop`" class="font-normal">{{ t('export.includeDrop') }}</Label>
         </div>
         <div class="flex items-center gap-2">
           <Checkbox
@@ -274,10 +276,10 @@ function onSchemaMode(value: unknown) {
             :model-value="wrapTransaction"
             @update:model-value="(v) => (wrapTransaction = Boolean(v))"
           />
-          <Label :for="`${variant}-export-tx`" class="font-normal">Wrap in a transaction</Label>
+          <Label :for="`${variant}-export-tx`" class="font-normal">{{ t('export.wrapTx') }}</Label>
         </div>
         <div class="grid gap-1.5">
-          <Label :for="`${variant}-export-batch`">Insert batch size</Label>
+          <Label :for="`${variant}-export-batch`">{{ t('export.insertBatch') }}</Label>
           <Input :id="`${variant}-export-batch`" v-model="insertBatchSize" type="number" min="1" />
         </div>
       </template>
@@ -288,18 +290,18 @@ function onSchemaMode(value: unknown) {
         <div class="flex items-center gap-2.5">
           <RadioGroupItem :id="`${variant}-schema-create`" value="schemaAdd" />
           <Label :for="`${variant}-schema-create`" class="grid gap-0.5 font-normal leading-snug">
-            <span class="font-medium leading-none">Create</span>
+            <span class="font-medium leading-none">{{ t('export.create') }}</span>
             <span class="text-muted-foreground text-xs font-normal">
-              CREATE TABLE IF NOT EXISTS. Existing tables are left untouched.
+              {{ t('export.createHelp') }}
             </span>
           </Label>
         </div>
         <div class="flex items-center gap-2.5">
           <RadioGroupItem :id="`${variant}-schema-drop`" value="schemaReplace" />
           <Label :for="`${variant}-schema-drop`" class="grid gap-0.5 font-normal leading-snug">
-            <span class="font-medium leading-none">Drop</span>
+            <span class="font-medium leading-none">{{ t('export.drop') }}</span>
             <span class="text-muted-foreground text-xs font-normal">
-              DROP TABLE IF EXISTS, then CREATE TABLE. MySQL also disables foreign key checks for this file.
+              {{ t('export.dropHelp') }}
             </span>
           </Label>
         </div>
@@ -313,7 +315,7 @@ function onSchemaMode(value: unknown) {
       :model-value="gzip"
       @update:model-value="(v) => (gzip = Boolean(v))"
     />
-    <Label :for="`${variant}-export-gzip`" class="font-normal">Compress with gzip</Label>
+    <Label :for="`${variant}-export-gzip`" class="font-normal">{{ t('export.gzip') }}</Label>
   </div>
 
   <div class="flex items-center gap-2">
@@ -322,10 +324,10 @@ function onSchemaMode(value: unknown) {
       :model-value="settings.deleteOnAbortExport"
       @update:model-value="(v) => settings.setDeleteOnAbortExport(Boolean(v))"
     />
-    <Label :for="`${variant}-export-delete-abort`" class="font-normal">Delete files on abort/error</Label>
+    <Label :for="`${variant}-export-delete-abort`" class="font-normal">{{ t('export.deleteOnAbort') }}</Label>
   </div>
 
   <p v-if="overwriteWarn" class="text-destructive text-xs">
-    Files in this destination will be overwritten.
+    {{ t('common.overwriteFiles') }}
   </p>
 </template>

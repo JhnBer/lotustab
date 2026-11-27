@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useColorMode } from "@vueuse/core";
+import { useI18n } from "vue-i18n";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -10,18 +11,35 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
+import { isAppLocale } from "@/i18n";
 import {
   isCellCopyLayout,
   isSideViewMinTextLength,
   isTabLayout,
   PAGE_SIZES,
   QUERY_TIMEOUTS,
-  queryTimeoutLabel,
   useSettingsStore,
 } from "@/stores/settings";
 
 const settings = useSettingsStore();
+const { t, locale } = useI18n();
 const mode = useColorMode({ initialValue: "auto" });
+
+function onLocale(value: unknown) {
+  if (isAppLocale(value)) {
+    settings.setLocale(value);
+  }
+}
+
+function timeoutLabel(seconds: number): string {
+  if (seconds <= 0) {
+    return t("settings.queryTimeoutOff");
+  }
+  if (seconds < 60) {
+    return t("settings.queryTimeoutSeconds", { n: seconds });
+  }
+  return t("settings.queryTimeoutMinutes", { n: seconds / 60 });
+}
 
 function onTheme(value: unknown) {
   if (value === "light" || value === "dark" || value === "auto") {
@@ -108,24 +126,37 @@ function onApplySideViewLengthToJson(value: unknown) {
 <template>
   <div class="h-full overflow-y-auto">
   <section class="mx-auto flex w-full min-w-0 max-w-lg flex-col gap-8 px-4 py-4">
-    <h1 class="text-lg font-medium">Settings</h1>
+    <h1 class="text-lg font-medium">{{ t('settings.title') }}</h1>
 
     <div class="flex items-center justify-between gap-4">
-      <Label for="settings-theme" class="min-w-0">Theme</Label>
-      <Select :model-value="mode" @update:model-value="onTheme">
-        <SelectTrigger id="settings-theme" size="sm" class="w-36 shrink-0">
+      <Label for="settings-language" class="min-w-0">{{ t('settings.language') }}</Label>
+      <Select :model-value="settings.locale" @update:model-value="onLocale">
+        <SelectTrigger id="settings-language" size="sm" class="w-36 shrink-0">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="light">Light</SelectItem>
-          <SelectItem value="dark">Dark</SelectItem>
-          <SelectItem value="auto">System</SelectItem>
+          <SelectItem value="en">English</SelectItem>
+          <SelectItem value="zh-CN">简体中文</SelectItem>
         </SelectContent>
       </Select>
     </div>
 
     <div class="flex items-center justify-between gap-4">
-      <Label for="settings-tint" class="min-w-0">Colored connection headers</Label>
+      <Label for="settings-theme" class="min-w-0">{{ t('settings.theme') }}</Label>
+      <Select :key="locale" :model-value="mode" @update:model-value="onTheme">
+        <SelectTrigger id="settings-theme" size="sm" class="w-36 shrink-0">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="light">{{ t('settings.themeLight') }}</SelectItem>
+          <SelectItem value="dark">{{ t('settings.themeDark') }}</SelectItem>
+          <SelectItem value="auto">{{ t('settings.themeSystem') }}</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+
+    <div class="flex items-center justify-between gap-4">
+      <Label for="settings-tint" class="min-w-0">{{ t('settings.tint') }}</Label>
       <Switch
         id="settings-tint"
         :model-value="settings.connectionTint"
@@ -134,7 +165,7 @@ function onApplySideViewLengthToJson(value: unknown) {
     </div>
 
     <div class="flex items-center justify-between gap-4">
-      <Label for="settings-show-all-dbs" class="min-w-0">Show all databases</Label>
+      <Label for="settings-show-all-dbs" class="min-w-0">{{ t('settings.showAllDatabases') }}</Label>
       <Switch
         id="settings-show-all-dbs"
         :model-value="settings.showAllDatabases"
@@ -143,7 +174,7 @@ function onApplySideViewLengthToJson(value: unknown) {
     </div>
 
     <div v-if="settings.showAllDatabases" class="flex items-center justify-between gap-4">
-      <Label for="settings-enable-db-choice" class="min-w-0">Enable database choice</Label>
+      <Label for="settings-enable-db-choice" class="min-w-0">{{ t('settings.enableDatabaseChoice') }}</Label>
       <Switch
         id="settings-enable-db-choice"
         :model-value="settings.enableDatabaseChoice"
@@ -152,27 +183,27 @@ function onApplySideViewLengthToJson(value: unknown) {
     </div>
 
     <div class="flex items-center justify-between gap-4">
-      <Label for="settings-tab-layout" class="min-w-0">Tab layout</Label>
-      <Select :model-value="settings.tabLayout" @update:model-value="onTabLayout">
+      <Label for="settings-tab-layout" class="min-w-0">{{ t('settings.tabLayout') }}</Label>
+      <Select :key="locale" :model-value="settings.tabLayout" @update:model-value="onTabLayout">
         <SelectTrigger id="settings-tab-layout" size="sm" class="w-36 shrink-0">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="scroll">Scroll</SelectItem>
-          <SelectItem value="wrap">Wrap</SelectItem>
+          <SelectItem value="scroll">{{ t('settings.tabScroll') }}</SelectItem>
+          <SelectItem value="wrap">{{ t('settings.tabWrap') }}</SelectItem>
         </SelectContent>
       </Select>
     </div>
 
     <div class="flex items-center justify-between gap-4">
-      <Label for="settings-page-size" class="min-w-0">Default rows per page</Label>
-      <Select :model-value="String(settings.defaultPageSize)" @update:model-value="onPageSize">
+      <Label for="settings-page-size" class="min-w-0">{{ t('settings.pageSize') }}</Label>
+      <Select :key="locale" :model-value="String(settings.defaultPageSize)" @update:model-value="onPageSize">
         <SelectTrigger id="settings-page-size" size="sm" class="w-36 shrink-0">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
           <SelectItem v-for="size in PAGE_SIZES" :key="size" :value="String(size)">
-            {{ size }} / page
+            {{ t('common.perPage', { n: size }) }}
           </SelectItem>
         </SelectContent>
       </Select>
@@ -180,16 +211,16 @@ function onApplySideViewLengthToJson(value: unknown) {
 
     <div class="flex items-center justify-between gap-4">
       <div class="min-w-0">
-        <Label for="settings-query-timeout">Query timeout</Label>
-        <p class="text-muted-foreground mt-1 text-xs">Cancels a running query after this time. Off waits until you cancel.</p>
+        <Label for="settings-query-timeout">{{ t('settings.queryTimeout') }}</Label>
+        <p class="text-muted-foreground mt-1 text-xs">{{ t('settings.queryTimeoutHelp') }}</p>
       </div>
-      <Select :model-value="String(settings.queryTimeoutSeconds)" @update:model-value="onQueryTimeout">
+      <Select :key="locale" :model-value="String(settings.queryTimeoutSeconds)" @update:model-value="onQueryTimeout">
         <SelectTrigger id="settings-query-timeout" size="sm" class="w-36 shrink-0">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
           <SelectItem v-for="seconds in QUERY_TIMEOUTS" :key="seconds" :value="String(seconds)">
-            {{ queryTimeoutLabel(seconds) }}
+            {{ timeoutLabel(seconds) }}
           </SelectItem>
         </SelectContent>
       </Select>
@@ -197,9 +228,9 @@ function onApplySideViewLengthToJson(value: unknown) {
 
     <div class="flex items-center justify-between gap-4">
       <div class="min-w-0">
-        <Label for="settings-delete-on-abort">Delete partial files on abort/error</Label>
+        <Label for="settings-delete-on-abort">{{ t('settings.deleteOnAbort') }}</Label>
         <p class="text-muted-foreground mt-1 text-xs">
-          Removes export files if a dump is canceled or fails.
+          {{ t('settings.deleteOnAbortHelp') }}
         </p>
       </div>
       <Switch
@@ -211,14 +242,14 @@ function onApplySideViewLengthToJson(value: unknown) {
 
     <div class="flex flex-col gap-8 border-t pt-8">
       <div>
-        <h2 class="text-sm font-medium">Cells</h2>
+        <h2 class="text-sm font-medium">{{ t('settings.cells') }}</h2>
         <p class="text-muted-foreground mt-1 text-xs">
-          Double-click edits a cell when its text is this long or shorter. Longer text opens the side view.
+          {{ t('settings.cellsHelp') }}
         </p>
       </div>
 
       <div class="flex items-center justify-between gap-4">
-        <Label for="settings-side-view-min-length" class="min-w-0">Min text length to open side view</Label>
+        <Label for="settings-side-view-min-length" class="min-w-0">{{ t('settings.sideViewLength') }}</Label>
         <Input
           id="settings-side-view-min-length"
           :model-value="settings.sideViewMinTextLength"
@@ -233,9 +264,9 @@ function onApplySideViewLengthToJson(value: unknown) {
 
       <div class="flex items-center justify-between gap-4">
         <div class="min-w-0">
-          <Label for="settings-side-view-json">Also apply to JSON fields</Label>
+          <Label for="settings-side-view-json">{{ t('settings.sideViewJson') }}</Label>
           <p class="text-muted-foreground mt-1 text-xs">
-            JSON columns always open the side view unless this is on.
+            {{ t('settings.sideViewJsonHelp') }}
           </p>
         </div>
         <Switch
@@ -248,26 +279,26 @@ function onApplySideViewLengthToJson(value: unknown) {
 
     <div class="flex flex-col gap-8 border-t pt-8">
       <div>
-        <h2 class="text-sm font-medium">Copy</h2>
-        <p class="text-muted-foreground mt-1 text-xs">Separators used when copying selected cells.</p>
+        <h2 class="text-sm font-medium">{{ t('settings.copy') }}</h2>
+        <p class="text-muted-foreground mt-1 text-xs">{{ t('settings.copyHelp') }}</p>
       </div>
 
       <div class="flex items-center justify-between gap-4">
-        <Label for="settings-cell-copy" class="min-w-0">Selected cells</Label>
-        <Select :model-value="settings.cellCopyLayout" @update:model-value="onCellCopyLayout">
+        <Label for="settings-cell-copy" class="min-w-0">{{ t('settings.selectedCells') }}</Label>
+        <Select :key="locale" :model-value="settings.cellCopyLayout" @update:model-value="onCellCopyLayout">
           <SelectTrigger id="settings-cell-copy" size="sm" class="w-48 shrink-0">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="grid">Per column and row</SelectItem>
-            <SelectItem value="line">Per row</SelectItem>
-            <SelectItem value="tab">Per column</SelectItem>
+            <SelectItem value="grid">{{ t('settings.copyGrid') }}</SelectItem>
+            <SelectItem value="line">{{ t('settings.copyLine') }}</SelectItem>
+            <SelectItem value="tab">{{ t('settings.copyTab') }}</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
       <div v-if="settings.cellCopyLayout !== 'line'" class="flex items-center justify-between gap-4">
-        <Label for="settings-custom-cell-delimiter" class="min-w-0">Enable custom cell delimiter</Label>
+        <Label for="settings-custom-cell-delimiter" class="min-w-0">{{ t('settings.customCellDelimiter') }}</Label>
         <div class="flex shrink-0 items-center gap-2">
           <Input
             :model-value="settings.customCellDelimiter"
@@ -275,7 +306,7 @@ function onApplySideViewLengthToJson(value: unknown) {
             size="xs"
             class="w-20 font-mono"
             placeholder="\t"
-            aria-label="Cell delimiter"
+            :aria-label="t('settings.cellDelimiter')"
             @update:model-value="onCustomCellDelimiter"
           />
           <Switch
@@ -287,7 +318,7 @@ function onApplySideViewLengthToJson(value: unknown) {
       </div>
 
       <div v-if="settings.cellCopyLayout !== 'tab'" class="flex items-center justify-between gap-4">
-        <Label for="settings-custom-row-delimiter" class="min-w-0">Enable custom row delimiter</Label>
+        <Label for="settings-custom-row-delimiter" class="min-w-0">{{ t('settings.customRowDelimiter') }}</Label>
         <div class="flex shrink-0 items-center gap-2">
           <Input
             :model-value="settings.customRowDelimiter"
@@ -295,7 +326,7 @@ function onApplySideViewLengthToJson(value: unknown) {
             size="xs"
             class="w-20 font-mono"
             placeholder="\n"
-            aria-label="Row delimiter"
+            :aria-label="t('settings.rowDelimiter')"
             @update:model-value="onCustomRowDelimiter"
           />
           <Switch
@@ -310,7 +341,7 @@ function onApplySideViewLengthToJson(value: unknown) {
         v-if="(settings.cellCopyLayout !== 'line' && settings.useCustomCellDelimiter) || (settings.cellCopyLayout !== 'tab' && settings.useCustomRowDelimiter)"
         class="text-muted-foreground -mt-4 text-xs"
       >
-        Use \t for a tab, \n for a new line, and \r for a carriage return.
+        {{ t('settings.delimiterHelp') }}
       </p>
     </div>
   </section>

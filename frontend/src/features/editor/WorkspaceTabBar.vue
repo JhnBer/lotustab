@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { FileCode2, Plus, Table2, TableProperties, X } from "@lucide/vue";
 import { VueDraggable } from "vue-draggable-plus";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import { useQueryStore, type WorkspaceTab } from "@/stores/query";
 import { useSettingsStore } from "@/stores/settings";
 
 const connections = useConnectionsStore();
+const { t } = useI18n();
 const queries = useQueryStore();
 const settings = useSettingsStore();
 const { writeClipboard } = useClipboardText();
@@ -104,26 +106,26 @@ function closeDisabled(id: string, side: Exclude<CloseSide, "one">) {
           </ContextMenuTrigger>
           <ContextMenuContent>
             <ContextMenuItem @select="copyName(tab.title)">
-              Copy name
+              {{ t('query.copyName') }}
             </ContextMenuItem>
             <ContextMenuItem @select="queries.close(tab.id)">
-              Close
+              {{ t('query.close') }}
             </ContextMenuItem>
             <ContextMenuSeparator />
             <ContextMenuItem
               :disabled="closeDisabled(tab.id, 'left')"
               @select="queries.closeFrom(tab.id, 'left')"
             >
-              Close Tabs to the Left
+              {{ t('query.closeLeft') }}
             </ContextMenuItem>
             <ContextMenuItem
               :disabled="closeDisabled(tab.id, 'right')"
               @select="queries.closeFrom(tab.id, 'right')"
             >
-              Close Tabs to the Right
+              {{ t('query.closeRight') }}
             </ContextMenuItem>
             <ContextMenuItem @select="queries.closeFrom(tab.id, 'all')">
-              Close All Tabs
+              {{ t('query.closeAll') }}
             </ContextMenuItem>
           </ContextMenuContent>
         </ContextMenu>

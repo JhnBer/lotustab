@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { ArrowUpDown, Database, Server, Settings } from "@lucide/vue";
 import { storeToRefs } from "pinia";
 import { VueDraggable } from "vue-draggable-plus";
@@ -38,6 +39,7 @@ import { useConnectionsStore } from "@/stores/connections";
 import { useTransfersStore } from "@/stores/transfers";
 
 const route = useRoute();
+const { t } = useI18n();
 const router = useRouter();
 const connections = useConnectionsStore();
 const transfers = useTransfersStore();
@@ -157,12 +159,12 @@ onBeforeUnmount(() => {
                       @click="goConnections"
                     >
                       <Server />
-                      <span>Connections</span>
+                      <span>{{ t('nav.connections') }}</span>
                     </SidebarMenuButton>
                   </div>
                 </TooltipTrigger>
                 <TooltipContent side="right" align="center">
-                  Connections
+                  {{ t('nav.connections') }}
                 </TooltipContent>
               </Tooltip>
             </SidebarMenuItem>
@@ -214,31 +216,31 @@ onBeforeUnmount(() => {
                     <ContextMenuLabel>{{ profile.name }}</ContextMenuLabel>
                     <ContextMenuSeparator />
                     <ContextMenuItem @click="openInNewWindow(profile)">
-                      Open in new window
+                      {{ t('connections.openWindow') }}
                     </ContextMenuItem>
                     <ContextMenuItem @click="unpin(profile)">
-                      Unpin
+                      {{ t('common.unpin') }}
                     </ContextMenuItem>
                     <ContextMenuItem @click="openEdit(profile)">
-                      Edit
+                      {{ t('common.edit') }}
                     </ContextMenuItem>
                     <ContextMenuItem @click="openExportData(profile.id)">
-                      Export…
+                      {{ t('common.export') }}
                     </ContextMenuItem>
                     <ContextMenuSeparator />
                     <template v-if="connections.isConnected(profile.id)">
                       <ContextMenuItem @click="disconnect(profile)">
-                        Disconnect
+                        {{ t('common.disconnect') }}
                       </ContextMenuItem>
                     </template>
                     <template v-else-if="connections.isConnecting(profile.id)">
                       <ContextMenuItem @click="connections.cancelConnect(profile.id)">
-                        Cancel connecting
+                        {{ t('connections.cancelConnecting') }}
                       </ContextMenuItem>
                     </template>
                     <template v-else>
                       <ContextMenuItem @click="connect(profile)">
-                        Connect
+                        {{ t('common.connect') }}
                       </ContextMenuItem>
                     </template>
                   </ContextMenuContent>
@@ -261,7 +263,7 @@ onBeforeUnmount(() => {
                   @click="goTransfers"
                 >
                   <ArrowUpDown />
-                  <span>Transfers</span>
+                  <span>{{ t('nav.transfers') }}</span>
                   <span
                     v-if="transfers.runningCount > 0"
                     class="bg-primary text-primary-foreground absolute top-0.5 right-0.5 flex size-3.5 items-center justify-center rounded-full text-[9px] font-medium"
@@ -272,7 +274,7 @@ onBeforeUnmount(() => {
               </div>
             </TooltipTrigger>
             <TooltipContent side="right" align="center">
-              Transfers
+              {{ t('nav.transfers') }}
             </TooltipContent>
           </Tooltip>
         </SidebarMenuItem>
@@ -286,12 +288,12 @@ onBeforeUnmount(() => {
                   @click="goSettings"
                 >
                   <Settings />
-                  <span>Settings</span>
+                  <span>{{ t('nav.settings') }}</span>
                 </SidebarMenuButton>
               </div>
             </TooltipTrigger>
             <TooltipContent side="right" align="center">
-              Settings
+              {{ t('nav.settings') }}
             </TooltipContent>
           </Tooltip>
         </SidebarMenuItem>

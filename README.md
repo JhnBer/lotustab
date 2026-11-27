@@ -48,3 +48,9 @@ Contributions are accepted under MIT via the [CLA](CLA.md). See [CONTRIBUTING.md
 ## Build
 
 Build, the local PostgreSQL, and the seed are described in [docs/development.md](docs/development.md).
+
+## Languages
+
+If a translation key is missing, the UI uses English.
+
+Request a language in a GitHub issue, or open a pull request that adds one. Instructions are in [docs/languages.md](docs/languages.md).

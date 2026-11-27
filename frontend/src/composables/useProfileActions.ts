@@ -1,4 +1,5 @@
 import { toast } from "vue-sonner";
+import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { errorMessage, isCanceled } from "@/lib/errors";
 import type { Profile } from "@/lib/wails";
@@ -20,6 +21,7 @@ export type ActivateOptions = {
 };
 
 export function useProfileActions() {
+  const { t } = useI18n();
   const connections = useConnectionsStore();
   const queries = useQueryStore();
   const router = useRouter();
@@ -58,7 +60,7 @@ export function useProfileActions() {
       if (!connections.isConnected(profile.id)) {
         return;
       }
-      toast.success(`Connected to ${profile.name}`);
+      toast.success(t("connections.connectedTo", { name: profile.name }));
       if (options?.openQuery) {
         connections.select(profile.id);
         queries.openForProfile(profile.id, profile.name);
@@ -77,7 +79,7 @@ export function useProfileActions() {
   async function disconnect(profile: Profile) {
     try {
       await connections.disconnect(profile.id);
-      toast.info(`Disconnected from ${profile.name}`);
+      toast.info(t("connections.disconnectedFrom", { name: profile.name }));
     } catch (err) {
       toast.error(errorMessage(err));
     }
@@ -86,7 +88,7 @@ export function useProfileActions() {
   async function clone(profile: Profile) {
     try {
       await connections.clone(profile.id);
-      toast.success(`Cloned ${profile.name}`);
+      toast.success(t("connections.cloned", { name: profile.name }));
     } catch (err) {
       toast.error(errorMessage(err));
     }
@@ -95,7 +97,7 @@ export function useProfileActions() {
   async function remove(profile: Profile) {
     try {
       await connections.remove(profile.id);
-      toast.success(`Deleted ${profile.name}`);
+      toast.success(t("connections.deleted", { name: profile.name }));
     } catch (err) {
       toast.error(errorMessage(err));
     }

@@ -2,6 +2,7 @@
 import { Pencil, Pin, Plus, SquareArrowOutUpRight } from "@lucide/vue";
 import { storeToRefs } from "pinia";
 import { onMounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { Window } from "@wailsio/runtime";
 import { SidebarHeader } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import { connBg } from "@/lib/colors";
 import { useConnectionsStore } from "@/stores/connections";
 
 const connections = useConnectionsStore();
+const { t } = useI18n();
 const { selected } = storeToRefs(connections);
 const { togglePin, openInNewWindow } = useProfileActions();
 const { dialogOpen, editing, openCreate, openEdit } = useConnectionDialog();
@@ -41,8 +43,8 @@ onMounted(async () => {
           size="icon-xs"
           variant="ghost"
           class="shrink-0"
-          title="Edit"
-          aria-label="Edit"
+          :title="t('common.edit')"
+          :aria-label="t('common.edit')"
           @click="openEdit(selected)"
         >
           <Pencil class="size-3.5" />
@@ -51,7 +53,7 @@ onMounted(async () => {
           size="icon-xs"
           variant="ghost"
           class="shrink-0"
-          :title="connections.isPinned(selected.id) ? 'Unpin' : 'Pin'"
+          :title="connections.isPinned(selected.id) ? t('common.unpin') : t('common.pin')"
           @click="togglePin(selected)"
         >
           <Pin
@@ -64,20 +66,20 @@ onMounted(async () => {
           size="icon-xs"
           variant="ghost"
           class="shrink-0"
-          title="Open in new window"
+          :title="t('connections.openWindow')"
           @click="openInNewWindow(selected)"
         >
           <SquareArrowOutUpRight class="size-3.5" />
         </Button>
       </div>
       <div v-else class="flex w-full items-center gap-1 px-2 py-1">
-        <span class="min-w-0 flex-1 text-sm font-medium">Connections</span>
+        <span class="min-w-0 flex-1 text-sm font-medium">{{ t('nav.connections') }}</span>
         <Button
           size="icon-xs"
           variant="ghost"
           class="shrink-0"
-          title="New connection"
-          aria-label="New connection"
+          :title="t('connections.new')"
+          :aria-label="t('connections.new')"
           @click="openCreate"
         >
           <Plus class="size-3.5" />

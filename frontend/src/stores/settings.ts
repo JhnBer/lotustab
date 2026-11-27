@@ -1,6 +1,12 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { Events } from "@wailsio/runtime";
+import {
+  isAppLocale,
+  LOCALE_STORAGE_KEY,
+  readStoredLocale,
+  type AppLocale,
+} from "@/i18n";
 
 export const PAGE_SIZES = [50, 100, 250, 500, 1000, 5000, 10000] as const;
 export const DEFAULT_PAGE_SIZE = 100;
@@ -47,16 +53,6 @@ export function isPageSize(n: number): boolean {
 
 export function isQueryTimeout(n: number): boolean {
   return (QUERY_TIMEOUTS as readonly number[]).includes(n);
-}
-
-export function queryTimeoutLabel(seconds: number): string {
-  if (seconds <= 0) {
-    return "Off";
-  }
-  if (seconds < 60) {
-    return `${seconds}s`;
-  }
-  return `${seconds / 60} min`;
 }
 
 function readPageSize(): number {
@@ -169,6 +165,7 @@ type SettingsPayload = {
   autoInstallUpdates: boolean;
   lastUpdateCheckAt: string | null;
   lastUpdateCheckSource: UpdateCheckSource | null;
+  locale: AppLocale;
 };
 
 export const useSettingsStore = defineStore("settings", () => {
@@ -189,6 +186,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const autoInstallUpdates = ref(readAutoInstallUpdates());
   const lastUpdateCheckAt = ref<string | null>(readLastUpdateCheckAt());
   const lastUpdateCheckSource = ref<UpdateCheckSource | null>(readLastUpdateCheckSource());
+  const locale = ref<AppLocale>(readStoredLocale());
 
   function snapshot(): SettingsPayload {
     return {
@@ -209,6 +207,7 @@ export const useSettingsStore = defineStore("settings", () => {
       autoInstallUpdates: autoInstallUpdates.value,
       lastUpdateCheckAt: lastUpdateCheckAt.value,
       lastUpdateCheckSource: lastUpdateCheckSource.value,
+      locale: locale.value,
     };
   }
 
@@ -228,6 +227,7 @@ export const useSettingsStore = defineStore("settings", () => {
     localStorage.setItem(SIDE_VIEW_MIN_TEXT_LENGTH_KEY, String(sideViewMinTextLength.value));
     localStorage.setItem(APPLY_SIDE_VIEW_LENGTH_TO_JSON_KEY, String(applySideViewLengthToJson.value));
     localStorage.setItem(AUTO_INSTALL_KEY, String(autoInstallUpdates.value));
+    localStorage.setItem(LOCALE_STORAGE_KEY, locale.value);
     if (lastUpdateCheckAt.value) {
       localStorage.setItem(LAST_CHECK_AT_KEY, lastUpdateCheckAt.value);
     } else {
@@ -294,6 +294,7 @@ export const useSettingsStore = defineStore("settings", () => {
         : next.lastUpdateCheckSource === null
           ? null
           : lastUpdateCheckSource.value,
+      locale: isAppLocale(next.locale) ? next.locale : locale.value,
     };
   }
 
@@ -346,7 +347,8 @@ export const useSettingsStore = defineStore("settings", () => {
       applySideViewLengthToJson.value === applyLengthToJson &&
       autoInstallUpdates.value === next.autoInstallUpdates &&
       lastUpdateCheckAt.value === next.lastUpdateCheckAt &&
-      lastUpdateCheckSource.value === next.lastUpdateCheckSource
+      lastUpdateCheckSource.value === next.lastUpdateCheckSource &&
+      locale.value === next.locale
     ) {
       return;
     }
@@ -367,6 +369,7 @@ export const useSettingsStore = defineStore("settings", () => {
     autoInstallUpdates.value = next.autoInstallUpdates;
     lastUpdateCheckAt.value = next.lastUpdateCheckAt;
     lastUpdateCheckSource.value = next.lastUpdateCheckSource;
+    locale.value = next.locale;
     persist();
   }
 
@@ -490,6 +493,14 @@ export const useSettingsStore = defineStore("settings", () => {
     commit();
   }
 
+  function setLocale(next: AppLocale) {
+    if (locale.value === next) {
+      return;
+    }
+    locale.value = next;
+    commit();
+  }
+
   function recordUpdateCheck(source: UpdateCheckSource) {
     lastUpdateCheckAt.value = new Date().toISOString();
     lastUpdateCheckSource.value = source;
@@ -522,6 +533,7 @@ export const useSettingsStore = defineStore("settings", () => {
     autoInstallUpdates,
     lastUpdateCheckAt,
     lastUpdateCheckSource,
+    locale,
     setDefaultPageSize,
     setConnectionTint,
     setShowAllDatabases,
@@ -538,5 +550,6 @@ export const useSettingsStore = defineStore("settings", () => {
     setApplySideViewLengthToJson,
     setAutoInstallUpdates,
     recordUpdateCheck,
+    setLocale,
   };
 });

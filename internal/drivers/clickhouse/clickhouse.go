@@ -38,12 +38,12 @@ func (d *Driver) DisplayName() string { return "ClickHouse" }
 
 func (d *Driver) ConnectionSpec() []driver.Field {
 	return []driver.Field{
-		{Key: "host", Label: "Host", Type: driver.FieldText, Required: true, Default: defaultHost, Placeholder: "localhost", Group: "host_port"},
-		{Key: "port", Label: "Port", Type: driver.FieldNumber, Required: true, Default: defaultPort, Placeholder: defaultPort, Group: "host_port"},
-		{Key: "user", Label: "User", Type: driver.FieldText, Required: true, Default: defaultUser, Placeholder: defaultUser, Group: "auth"},
-		{Key: "password", Label: "Password", Type: driver.FieldPassword, Secret: true, Placeholder: "stored in keychain", Group: "auth"},
-		{Key: "database", Label: "Database", Type: driver.FieldText, Placeholder: "default", Fetchable: true},
-		{Key: "secure", Label: "TLS", Type: driver.FieldCheckbox, Default: "false"},
+		{Key: "host", LabelKey: "field.common.host", Type: driver.FieldText, Required: true, Default: defaultHost, Placeholder: "localhost", Group: "host_port"},
+		{Key: "port", LabelKey: "field.common.port", Type: driver.FieldNumber, Required: true, Default: defaultPort, Placeholder: defaultPort, Group: "host_port"},
+		{Key: "user", LabelKey: "field.common.user", Type: driver.FieldText, Required: true, Default: defaultUser, Placeholder: defaultUser, Group: "auth"},
+		{Key: "password", LabelKey: "field.common.password", Type: driver.FieldPassword, Secret: true, Placeholder: "stored in keychain", Group: "auth"},
+		{Key: "database", LabelKey: "field.common.database", Type: driver.FieldText, Placeholder: "default", Fetchable: true},
+		{Key: "secure", LabelKey: "driver.clickhouse.field.secure.label", Type: driver.FieldCheckbox, Default: "false"},
 	}
 }
 

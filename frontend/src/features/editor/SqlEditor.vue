@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { sql } from "@codemirror/lang-sql";
 import { Compartment, EditorState } from "@codemirror/state";
@@ -18,11 +19,17 @@ const emit = defineEmits<{
 
 const host = ref<HTMLDivElement | null>(null);
 const mode = useColorMode();
+const { t, locale } = useI18n();
 const themeComp = new Compartment();
+const placeholderComp = new Compartment();
 let view: EditorView | undefined;
 
 function themeExtensions() {
   return mode.value === "light" ? [] : [oneDark];
+}
+
+function placeholderExtension() {
+  return placeholder(t("query.placeholder"));
 }
 
 function runSql(): string {
@@ -50,7 +57,7 @@ function createEditor() {
         highlightActiveLine(),
         history(),
         sql(),
-        placeholder("Write SQL and press ⌘/Ctrl+Enter"),
+        placeholderComp.of(placeholderExtension()),
         keymap.of([
           ...defaultKeymap,
           ...historyKeymap,
@@ -98,6 +105,12 @@ watch(
 watch(mode, () => {
   view?.dispatch({
     effects: themeComp.reconfigure(themeExtensions()),
+  });
+});
+
+watch(locale, () => {
+  view?.dispatch({
+    effects: placeholderComp.reconfigure(placeholderExtension()),
   });
 });
 

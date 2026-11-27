@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { Events } from "@wailsio/runtime";
 import { Eye, RefreshCw, Table2 } from "@lucide/vue";
 import { toast } from "vue-sonner";
@@ -72,6 +73,7 @@ type BatchProgress = {
 type Phase = "form" | "counting" | "exporting";
 
 const connections = useConnectionsStore();
+const { t } = useI18n();
 const settings = useSettingsStore();
 const transfers = useTransfersStore();
 
@@ -184,7 +186,7 @@ const remainingLabel = computed(() => {
   if (!Number.isFinite(leftMs) || leftMs <= 0) {
     return "";
   }
-  return `~${formatDuration(leftMs)} remaining`;
+  return t("common.remaining", { duration: formatDuration(leftMs) });
 });
 
 watch(
@@ -585,11 +587,11 @@ async function startExport() {
     toast.success(
       schemaExport.value
         ? files > 1
-          ? `Exported schema to ${files} files`
-          : "Exported schema"
+          ? t("export.exportedSchemaFiles", { n: files })
+          : t("export.exportedSchema")
         : files > 1
-          ? `Exported ${formatRows(result.rows)} rows to ${files} files`
-          : `Exported ${formatRows(result.rows)} rows`,
+          ? t("export.exportedRowsFiles", { rows: formatRows(result.rows), files })
+          : t("export.exportedRows", { rows: formatRows(result.rows) }),
     );
     emit("update:open", false);
   } catch (err) {
@@ -605,7 +607,7 @@ async function startExport() {
     if (isDirNotEmptyError(err)) {
       overwriteWarn.value = true;
       phase.value = "form";
-      transfers.fail(id, "Destination is not empty");
+      transfers.fail(id, t("common.destinationNotEmpty"));
       return;
     }
     transfers.fail(id, errorMessage(err));
@@ -629,22 +631,22 @@ function cancelExport() {
   <Dialog :open="open" @update:open="onOpenChange">
     <DialogContent class="sm:max-w-lg max-h-[90vh] overflow-y-auto" :show-close-button="true">
       <DialogHeader>
-        <DialogTitle>Export</DialogTitle>
+        <DialogTitle>{{ t('export.title') }}</DialogTitle>
         <DialogDescription>
-          Choose a database and tables, then stream a SQL or CSV dump.
+          {{ t('export.batchHelp') }}
         </DialogDescription>
       </DialogHeader>
 
       <div v-if="running" class="grid gap-3 py-2">
         <div class="flex items-center gap-2 text-sm">
-          <LotusLoader class="size-4" label="Exporting" />
+          <LotusLoader class="size-4" :label="t('export.exporting')" />
           <span v-if="phase === 'counting'">
-            Preparing… Counting rows in {{ selectedTables.length }} tables…
+            {{ t('export.preparing', { n: selectedTables.length }) }}
           </span>
           <span v-else>
-            {{ progress.totalRows === 0 && progress.tableIndex === 0 ? "Starting…" : "Exporting…" }}
+            {{ progress.totalRows === 0 && progress.tableIndex === 0 ? t('common.starting') : t('common.exporting') }}
             <template v-if="progress.tableTotal">
-              · table {{ progress.tableIndex || 1 }} of {{ progress.tableTotal }}
+              · {{ t('export.tableProgress', { index: progress.tableIndex || 1, total: progress.tableTotal }) }}
               <template v-if="progress.tableName"> ({{ progress.tableName }})</template>
             </template>
           </span>
@@ -655,15 +657,15 @@ function cancelExport() {
         <p class="text-muted-foreground text-sm">
           {{ percent }}%
           ·
-          <template v-if="schemaExport">Schema</template>
+          <template v-if="schemaExport">{{ t('common.schema') }}</template>
           <template v-else-if="countedTotal != null">
-            {{ formatRows(progress.totalRows) }} / {{ formatRows(countedTotal) }} rows
+            {{ t('common.rowsOf', { rows: formatRows(progress.totalRows), total: formatRows(countedTotal) }) }}
           </template>
-          <template v-else>{{ formatRows(progress.totalRows) }} rows</template>
+          <template v-else>{{ t('common.rows', { n: formatRows(progress.totalRows) }) }}</template>
           · {{ formatBytes(progress.totalBytes) }}
         </p>
         <p class="text-muted-foreground text-sm">
-          Elapsed: {{ formatDuration(elapsedMs) }}
+          {{ t('common.elapsed', { duration: formatDuration(elapsedMs) }) }}
           <template v-if="remainingLabel"> · {{ remainingLabel }}</template>
         </p>
         <pre
@@ -674,10 +676,10 @@ function cancelExport() {
 
       <div v-else class="grid gap-3">
         <div class="grid gap-1.5">
-          <Label>Connection</Label>
+          <Label>{{ t('export.connection') }}</Label>
           <Select :model-value="profileId" @update:model-value="(v) => onProfileChange(String(v ?? ''))">
             <SelectTrigger class="w-full">
-              <SelectValue placeholder="Select connection" />
+              <SelectValue :placeholder="t('export.selectConnection')" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem v-for="profile in connections.profiles" :key="profile.id" :value="profile.id">
@@ -688,14 +690,14 @@ function cancelExport() {
         </div>
 
         <div class="grid gap-1.5">
-          <Label>Database</Label>
+          <Label>{{ t('common.database') }}</Label>
           <div class="flex items-center gap-1.5">
             <DatabaseCombobox
               class="h-8 min-w-0 flex-1"
               :model-value="database"
               :options="databases"
               :disabled="!profileId || loadingDbs"
-              placeholder="Select database"
+              :placeholder="t('connections.selectDatabasePlaceholder')"
               @update:model-value="onDatabaseChange"
             />
             <Button
@@ -703,7 +705,7 @@ function cancelExport() {
               size="icon-sm"
               variant="outline"
               :disabled="!profileId || loadingDbs"
-              title="Reload databases"
+              :title="t('connections.reloadDatabases')"
               @click="profileId && loadDatabases(profileId, database)"
             >
               <RefreshCw :class="loadingDbs ? 'size-3.5 animate-spin' : 'size-3.5'" />
@@ -713,7 +715,7 @@ function cancelExport() {
         </div>
 
         <div class="flex items-center justify-between gap-4">
-          <Label for="export-full-db">Export full database</Label>
+          <Label for="export-full-db">{{ t('export.fullDatabase') }}</Label>
           <Switch
             id="export-full-db"
             :model-value="exportFull"
@@ -721,13 +723,13 @@ function cancelExport() {
             @update:model-value="(v) => (exportFull = v === true)"
           />
         </div>
-        <p v-if="exportFull && loadingTables" class="text-muted-foreground text-xs">Loading tables…</p>
+        <p v-if="exportFull && loadingTables" class="text-muted-foreground text-xs">{{ t('connections.loadingTables') }}</p>
         <p v-else-if="exportFull && tableError" class="text-destructive text-xs">{{ tableError }}</p>
         <p v-else-if="exportFull && database && tables.length === 0 && !loadingTables" class="text-muted-foreground text-xs">
-          No tables in this database.
+          {{ t('export.noTablesInDb') }}
         </p>
         <p v-if="schemaExport && tables.some((table) => table.type === 'view')" class="text-muted-foreground text-xs">
-          Views are not included in a schema export.
+          {{ t('export.viewsExcluded') }}
         </p>
 
         <div v-if="!exportFull" class="grid gap-1.5">
@@ -737,17 +739,17 @@ function cancelExport() {
               :disabled="choosableTables.length === 0"
               @update:model-value="() => toggleFiltered(!allFilteredSelected)"
             />
-            <Label class="font-normal">Tables</Label>
+            <Label class="font-normal">{{ t('export.tables') }}</Label>
             <span class="text-muted-foreground text-xs">
-              {{ selectedTables.length }} selected
+              {{ t('common.selected', { n: selectedTables.length }) }}
             </span>
           </div>
-          <Input v-model="tableQuery" placeholder="Filter tables…" />
-          <p v-if="loadingTables" class="text-muted-foreground text-xs">Loading tables…</p>
+          <Input v-model="tableQuery" :placeholder="t('connections.filterTables')" />
+          <p v-if="loadingTables" class="text-muted-foreground text-xs">{{ t('connections.loadingTables') }}</p>
           <p v-else-if="tableError" class="text-destructive text-xs">{{ tableError }}</p>
-          <p v-else-if="tables.length === 0" class="text-muted-foreground text-xs">No tables.</p>
+          <p v-else-if="tables.length === 0" class="text-muted-foreground text-xs">{{ t('connections.noTablesShort') }}</p>
           <p v-else-if="filteredTables.length === 0" class="text-muted-foreground text-xs">
-            No matching tables.
+            {{ t('connections.noMatchingTables') }}
           </p>
           <div v-else class="max-h-48 overflow-auto rounded-md border p-1">
             <label
@@ -793,16 +795,16 @@ function cancelExport() {
 
       <DialogFooter>
         <Button v-if="running" type="button" variant="ghost" @click="emit('update:open', false)">
-          Close
+          {{ t('common.close') }}
         </Button>
         <Button v-if="running" type="button" variant="outline" @click="cancelExport">
-          Cancel export
+          {{ t('export.cancel') }}
         </Button>
         <Button v-else type="button" variant="outline" @click="emit('update:open', false)">
-          Close
+          {{ t('common.close') }}
         </Button>
         <Button v-if="!running" type="button" :disabled="!canExport" @click="startExport">
-          {{ overwriteWarn ? "Overwrite and export" : "Export" }}
+          {{ overwriteWarn ? t('export.overwrite') : t('export.title') }}
         </Button>
       </DialogFooter>
     </DialogContent>

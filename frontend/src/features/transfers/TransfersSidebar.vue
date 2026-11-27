@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useRoute } from "vue-router";
+import { useI18n } from "vue-i18n";
 import {
   Sidebar,
   SidebarContent,
@@ -13,6 +14,7 @@ import {
 } from "@/components/ui/sidebar";
 
 const route = useRoute();
+const { t } = useI18n();
 </script>
 
 <template>
@@ -20,7 +22,7 @@ const route = useRoute();
     <SidebarHeader>
       <div class="h-12 -m-2 flex items-center p-2">
         <div class="text-sm font-medium px-2 py-1">
-          Transfers
+          {{ t('nav.transfers') }}
         </div>
       </div>
     </SidebarHeader>
@@ -33,7 +35,7 @@ const route = useRoute();
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton as-child :is-active="route.path === '/transfers'">
-                <RouterLink to="/transfers">Exports</RouterLink>
+                <RouterLink to="/transfers">{{ t('transfers.exports') }}</RouterLink>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>

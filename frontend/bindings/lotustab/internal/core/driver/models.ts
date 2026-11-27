@@ -104,7 +104,7 @@ export interface DriverInfo {
  */
 export interface Field {
     "key": string;
-    "label": string;
+    "labelKey": string;
     "type": FieldType;
     "required": boolean;
     "secret": boolean;
@@ -135,7 +135,7 @@ export enum FieldType {
  * Option is a selectable value for FieldSelect.
  */
 export interface Option {
-    "label": string;
+    "labelKey": string;
     "value": string;
 }
 

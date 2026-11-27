@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import {
   Item,
   ItemActions,
@@ -11,6 +12,8 @@ import {
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import SshHopFields from "@/features/connections/SshHopFields.vue";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   params: Record<string, string>;
@@ -36,7 +39,7 @@ const jumpEnabled = computed({
   <Item variant="outline" class="bg-muted/50">
     <ItemContent>
       <ItemTitle>
-        <Label for="ssh-enabled">SSH tunnel</Label>
+        <Label for="ssh-enabled">{{ t('ssh.tunnel') }}</Label>
       </ItemTitle>
     </ItemContent>
     <ItemActions>
@@ -49,7 +52,7 @@ const jumpEnabled = computed({
       </div>
       <ItemSeparator />
       <ItemFooter>
-        <Label for="ssh-jump-enabled">Jump host</Label>
+        <Label for="ssh-jump-enabled">{{ t('ssh.jumpHost') }}</Label>
         <Switch
           id="ssh-jump-enabled"
           :model-value="jumpEnabled"

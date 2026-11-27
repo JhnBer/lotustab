@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { RefreshCw } from "@lucide/vue";
 import { toast } from "vue-sonner";
 import { FieldType, type Field } from "@/lib/wails";
@@ -20,6 +21,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { errorMessage } from "@/lib/errors";
+
+const { t, locale } = useI18n();
 
 const props = defineProps<{
   field: Field;
@@ -65,7 +68,7 @@ async function onFetch() {
     const names = (await props.fetchOptions()) ?? [];
     fetched.value = names;
     if (names.length === 0) {
-      toast.error("No databases found");
+      toast.error(t("connections.noDatabases"));
       return;
     }
     if (!props.modelValue && names.length === 1) {
@@ -81,15 +84,16 @@ async function onFetch() {
 
 <template>
   <div class="grid min-w-0 gap-1.5">
-    <Label :for="field.key">{{ field.label }}</Label>
+    <Label :for="field.key">{{ t(field.labelKey) }}</Label>
 
     <Select
       v-if="fieldType === FieldType.FieldSelect || fieldType === 'select'"
+      :key="locale"
       :model-value="modelValue || field.default || ''"
       @update:model-value="(v) => setValue(String(v ?? ''))"
     >
       <SelectTrigger class="w-full">
-        <SelectValue :placeholder="field.placeholder || field.label" />
+        <SelectValue :placeholder="field.placeholder || t(field.labelKey)" />
       </SelectTrigger>
       <SelectContent>
         <SelectItem
@@ -97,7 +101,7 @@ async function onFetch() {
           :key="option.value"
           :value="option.value"
         >
-          {{ option.label }}
+          {{ t(option.labelKey) }}
         </SelectItem>
       </SelectContent>
     </Select>
@@ -111,7 +115,7 @@ async function onFetch() {
         :model-value="modelValue === 'true'"
         @update:model-value="(checked) => setValue(checked === true ? 'true' : 'false')"
       />
-      <Label :for="field.key" class="font-normal">{{ field.label }}</Label>
+      <Label :for="field.key" class="font-normal">{{ t(field.labelKey) }}</Label>
     </div>
 
     <InputGroup v-else-if="field.fetchable && fetchOptions">
@@ -124,7 +128,7 @@ async function onFetch() {
             :id="field.key"
             class="h-8 w-full min-w-0 rounded-none border-0 bg-transparent shadow-none focus-visible:ring-0 dark:bg-transparent dark:hover:bg-transparent"
           >
-            <SelectValue :placeholder="field.placeholder || field.label" />
+            <SelectValue :placeholder="field.placeholder || t(field.labelKey)" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem v-for="name in selectOptions" :key="name" :value="name">
@@ -145,7 +149,7 @@ async function onFetch() {
       <InputGroupAddon align="inline-end">
         <InputGroupButton :disabled="fetching" @click="onFetch">
           <RefreshCw :class="fetching ? 'animate-spin' : undefined" />
-          {{ fetching ? "Fetching…" : "Fetch" }}
+          {{ fetching ? t("common.fetching") : t("common.fetch") }}
         </InputGroupButton>
       </InputGroupAddon>
     </InputGroup>

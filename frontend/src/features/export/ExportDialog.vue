@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { Events } from "@wailsio/runtime";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ const emit = defineEmits<{
 type Progress = { chunk: number; rows: number; bytes: number; query?: string };
 
 const settings = useSettingsStore();
+const { t } = useI18n();
 const transfers = useTransfersStore();
 
 let lastExportDir = "";
@@ -98,7 +100,7 @@ const remainingLabel = computed(() => {
   if (!Number.isFinite(leftMs) || leftMs <= 0) {
     return "";
   }
-  return `~${formatDuration(leftMs)} remaining`;
+  return t("common.remaining", { duration: formatDuration(leftMs) });
 });
 
 watch(
@@ -203,13 +205,13 @@ function parseCount(value: string, fallback: number): number {
 
 function rowsProgressLabel(): string {
   if (schemaExport.value) {
-    return "Schema";
+    return t("common.schema");
   }
   const rows = formatRows(progress.value.rows);
   if (checkedTotal.value != null) {
-    return `${rows} / ${formatRows(checkedTotal.value)} rows`;
+    return t("common.rowsOf", { rows, total: formatRows(checkedTotal.value) });
   }
-  return `${rows} rows`;
+  return t("common.rows", { n: rows });
 }
 
 async function choosePath() {
@@ -338,11 +340,11 @@ async function startExport() {
     toast.success(
       schemaExport.value
         ? files > 1
-          ? `Exported schema to ${files} files`
-          : "Exported schema"
+          ? t("export.exportedSchemaFiles", { n: files })
+          : t("export.exportedSchema")
         : files > 1
-          ? `Exported ${formatRows(result.rows)} rows to ${files} files`
-          : `Exported ${formatRows(result.rows)} rows`,
+          ? t("export.exportedRowsFiles", { rows: formatRows(result.rows), files })
+          : t("export.exportedRows", { rows: formatRows(result.rows) }),
     );
     emit("update:open", false);
   } catch (err) {
@@ -357,7 +359,7 @@ async function startExport() {
     }
     if (isDirNotEmptyError(err)) {
       overwriteWarn.value = true;
-      transfers.fail(id, "Destination is not empty");
+      transfers.fail(id, t("common.destinationNotEmpty"));
       running.value = false;
       return;
     }
@@ -381,24 +383,24 @@ function cancelExport() {
   <Dialog :open="open" @update:open="onOpenChange">
     <DialogContent class="sm:max-w-lg" :show-close-button="!running">
       <DialogHeader>
-        <DialogTitle>Export {{ target?.name ?? "table" }}</DialogTitle>
+        <DialogTitle>{{ t('export.tableTitle', { name: target?.name ?? t('export.tableFallback') }) }}</DialogTitle>
         <DialogDescription>
-          Stream rows to a SQL or CSV dump. Optionally add a WHERE condition to export a subset.
+          {{ t('export.help') }}
         </DialogDescription>
       </DialogHeader>
 
       <div v-if="running" class="grid gap-3 py-2">
         <div class="flex items-center gap-2 text-sm">
-          <LotusLoader class="size-4" label="Exporting" />
-          <span>{{ progress.rows === 0 && progress.chunk === 0 ? "Starting…" : "Exporting…" }}</span>
+          <LotusLoader class="size-4" :label="t('export.exporting')" />
+          <span>{{ progress.rows === 0 && progress.chunk === 0 ? t('common.starting') : t('common.exporting') }}</span>
         </div>
         <p class="text-muted-foreground text-sm">
-          <template v-if="schemaExport">Schema</template>
-          <template v-else>Chunk {{ progress.chunk || 1 }} · {{ rowsProgressLabel() }}</template>
+          <template v-if="schemaExport">{{ t('common.schema') }}</template>
+          <template v-else>{{ t('export.chunk', { n: progress.chunk || 1 }) }} · {{ rowsProgressLabel() }}</template>
           · {{ formatBytes(progress.bytes) }}
         </p>
         <p class="text-muted-foreground text-sm">
-          Elapsed: {{ formatDuration(elapsedMs) }}
+          {{ t('common.elapsed', { duration: formatDuration(elapsedMs) }) }}
           <template v-if="remainingLabel"> · {{ remainingLabel }}</template>
         </p>
         <pre
@@ -438,13 +440,13 @@ function cancelExport() {
 
       <DialogFooter>
         <Button v-if="running" type="button" variant="outline" @click="cancelExport">
-          Cancel
+          {{ t('common.cancel') }}
         </Button>
         <Button v-else type="button" variant="outline" @click="emit('update:open', false)">
-          Close
+          {{ t('common.close') }}
         </Button>
         <Button v-if="!running" type="button" :disabled="!canExport" @click="startExport">
-          {{ overwriteWarn ? "Overwrite and export" : "Export" }}
+          {{ overwriteWarn ? t('export.overwrite') : t('export.title') }}
         </Button>
       </DialogFooter>
     </DialogContent>

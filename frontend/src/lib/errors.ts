@@ -1,3 +1,5 @@
+import { translate } from "@/i18n";
+
 export function isCanceled(err: unknown): boolean {
   if (typeof err === "object" && err !== null) {
     if ("name" in err && (err as { name: string }).name === "CancelError") {
@@ -22,7 +24,7 @@ export function isCanceled(err: unknown): boolean {
 
 export function errorMessage(err: unknown): string {
   if (err == null) {
-    return "Unknown error";
+    return translate("common.unknownError");
   }
   if (typeof err === "string") {
     return err;

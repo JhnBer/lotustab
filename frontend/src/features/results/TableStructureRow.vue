@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { GripVertical, Undo2, X } from "@lucide/vue";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -43,6 +44,7 @@ const emit = defineEmits<{
 }>();
 
 const queries = useQueryStore();
+const { t } = useI18n();
 
 const typeChoices = computed(() => {
   const types = props.columnTypes ?? [];
@@ -58,7 +60,7 @@ const defaultPlaceholder = computed(() => {
     return "NULL";
   }
   if (props.col.defaultValue === "") {
-    return "empty string";
+    return t("common.emptyString");
   }
   return undefined;
 });
@@ -132,7 +134,7 @@ function onHandleDragStart(event: DragEvent) {
         type="button"
         draggable="true"
         class="drag-handle text-muted-foreground hover:text-foreground cursor-grab px-1 active:cursor-grabbing"
-        aria-label="Reorder column"
+        :aria-label="t('results.reorderColumn')"
         :disabled="col.dropped"
         @dragstart="onHandleDragStart"
         @dragend="emit('reorderend')"
@@ -190,7 +192,7 @@ function onHandleDragStart(event: DragEvent) {
         </ContextMenuTrigger>
         <ContextMenuContent>
           <ContextMenuItem :disabled="disabled" @select="patch({ defaultValue: null })">
-            Set NULL
+            {{ t('results.setNull') }}
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
@@ -216,7 +218,7 @@ function onHandleDragStart(event: DragEvent) {
       <Button
         size="icon-xs"
         variant="ghost"
-        :aria-label="col.dropped ? 'Restore column' : 'Drop column'"
+        :aria-label="col.dropped ? t('results.restoreColumn') : t('results.dropColumn')"
         :disabled="running"
         @click="queries.toggleDropStructureColumn(tabId, col.key)"
       >

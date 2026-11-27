@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 import { Events } from "@wailsio/runtime";
 import { toast } from "vue-sonner";
@@ -10,6 +11,7 @@ import { errorMessage } from "@/lib/errors";
 import { WindowsService } from "@/lib/wails";
 
 const route = useRoute();
+const { t } = useI18n();
 const titlebarHeight = useTitleBarHeight();
 const payload = ref<ValueInspectorPayload | null>(null);
 const returnUnavailable = ref(false);
@@ -103,7 +105,7 @@ async function returnToPanel() {
     const message = errorMessage(err);
     if (message.toLowerCase().includes("closed")) {
       returnUnavailable.value = true;
-      toast.error("Source window is closed. Nothing to return to.");
+      toast.error(t("results.sourceClosed"));
       return;
     }
     toast.error(message);
@@ -143,7 +145,7 @@ onBeforeUnmount(() => {
         v-else-if="missing"
         class="text-muted-foreground flex h-full items-center justify-center p-6 text-sm"
       >
-        No value payload. Open a cell with Open in new window.
+        {{ t('results.noPayload') }}
       </div>
     </div>
   </div>

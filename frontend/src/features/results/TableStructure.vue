@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import { Plus, RotateCw, X } from "@lucide/vue";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ const props = defineProps<{
 }>();
 
 const queries = useQueryStore();
+const { t } = useI18n();
 const connections = useConnectionsStore();
 const query = ref("");
 const confirmRefresh = ref(false);
@@ -47,8 +49,8 @@ const emptyHint = computed(() =>
   props.tab.structureError
     ? props.tab.structureError
     : searching.value
-      ? "No columns match this search."
-      : "This table has no columns.",
+      ? t("results.noColumnMatch")
+      : t("results.noColumns"),
 );
 
 const dirty = computed(() =>
@@ -56,7 +58,7 @@ const dirty = computed(() =>
 );
 
 const extraColumnWidth = computed(() => {
-  let longest = "Extra".length;
+  let longest = t("results.colExtra").length;
   for (const col of props.tab.structure?.columns ?? []) {
     longest = Math.max(longest, (col.extra ?? "").length);
   }
@@ -128,7 +130,7 @@ function rowAt(index: number): DraftColumn | undefined {
       <Button
         size="icon-xs"
         variant="outline"
-        :aria-label="running ? 'Cancel' : 'Refresh structure'"
+        :aria-label="running ? t('common.cancel') : t('results.refreshStructure')"
         @click="running ? queries.cancel(tab.id) : onRefresh()"
       >
         <X v-if="running" class="size-3.5" />
@@ -138,15 +140,15 @@ function rowAt(index: number): DraftColumn | undefined {
         size="xs"
         v-model="query"
         class="max-w-64"
-        placeholder="Search columns…"
+        :placeholder="t('results.searchColumns')"
       />
       <Spinner v-if="running" class="size-3.5 shrink-0" />
       <span class="text-muted-foreground min-w-0 flex-1 truncate text-xs">
-        <template v-if="!tab.structure?.canReorder">Column order cannot be changed on this database.</template>
+        <template v-if="!tab.structure?.canReorder">{{ t('results.orderLocked') }}</template>
       </span>
       <Button size="xs" variant="outline" :disabled="running" @click="queries.addStructureColumn(tab.id, columnTypes[0] ?? '')">
         <Plus class="size-3.5" />
-        Column
+        {{ t('results.addColumn') }}
       </Button>
     </div>
 
@@ -161,18 +163,18 @@ function rowAt(index: number): DraftColumn | undefined {
         <div class="w-max min-w-full text-sm">
           <div class="bg-background sticky top-0 z-10 flex border-b" role="row">
             <div class="h-9 w-8 shrink-0" />
-            <div class="text-foreground flex h-9 min-w-40 flex-1 items-center px-2 font-medium">Name</div>
-            <div class="text-foreground flex h-9 w-48 shrink-0 items-center px-2 font-medium">Type</div>
-            <div v-if="driverId !== 'clickhouse'" class="text-foreground flex h-9 w-20 shrink-0 items-center justify-center px-2 font-medium">Null</div>
-            <div class="text-foreground flex h-9 min-w-36 flex-1 items-center px-2 font-medium">Default</div>
-            <div class="text-foreground flex h-9 w-20 shrink-0 items-center justify-center px-2 font-medium">Primary</div>
+            <div class="text-foreground flex h-9 min-w-40 flex-1 items-center px-2 font-medium">{{ t('results.colName') }}</div>
+            <div class="text-foreground flex h-9 w-48 shrink-0 items-center px-2 font-medium">{{ t('results.colType') }}</div>
+            <div v-if="driverId !== 'clickhouse'" class="text-foreground flex h-9 w-20 shrink-0 items-center justify-center px-2 font-medium">{{ t('results.colNull') }}</div>
+            <div class="text-foreground flex h-9 min-w-36 flex-1 items-center px-2 font-medium">{{ t('results.colDefault') }}</div>
+            <div class="text-foreground flex h-9 w-20 shrink-0 items-center justify-center px-2 font-medium">{{ t('results.colPrimary') }}</div>
             <div
               class="text-foreground flex h-9 shrink-0 items-center px-2 font-medium"
               :style="{ width: extraColumnWidth }"
             >
-              Extra
+              {{ t('results.colExtra') }}
             </div>
-            <div class="text-foreground flex h-9 min-w-36 flex-1 items-center px-2 font-medium">Comment</div>
+            <div class="text-foreground flex h-9 min-w-36 flex-1 items-center px-2 font-medium">{{ t('results.colComment') }}</div>
             <div class="h-9 w-10 shrink-0" />
           </div>
           <div v-if="visible.length === 0" class="text-muted-foreground px-3 py-8 text-center text-sm">
@@ -208,14 +210,14 @@ function rowAt(index: number): DraftColumn | undefined {
     <Dialog :open="confirmRefresh" @update:open="confirmRefresh = $event">
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Discard structure changes?</DialogTitle>
+          <DialogTitle>{{ t('results.discardTitle') }}</DialogTitle>
           <DialogDescription>
-            Refreshing will drop unsaved column changes.
+            {{ t('results.discardHelp') }}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button variant="outline" @click="confirmRefresh = false">Cancel</Button>
-          <Button @click="confirmAndRefresh">Refresh</Button>
+          <Button variant="outline" @click="confirmRefresh = false">{{ t('common.cancel') }}</Button>
+          <Button @click="confirmAndRefresh">{{ t('common.refresh') }}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

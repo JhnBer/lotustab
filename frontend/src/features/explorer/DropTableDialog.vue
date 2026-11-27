@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { Copy } from "@lucide/vue";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { writeClipboard } from "@/composables/useClipboardText";
 import { errorMessage } from "@/lib/errors";
 import { QueryService, type TableRef } from "@/lib/wails";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   open: boolean;
@@ -47,7 +50,7 @@ async function copyName() {
     return;
   }
   if (!(await writeClipboard(name.value))) {
-    toast.error("Could not copy to clipboard");
+    toast.error(t("common.copyFailed"));
   }
 }
 
@@ -72,9 +75,9 @@ async function drop() {
   <Dialog :open="open" @update:open="emit('update:open', $event)">
     <DialogContent>
       <DialogHeader>
-        <DialogTitle>Drop table</DialogTitle>
+        <DialogTitle>{{ t('connections.dropTable') }}</DialogTitle>
         <DialogDescription>
-          This permanently deletes the table.
+          {{ t('connections.dropTableHelp') }}
         </DialogDescription>
       </DialogHeader>
       <div class="flex items-center gap-1">
@@ -83,8 +86,8 @@ async function drop() {
           size="icon-xs"
           variant="ghost"
           class="shrink-0"
-          title="Copy"
-          aria-label="Copy"
+          :title="t('common.copy')"
+          :aria-label="t('common.copy')"
           @click="copyName"
         >
           <Copy class="size-3.5" />
@@ -93,15 +96,15 @@ async function drop() {
       <Input
         v-model="typed"
         autofocus
-        placeholder="Type the table name"
+        :placeholder="t('connections.typeTableName')"
         @keydown.enter.prevent="drop"
       />
       <DialogFooter>
         <Button variant="outline" :disabled="dropping" @click="emit('update:open', false)">
-          Cancel
+          {{ t('common.cancel') }}
         </Button>
         <Button variant="destructive" :disabled="!confirmed || dropping" @click="drop">
-          Delete
+          {{ t('common.delete') }}
         </Button>
       </DialogFooter>
     </DialogContent>

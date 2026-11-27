@@ -18,14 +18,14 @@ const (
 
 // Option is a selectable value for FieldSelect.
 type Option struct {
-	Label string `json:"label"`
-	Value string `json:"value"`
+	LabelKey string `json:"labelKey"`
+	Value    string `json:"value"`
 }
 
 // Field is a declarative connection-form field advertised by a driver.
 type Field struct {
 	Key         string    `json:"key"`
-	Label       string    `json:"label"`
+	LabelKey    string    `json:"labelKey"`
 	Type        FieldType `json:"type"`
 	Required    bool      `json:"required"`
 	Secret      bool      `json:"secret"`

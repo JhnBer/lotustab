@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -37,6 +38,8 @@ import {
 import { statementLabel, type CopyableResult } from "@/features/results/copyResults";
 import { errorMessage, isCanceled } from "@/lib/errors";
 import { ExportService, type SaveResultItem, type SaveResultSetsRequest } from "@/lib/wails";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   open: boolean;
@@ -222,7 +225,7 @@ async function save() {
     const files = result?.files?.length ?? 0;
     const rows = result?.rows ?? 0;
     toast.success(
-      files > 1 ? `Saved ${rows} rows to ${files} files` : `Saved ${rows} rows`,
+      files > 1 ? t("results.savedFiles", { rows, files }) : t("results.saved", { rows }),
     );
     emit("update:open", false);
   } catch (err) {
@@ -244,18 +247,18 @@ async function save() {
   <Dialog :open="open" @update:open="onOpenChange">
     <DialogContent class="sm:max-w-lg max-h-[90vh] overflow-y-auto" :show-close-button="true">
       <DialogHeader>
-        <DialogTitle>Save results</DialogTitle>
+        <DialogTitle>{{ t('results.saveTitle') }}</DialogTitle>
         <DialogDescription>
-          Write the current query results as SQL inserts or JSON.
+          {{ t('results.saveHelp') }}
         </DialogDescription>
       </DialogHeader>
 
       <div class="grid gap-3">
         <div class="grid gap-1.5">
-          <Label>Format</Label>
+          <Label>{{ t('results.format') }}</Label>
           <Select :model-value="format" @update:model-value="(v) => (format = String(v ?? 'sql'))">
             <SelectTrigger class="w-full">
-              <SelectValue placeholder="Format" />
+              <SelectValue :placeholder="t('results.format')" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="sql">SQL</SelectItem>
@@ -270,9 +273,9 @@ async function save() {
               :model-value="allSelected ? true : someSelected ? 'indeterminate' : false"
               @update:model-value="() => toggleFiltered(!allSelected)"
             />
-            <Label class="font-normal">Results</Label>
+            <Label class="font-normal">{{ t('results.results') }}</Label>
             <span class="text-muted-foreground text-xs">
-              {{ selectedSets.length }} selected
+              {{ t('common.selected', { n: selectedSets.length }) }}
             </span>
           </div>
           <div class="max-h-48 overflow-auto rounded-md border p-1">
@@ -295,7 +298,7 @@ async function save() {
 
         <template v-if="format === 'sql'">
           <div v-if="multi" class="flex items-center justify-between gap-4">
-            <Label for="save-separate-tables">Insert into separate tables</Label>
+            <Label for="save-separate-tables">{{ t('results.separateTables') }}</Label>
             <Switch
               id="save-separate-tables"
               :model-value="separateTables"
@@ -303,7 +306,7 @@ async function save() {
             />
           </div>
           <div v-if="multi && separateTables" class="grid gap-1.5">
-            <Label>Table names</Label>
+            <Label>{{ t('results.tableNames') }}</Label>
             <div class="max-h-48 space-y-1.5 overflow-auto rounded-md border p-2">
               <div
                 v-for="item in selectedSets"
@@ -325,7 +328,7 @@ async function save() {
             </div>
           </div>
           <div v-else class="grid gap-1.5">
-            <Label for="save-table-name">Table name</Label>
+            <Label for="save-table-name">{{ t('results.tableName') }}</Label>
             <Input
               id="save-table-name"
               v-model="tableName"
@@ -336,7 +339,7 @@ async function save() {
         </template>
 
         <div v-if="multi && selectedSets.length > 1" class="flex items-center justify-between gap-4">
-          <Label for="save-single-file">Single file</Label>
+          <Label for="save-single-file">{{ t('results.singleFile') }}</Label>
           <Switch
             id="save-single-file"
             :model-value="singleFile"
@@ -345,7 +348,7 @@ async function save() {
         </div>
 
         <div v-if="folderMode" class="grid gap-1.5">
-          <Label for="save-foldername">Folder name</Label>
+          <Label for="save-foldername">{{ t('results.folderName') }}</Label>
           <Input
             id="save-foldername"
             v-model="folderName"
@@ -353,11 +356,11 @@ async function save() {
             spellcheck="false"
           />
           <p class="text-muted-foreground text-xs">
-            Each result is saved as a separate file.
+            {{ t('results.separateFiles') }}
           </p>
         </div>
         <div v-else class="grid gap-1.5">
-          <Label for="save-filename">Filename</Label>
+          <Label for="save-filename">{{ t('results.filename') }}</Label>
           <Input
             id="save-filename"
             v-model="fileName"
@@ -367,35 +370,35 @@ async function save() {
         </div>
 
         <div class="grid gap-1.5">
-          <Label for="save-path">Path</Label>
+          <Label for="save-path">{{ t('results.path') }}</Label>
           <InputGroup>
             <InputGroupInput
               id="save-path"
               v-model="outputDir"
-              placeholder="Choose a folder…"
+              :placeholder="t('export.chooseFolder')"
               spellcheck="false"
             />
             <InputGroupAddon align="inline-end">
               <InputGroupButton :disabled="browsing" @click="choosePath">
                 <Spinner v-if="browsing" class="size-3.5" />
-                Browse…
+                {{ t('common.browse') }}
               </InputGroupButton>
             </InputGroupAddon>
           </InputGroup>
         </div>
 
         <p v-if="overwriteWarn" class="text-destructive text-xs">
-          Files in this destination will be overwritten.
+          {{ t('common.overwriteFiles') }}
         </p>
       </div>
 
       <DialogFooter>
         <Button type="button" variant="outline" :disabled="saving" @click="emit('update:open', false)">
-          Close
+          {{ t('common.close') }}
         </Button>
         <Button type="button" :disabled="!canSave" @click="save">
           <Spinner v-if="saving" class="size-3.5" />
-          {{ overwriteWarn ? "Overwrite and save" : "Save" }}
+          {{ overwriteWarn ? t('results.overwriteSave') : t('common.save') }}
         </Button>
       </DialogFooter>
     </DialogContent>

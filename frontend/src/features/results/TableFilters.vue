@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { X } from "@lucide/vue";
+import { useI18n } from "vue-i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -16,6 +17,8 @@ import {
   valuePlaceholder,
   type TableFilter,
 } from "@/features/results/filters";
+
+const { t } = useI18n();
 
 const props = defineProps<{
   filters: TableFilter[];
@@ -72,7 +75,7 @@ function remove(index: number) {
         @update:model-value="patch(index, { column: String($event ?? '') })"
       >
         <SelectTrigger size="sm" class="h-7 w-36">
-          <SelectValue placeholder="Column" />
+          <SelectValue :placeholder="t('results.column')" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem v-for="column in columns" :key="column.name" :value="column.name">
@@ -106,7 +109,7 @@ function remove(index: number) {
         size="icon-xs"
         variant="ghost"
         :disabled="disabled"
-        aria-label="Remove filter"
+        :aria-label="t('results.removeFilter')"
         @click="remove(index)"
       >
         <X />

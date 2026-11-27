@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { ChevronDown } from "@lucide/vue";
 import {
   PopoverContent,
@@ -11,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 
 const CAP = 200;
+const { t } = useI18n();
 
 const props = withDefaults(
   defineProps<{
@@ -23,11 +25,14 @@ const props = withDefaults(
     class?: string;
   }>(),
   {
-    placeholder: "Select database",
-    noneLabel: "None",
+    placeholder: "",
+    noneLabel: "",
     disabled: false,
   },
 );
+
+const placeholderText = computed(() => props.placeholder || t("connections.selectDatabasePlaceholder"));
+const noneText = computed(() => props.noneLabel || t("common.none"));
 
 const emit = defineEmits<{
   "update:modelValue": [value: string];
@@ -61,7 +66,7 @@ const filtered = computed(() => {
 
 const display = computed(() => {
   if (props.noneValue && (!props.modelValue || props.modelValue === props.noneValue)) {
-    return props.noneLabel;
+    return noneText.value;
   }
   return props.modelValue || "";
 });
@@ -97,7 +102,7 @@ function onOpen(value: boolean) {
         )"
       >
         <span class="min-w-0 flex-1 truncate text-left" :class="display ? '' : 'text-muted-foreground'">
-          {{ display || placeholder }}
+          {{ display || placeholderText }}
         </span>
         <ChevronDown class="text-muted-foreground size-4 shrink-0 pointer-events-none" />
       </button>
@@ -114,7 +119,7 @@ function onOpen(value: boolean) {
         <div class="p-1">
           <Input
             v-model="filter"
-            placeholder="Filter databases…"
+            :placeholder="t('connections.filterDatabases')"
             class="h-7"
             @keydown.esc="open = false"
           />
@@ -126,7 +131,7 @@ function onOpen(value: boolean) {
             class="focus:bg-accent focus:text-accent-foreground gap-1.5 rounded-md py-1 pr-2 pl-1.5 text-sm relative flex w-full cursor-default items-center outline-hidden select-none"
             @click="select(noneValue)"
           >
-            {{ noneLabel }}
+            {{ noneText }}
           </button>
           <button
             v-for="name in filtered.items"
@@ -139,10 +144,10 @@ function onOpen(value: boolean) {
             <span class="truncate">{{ name }}</span>
           </button>
           <p v-if="filtered.items.length === 0" class="text-muted-foreground px-1.5 py-1 text-xs">
-            No matching databases.
+            {{ t('connections.noMatchingDatabases') }}
           </p>
           <p v-else-if="filtered.extra > 0" class="text-muted-foreground px-1.5 py-1 text-xs">
-            {{ filtered.extra }} more. Use search.
+            {{ t('connections.moreDatabases', { n: filtered.extra }) }}
           </p>
         </div>
       </PopoverContent>

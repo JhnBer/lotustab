@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { Play, Plug } from "@lucide/vue";
 import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ import { isQueryTab, isTableTab, useQueryStore, type QueryTab, type TableTab } f
 import { useSettingsStore } from "@/stores/settings";
 
 const NONE = "__none__";
+const { t } = useI18n();
 
 const connections = useConnectionsStore();
 const queries = useQueryStore();
@@ -63,7 +65,7 @@ function queryPager(tab: QueryTab) {
     if (result.affectedKnown) {
       return {
         compact: true,
-        label: `${result.rowsAffected} affected · ${result.durationMs} ms`,
+        label: t("common.affectedDuration", { affected: result.rowsAffected, ms: result.durationMs }),
         durationMs: undefined as number | undefined,
         rowCount: 0,
         truncated: result.truncated,
@@ -72,7 +74,7 @@ function queryPager(tab: QueryTab) {
     }
     return {
       compact: true,
-      label: `${result.durationMs} ms`,
+      label: t("common.durationMs", { n: result.durationMs }),
       durationMs: undefined as number | undefined,
       rowCount: 0,
       truncated: result.truncated,
@@ -90,10 +92,11 @@ function queryPager(tab: QueryTab) {
     };
   }
   const n = result.rows?.length ?? 0;
-  const trunc = result.truncated ? " (truncated)" : "";
+  const rows = n === 1 ? t("common.rowOne", { n }) : t("common.rowMany", { n });
+  const shown = result.truncated ? `${rows} ${t("common.truncated")}` : rows;
   return {
     compact: true,
-    label: `${n} row${n === 1 ? "" : "s"}${trunc} · ${result.durationMs} ms`,
+    label: t("common.rowsDuration", { rows: shown, ms: result.durationMs }),
     durationMs: undefined as number | undefined,
     rowCount: n,
     truncated: result.truncated,
@@ -176,17 +179,17 @@ function onDatabase(tabId: string, value: string) {
       v-if="connecting"
       class="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-2 p-8 text-sm"
     >
-      <LotusLoader class="size-8" label="Connecting" />
-      <span>Connecting…</span>
+      <LotusLoader class="size-8" :label="t('query.connecting')" />
+      <span>{{ t('common.connecting') }}</span>
     </div>
 
     <div
       v-else-if="!connections.selectedId"
       class="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-2 p-8 text-sm"
     >
-      <span>Select a connection to start querying.</span>
+      <span>{{ t('query.selectConnection') }}</span>
       <RouterLink to="/connections" class="text-foreground hover:underline">
-        Open connections
+        {{ t('query.openConnections') }}
       </RouterLink>
     </div>
 
@@ -194,10 +197,10 @@ function onDatabase(tabId: string, value: string) {
       v-else-if="selectedOffline && !queries.activeTab"
       class="text-muted-foreground flex flex-1 flex-col items-center justify-center gap-3 p-8 text-sm"
     >
-      <span>Connect this database to start querying.</span>
+      <span>{{ t('query.connectToQuery') }}</span>
       <Button size="sm" @click="connectSelected">
         <Plug class="size-3.5" />
-        Connect
+        {{ t('common.connect') }}
       </Button>
     </div>
 
@@ -227,8 +230,8 @@ function onDatabase(tabId: string, value: string) {
                 :model-value="tab.database || NONE"
                 :options="explorer.databases"
                 :none-value="NONE"
-                none-label="None"
-                placeholder="Database"
+                :none-label="t('common.none')"
+                :placeholder="t('query.databasePlaceholder')"
                 :disabled="!settings.enableDatabaseChoice"
                 @update:model-value="onDatabase(tab.id, $event)"
               />
@@ -241,14 +244,14 @@ function onDatabase(tabId: string, value: string) {
                   :model-value="settings.enableDatabaseChoice"
                   @update:model-value="settings.setEnableDatabaseChoice(Boolean($event))"
                 />
-                Enable database choice
+                {{ t('query.enableChoice') }}
               </Label>
               <span class="text-muted-foreground min-w-0 flex-1 truncate">
                 <template v-if="settings.enableDatabaseChoice">
-                  You can choose a database here or specify it in the query.
+                  {{ t('query.choiceOn') }}
                 </template>
                 <template v-else>
-                  Specify the database in the query.
+                  {{ t('query.choiceOff') }}
                 </template>
               </span>
             </template>
@@ -260,12 +263,12 @@ function onDatabase(tabId: string, value: string) {
               class="shrink-0"
               @click="queries.cancel(tab.id)"
             >
-              Cancel
+              {{ t('common.cancel') }}
             </Button>
             <Button size="sm" class="shrink-0" :disabled="tab.running" @click="run()">
-              <LotusLoader v-if="tab.running" class="size-3.5" label="Running query" />
+              <LotusLoader v-if="tab.running" class="size-3.5" :label="t('query.running')" />
               <Play v-else class="size-3.5" />
-              Run
+              {{ t('common.run') }}
             </Button>
           </div>
           <SqlEditor
@@ -315,7 +318,7 @@ function onDatabase(tabId: string, value: string) {
           v-if="queries.coldMountId && queries.coldMountId === queries.activeTabId"
           class="absolute inset-0 z-10 flex items-center justify-center bg-background/60"
         >
-          <LotusLoader class="size-8" label="Loading tab" />
+          <LotusLoader class="size-8" :label="t('query.loadingTab')" />
         </div>
       </div>
     </template>

@@ -1,10 +1,10 @@
 export const WORKSPACE_SHORTCUTS = [
-  { id: "tab.next", label: "Next tab", key: "Tab", shift: false },
-  { id: "tab.prev", label: "Previous tab", key: "Tab", shift: true },
-  { id: "tab.close", label: "Close tab", key: "W", shift: false },
-  { id: "tab.reload", label: "Reload table", key: "R", shift: false },
-  { id: "tab.new", label: "New query tab", key: "T", shift: false },
-  { id: "window.new", label: "New window", key: "N", shift: false },
+  { id: "tab.next", labelKey: "shortcuts.nextTab", key: "Tab", shift: false },
+  { id: "tab.prev", labelKey: "shortcuts.prevTab", key: "Tab", shift: true },
+  { id: "tab.close", labelKey: "shortcuts.closeTab", key: "W", shift: false },
+  { id: "tab.reload", labelKey: "shortcuts.reloadTable", key: "R", shift: false },
+  { id: "tab.new", labelKey: "shortcuts.newQueryTab", key: "T", shift: false },
+  { id: "window.new", labelKey: "shortcuts.newWindow", key: "N", shift: false },
 ] as const;
 
 export type ShortcutId = (typeof WORKSPACE_SHORTCUTS)[number]["id"];

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
 import { Browser } from "@wailsio/runtime";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +24,7 @@ const githubURL = "https://github.com/JhnBer/lotustab";
 const licenseURL = "https://github.com/JhnBer/lotustab/blob/main/LICENSE";
 
 const settings = useSettingsStore();
+const { t } = useI18n();
 const updates = useUpdatesStore();
 
 const versionLine = computed(() => {
@@ -69,7 +71,7 @@ function formatSize(bytes: number): string {
 <template>
   <div class="h-full overflow-y-auto">
   <section class="mx-auto flex w-full max-w-lg flex-col gap-8 px-4 py-4">
-    <h1 class="text-lg font-medium">About</h1>
+    <h1 class="text-lg font-medium">{{ t('about.title') }}</h1>
 
     <div class="flex flex-col items-center gap-1.5">
       <img :src="logoSrc" alt="" width="64" height="64" class="size-16" />
@@ -80,24 +82,24 @@ function formatSize(bytes: number): string {
           :href="githubURL"
           class="hover:text-foreground underline-offset-4 hover:underline"
           @click.prevent="openExternal(githubURL)"
-        >GitHub</a>
+        >{{ t('about.github') }}</a>
         <span class="px-1.5">·</span>
         <a
           :href="licenseURL"
           class="hover:text-foreground underline-offset-4 hover:underline"
           @click.prevent="openExternal(licenseURL)"
-        >GPL-3.0 license</a>
+        >{{ t('about.license') }}</a>
       </p>
     </div>
 
     <Item variant="outline" class="min-w-0">
       <ItemHeader>
-        <ItemTitle>Software update</ItemTitle>
+        <ItemTitle>{{ t('about.softwareUpdate') }}</ItemTitle>
       </ItemHeader>
 
       <ItemContent class="w-full min-w-0">
         <p class="text-muted-foreground text-sm">
-          Last checked: {{ updates.lastCheckedLabel }}
+          {{ t('about.lastChecked', { when: updates.lastCheckedLabel }) }}
         </p>
         <Button
           size="xs"
@@ -106,21 +108,21 @@ function formatSize(bytes: number): string {
           :disabled="checkDisabled"
           @click="updates.check('manual')"
         >
-          Check for updates
+          {{ t('about.check') }}
         </Button>
 
         <p
           v-if="updates.phase === 'idle' && settings.lastUpdateCheckAt"
           class="text-muted-foreground mt-2 text-xs"
         >
-          LotusTab is up to date.
+          {{ t('about.upToDate') }}
         </p>
         <p v-else-if="updates.phase === 'checking'" class="text-muted-foreground mt-2 text-xs">
-          Checking for updates…
+          {{ t('about.checking') }}
         </p>
         <div v-else-if="updates.available && updates.phase === 'available'" class="mt-2 flex flex-col gap-1">
           <p class="text-sm">
-            Version {{ updates.available.version }} is available
+            {{ t('about.versionAvailable', { version: updates.available.version }) }}
             <span v-if="formatSize(updates.available.size)" class="text-muted-foreground">
               ({{ formatSize(updates.available.size) }})
             </span>
@@ -134,7 +136,7 @@ function formatSize(bytes: number): string {
         </div>
         <div v-else-if="updates.phase === 'downloading'" class="mt-2 flex flex-col gap-2">
           <p class="text-muted-foreground text-xs">
-            Downloading{{ updates.available?.version ? ` ${updates.available.version}` : "" }}…
+            {{ t('about.downloading', { version: updates.available?.version ? ` ${updates.available.version}` : '' }) }}
             <span v-if="updates.progressPercent">{{ updates.progressPercent }}%</span>
           </p>
           <div class="bg-muted h-1.5 overflow-hidden rounded-full">
@@ -145,11 +147,10 @@ function formatSize(bytes: number): string {
           </div>
         </div>
         <p v-else-if="updates.phase === 'ready'" class="mt-2 text-sm">
-          Update{{ updates.available?.version ? ` ${updates.available.version}` : "" }} is downloaded.
-          It applies the next time LotusTab starts, including if you quit and open it again.
+          {{ t('about.ready', { version: updates.available?.version ? ` ${updates.available.version}` : '' }) }}
         </p>
         <p v-else-if="updates.phase === 'error'" class="text-destructive mt-2 text-xs">
-          {{ updates.error || "Update failed" }}
+          {{ updates.error || t('about.failed') }}
         </p>
       </ItemContent>
 
@@ -158,9 +159,9 @@ function formatSize(bytes: number): string {
       <ItemContent class="w-full min-w-0">
         <div class="flex items-center justify-between gap-4">
           <div class="min-w-0">
-            <Label for="about-auto-install">Install updates automatically</Label>
+            <Label for="about-auto-install">{{ t('about.autoInstall') }}</Label>
             <p class="text-muted-foreground mt-1 text-xs">
-              Checks hourly and downloads in the background. The update applies the next time the app starts.
+              {{ t('about.autoInstallHelp') }}
             </p>
           </div>
           <Switch
@@ -174,10 +175,10 @@ function formatSize(bytes: number): string {
       <ItemFooter v-if="showInstallActions || updates.info.updateError" class="flex-wrap justify-start">
         <template v-if="updates.phase === 'available'">
           <Button size="sm" :disabled="updates.busy" @click="updates.installAndRestart()">
-            Install and restart immediately
+            {{ t('about.installNow') }}
           </Button>
           <Button size="sm" variant="outline" :disabled="updates.busy" @click="updates.installLater()">
-            Install and restart later
+            {{ t('about.installLater') }}
           </Button>
         </template>
         <Button
@@ -186,7 +187,7 @@ function formatSize(bytes: number): string {
           :disabled="updates.busy"
           @click="updates.restartNow()"
         >
-          Restart now
+          {{ t('about.restartNow') }}
         </Button>
       </ItemFooter>
     </Item>
