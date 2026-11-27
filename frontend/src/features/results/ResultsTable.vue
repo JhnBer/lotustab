@@ -4,7 +4,7 @@ import { useI18n } from "vue-i18n";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import { ArrowDown, ArrowUp, ArrowUpDown } from "@lucide/vue";
 import { Events, Window } from "@wailsio/runtime";
-import { toast } from "vue-sonner";
+import { toast } from "@/lib/toast";
 import { Spinner } from "@/components/ui/spinner";
 import LotusLoader from "@/components/LotusLoader.vue";
 import type { QueryResult } from "@/lib/wails";
@@ -636,7 +636,7 @@ async function openInspectorWindow() {
     );
     inspector.value = null;
   } catch (err) {
-    toast.error(errorMessage(err));
+    toast.error(errorMessage(err), { copy: true });
   }
 }
 

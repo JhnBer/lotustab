@@ -2,7 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { Copy } from "@lucide/vue";
-import { toast } from "vue-sonner";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -50,7 +50,7 @@ async function copyName() {
     return;
   }
   if (!(await writeClipboard(name.value))) {
-    toast.error(t("common.copyFailed"));
+    toast.error(t("common.copyFailed"), { copy: true });
   }
 }
 
@@ -64,7 +64,7 @@ async function drop() {
     emit("update:open", false);
     emit("dropped");
   } catch (err) {
-    toast.error(errorMessage(err));
+    toast.error(errorMessage(err), { copy: true });
   } finally {
     dropping.value = false;
   }

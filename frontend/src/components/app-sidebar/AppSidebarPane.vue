@@ -9,7 +9,7 @@ import {
   Table2,
   Unplug,
 } from "@lucide/vue";
-import { toast } from "vue-sonner";
+import { toast } from "@/lib/toast";
 import { storeToRefs } from "pinia";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
@@ -121,7 +121,7 @@ function syncActiveDatabase() {
     return;
   }
   void explorer.setActiveDatabase(selected.value.id, next.database).catch((err) => {
-    toast.error(errorMessage(err));
+    toast.error(errorMessage(err), { copy: true });
   });
 }
 
@@ -131,7 +131,7 @@ function hydrateExplorer(id: string) {
     return;
   }
   void explorer.ensureExpandedTables(id).catch((err) => {
-    toast.error(errorMessage(err));
+    toast.error(errorMessage(err), { copy: true });
   });
 }
 
@@ -155,7 +155,7 @@ watch(
       await explorer.loadDatabases(id);
       hydrateExplorer(id);
     } catch (err) {
-      toast.error(errorMessage(err));
+      toast.error(errorMessage(err), { copy: true });
     }
   },
   { immediate: true },
@@ -225,7 +225,7 @@ async function onToggleDatabase(database: string) {
     }
     await explorer.toggleDatabase(selected.value.id, database);
   } catch (err) {
-    toast.error(errorMessage(err));
+    toast.error(errorMessage(err), { copy: true });
   }
 }
 
@@ -236,7 +236,7 @@ async function onSelectDatabase(value: string) {
   try {
     await explorer.setActiveDatabase(selected.value.id, value);
   } catch (err) {
-    toast.error(errorMessage(err));
+    toast.error(errorMessage(err), { copy: true });
   }
 }
 
@@ -253,7 +253,7 @@ async function refreshExplorer() {
       syncActiveDatabase();
     }
   } catch (err) {
-    toast.error(errorMessage(err));
+    toast.error(errorMessage(err), { copy: true });
   } finally {
     explorerRefreshing.value = false;
   }
@@ -339,7 +339,7 @@ async function onTableDropped() {
       await explorer.searchTables(profileId, query);
     }
   } catch (err) {
-    toast.error(errorMessage(err));
+    toast.error(errorMessage(err), { copy: true });
   }
 }
 </script>

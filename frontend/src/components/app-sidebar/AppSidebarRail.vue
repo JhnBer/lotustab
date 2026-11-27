@@ -5,7 +5,7 @@ import { ArrowUpDown, Database, Server, Settings } from "@lucide/vue";
 import { storeToRefs } from "pinia";
 import { VueDraggable } from "vue-draggable-plus";
 import { useRoute, useRouter } from "vue-router";
-import { toast } from "vue-sonner";
+import { toast } from "@/lib/toast";
 import {
   Sidebar,
   SidebarContent,
@@ -120,7 +120,7 @@ function resetPinDragging() {
 }
 
 function handleErr(err: unknown) {
-  toast.error(errorMessage(err));
+  toast.error(errorMessage(err), { copy: true });
 }
 
 function onPinMenuOpen(id: string, open: boolean) {

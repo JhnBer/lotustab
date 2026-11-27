@@ -2,7 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { RefreshCw } from "@lucide/vue";
-import { toast } from "vue-sonner";
+import { toast } from "@/lib/toast";
 import { FieldType, type Field } from "@/lib/wails";
 import { Input } from "@/components/ui/input";
 import {
@@ -68,14 +68,14 @@ async function onFetch() {
     const names = (await props.fetchOptions()) ?? [];
     fetched.value = names;
     if (names.length === 0) {
-      toast.error(t("connections.noDatabases"));
+      toast.error(t("connections.noDatabases"), { copy: true });
       return;
     }
     if (!props.modelValue && names.length === 1) {
       setValue(names[0]);
     }
   } catch (err) {
-    toast.error(errorMessage(err));
+    toast.error(errorMessage(err), { copy: true });
   } finally {
     fetching.value = false;
   }

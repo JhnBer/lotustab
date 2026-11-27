@@ -2,7 +2,7 @@
 import { computed, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { Events } from "@wailsio/runtime";
-import { toast } from "vue-sonner";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -234,7 +234,7 @@ async function choosePath() {
     outputDir.value = dir;
     lastExportDir = dir;
   } catch (err) {
-    toast.error(errorMessage(err));
+    toast.error(errorMessage(err), { copy: true });
   } finally {
     browsing.value = false;
   }
@@ -256,7 +256,7 @@ async function checkCount() {
     );
     checkedTotal.value = Number(n) || 0;
   } catch (err) {
-    toast.error(errorMessage(err));
+    toast.error(errorMessage(err), { copy: true });
   } finally {
     counting.value = false;
   }
@@ -278,7 +278,7 @@ async function startExport() {
         return;
       }
     } catch (err) {
-      toast.error(errorMessage(err));
+      toast.error(errorMessage(err), { copy: true });
       return;
     }
   }
@@ -364,7 +364,7 @@ async function startExport() {
       return;
     }
     transfers.fail(id, errorMessage(err));
-    toast.error(errorMessage(err));
+    toast.error(errorMessage(err), { copy: true });
     running.value = false;
   } finally {
     stopClock();

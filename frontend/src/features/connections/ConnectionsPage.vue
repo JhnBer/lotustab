@@ -3,7 +3,7 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { GripVertical, Pencil, Pin, Plug, Plus, Trash2, Unplug } from "@lucide/vue";
 import { VueDraggable } from "vue-draggable-plus";
-import { toast } from "vue-sonner";
+import { toast } from "@/lib/toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -62,7 +62,7 @@ async function onReorder() {
   try {
     await connections.reorderProfiles(sortableProfiles.value.map((p) => p.id));
   } catch (err) {
-    toast.error(errorMessage(err));
+    toast.error(errorMessage(err), { copy: true });
   }
 }
 </script>

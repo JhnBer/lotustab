@@ -2,7 +2,7 @@
 import { computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { Play, Plug } from "@lucide/vue";
-import { toast } from "vue-sonner";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -151,7 +151,7 @@ async function run(sql?: string) {
     if (isCanceled(err)) {
       return;
     }
-    toast.error(errorMessage(err));
+    toast.error(errorMessage(err), { copy: true });
   }
 }
 

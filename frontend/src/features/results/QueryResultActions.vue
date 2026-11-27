@@ -2,7 +2,7 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { ChevronDown, Copy, Save } from "@lucide/vue";
-import { toast } from "vue-sonner";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -38,7 +38,7 @@ const canCopyAll = computed(() => allSets.value.length > 0);
 
 async function copyText(text: string) {
   if (!(await writeClipboard(text))) {
-    toast.error(t("common.copyFailed"));
+    toast.error(t("common.copyFailed"), { copy: true });
   }
 }
 

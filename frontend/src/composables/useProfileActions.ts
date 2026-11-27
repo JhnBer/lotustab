@@ -1,4 +1,4 @@
-import { toast } from "vue-sonner";
+import { toast } from "@/lib/toast";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { errorMessage, isCanceled } from "@/lib/errors";
@@ -38,7 +38,7 @@ export function useProfileActions() {
     try {
       await connections.togglePinned(profile.id);
     } catch (err) {
-      toast.error(errorMessage(err));
+      toast.error(errorMessage(err), { copy: true });
     }
   }
 
@@ -46,7 +46,7 @@ export function useProfileActions() {
     try {
       await connections.setPinned(profile.id, false);
     } catch (err) {
-      toast.error(errorMessage(err));
+      toast.error(errorMessage(err), { copy: true });
     }
   }
 
@@ -72,7 +72,7 @@ export function useProfileActions() {
       if (isCanceled(err)) {
         return;
       }
-      toast.error(errorMessage(err));
+      toast.error(errorMessage(err), { copy: true });
     }
   }
 
@@ -81,7 +81,7 @@ export function useProfileActions() {
       await connections.disconnect(profile.id);
       toast.info(t("connections.disconnectedFrom", { name: profile.name }));
     } catch (err) {
-      toast.error(errorMessage(err));
+      toast.error(errorMessage(err), { copy: true });
     }
   }
 
@@ -90,7 +90,7 @@ export function useProfileActions() {
       await connections.clone(profile.id);
       toast.success(t("connections.cloned", { name: profile.name }));
     } catch (err) {
-      toast.error(errorMessage(err));
+      toast.error(errorMessage(err), { copy: true });
     }
   }
 
@@ -99,7 +99,7 @@ export function useProfileActions() {
       await connections.remove(profile.id);
       toast.success(t("connections.deleted", { name: profile.name }));
     } catch (err) {
-      toast.error(errorMessage(err));
+      toast.error(errorMessage(err), { copy: true });
     }
   }
 
@@ -110,7 +110,7 @@ export function useProfileActions() {
         await router.push("/connections");
       }
     } catch (err) {
-      toast.error(errorMessage(err));
+      toast.error(errorMessage(err), { copy: true });
     }
   }
 

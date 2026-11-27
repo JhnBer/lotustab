@@ -3,7 +3,7 @@ import { onMounted, onBeforeUnmount, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 import { Events } from "@wailsio/runtime";
-import { toast } from "vue-sonner";
+import { toast } from "@/lib/toast";
 import { useTitleBarHeight } from "@/composables/useTitleBarHeight";
 import ValueInspectorPanel from "@/features/results/ValueInspectorPanel.vue";
 import type { ValueInspectorPayload } from "@/features/results/valueInspector";
@@ -105,10 +105,10 @@ async function returnToPanel() {
     const message = errorMessage(err);
     if (message.toLowerCase().includes("closed")) {
       returnUnavailable.value = true;
-      toast.error(t("results.sourceClosed"));
+      toast.error(t("results.sourceClosed"), { copy: true });
       return;
     }
-    toast.error(message);
+    toast.error(message, { copy: true });
   }
 }
 

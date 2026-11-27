@@ -2,7 +2,7 @@ import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { Events } from "@wailsio/runtime";
-import { toast } from "vue-sonner";
+import { toast } from "@/lib/toast";
 import { i18n, translate } from "@/i18n";
 import { errorMessage } from "@/lib/errors";
 import { AboutService } from "@/lib/wails";
@@ -178,6 +178,7 @@ export const useUpdatesStore = defineStore("updates", () => {
     }
     applyFailureNotified = true;
     toast.error(message, {
+      copy: true,
       action: {
         label: translate("about.openAbout"),
         onClick: () => {

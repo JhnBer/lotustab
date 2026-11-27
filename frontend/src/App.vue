@@ -3,7 +3,7 @@ import { computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useColorMode } from "@vueuse/core";
 import { useRoute, useRouter } from "vue-router";
-import { toast } from "vue-sonner";
+import { toast } from "@/lib/toast";
 import { Events, Window } from "@wailsio/runtime";
 import AppResizableLayout from "@/components/AppResizableLayout.vue";
 import AppSidebarRail from "@/components/app-sidebar/AppSidebarRail.vue";
@@ -74,7 +74,7 @@ onMounted(async () => {
   try {
     await connections.refresh();
   } catch (err) {
-    toast.error(errorMessage(err));
+    toast.error(errorMessage(err), { copy: true });
     updates.bindMainWindow();
   }
   Events.On("open:export-data", () => {

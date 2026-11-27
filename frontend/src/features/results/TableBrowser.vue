@@ -2,7 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { ChevronDown, ChevronRight, Filter, Plus, RotateCw, X } from "@lucide/vue";
-import { toast } from "vue-sonner";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -90,7 +90,7 @@ async function onApply() {
   try {
     await queries.applyEdits(props.tab.id);
   } catch (err) {
-    toast.error(errorMessage(err));
+    toast.error(errorMessage(err), { copy: true });
   }
 }
 
@@ -107,7 +107,7 @@ async function applyStructure() {
   try {
     await queries.applyStructure(props.tab.id);
   } catch (err) {
-    toast.error(errorMessage(err));
+    toast.error(errorMessage(err), { copy: true });
   }
 }
 </script>

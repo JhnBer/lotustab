@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { toast } from "vue-sonner";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -169,7 +169,7 @@ async function choosePath() {
     outputDir.value = dir;
     lastSaveDir = dir;
   } catch (err) {
-    toast.error(errorMessage(err));
+    toast.error(errorMessage(err), { copy: true });
   } finally {
     browsing.value = false;
   }
@@ -203,7 +203,7 @@ async function save() {
         return;
       }
     } catch (err) {
-      toast.error(errorMessage(err));
+      toast.error(errorMessage(err), { copy: true });
       return;
     }
   }
@@ -236,7 +236,7 @@ async function save() {
       overwriteWarn.value = true;
       return;
     }
-    toast.error(errorMessage(err));
+    toast.error(errorMessage(err), { copy: true });
   } finally {
     saving.value = false;
   }

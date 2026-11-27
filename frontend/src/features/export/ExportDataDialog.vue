@@ -3,7 +3,7 @@ import { computed, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { Events } from "@wailsio/runtime";
 import { Eye, RefreshCw, Table2 } from "@lucide/vue";
-import { toast } from "vue-sonner";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -356,7 +356,7 @@ async function loadDatabases(id: string, keepDatabase = "") {
       return;
     }
     dbError.value = errorMessage(err);
-    toast.error(errorMessage(err));
+    toast.error(errorMessage(err), { copy: true });
   } finally {
     if (profileId.value === id) {
       loadingDbs.value = false;
@@ -384,7 +384,7 @@ async function loadTables(id: string, db: string) {
     }
     tables.value = [];
     tableError.value = errorMessage(err);
-    toast.error(errorMessage(err));
+    toast.error(errorMessage(err), { copy: true });
   } finally {
     if (profileId.value === id && database.value === db) {
       loadingTables.value = false;
@@ -448,7 +448,7 @@ async function choosePath() {
     outputDir.value = dir;
     lastExportDir = dir;
   } catch (err) {
-    toast.error(errorMessage(err));
+    toast.error(errorMessage(err), { copy: true });
   } finally {
     browsing.value = false;
   }
@@ -484,7 +484,7 @@ async function startExport() {
         return;
       }
     } catch (err) {
-      toast.error(errorMessage(err));
+      toast.error(errorMessage(err), { copy: true });
       return;
     }
   }
@@ -531,7 +531,7 @@ async function startExport() {
         emit("update:open", false);
         return;
       }
-      toast.error(errorMessage(err));
+      toast.error(errorMessage(err), { copy: true });
       return;
     }
   }
@@ -611,7 +611,7 @@ async function startExport() {
       return;
     }
     transfers.fail(id, errorMessage(err));
-    toast.error(errorMessage(err));
+    toast.error(errorMessage(err), { copy: true });
     phase.value = "form";
   } finally {
     stopClock();

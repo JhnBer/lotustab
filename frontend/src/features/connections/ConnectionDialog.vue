@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { toast } from "vue-sonner";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -138,7 +138,7 @@ async function onTest() {
     await connections.test(payload());
     toast.success(t("connections.succeeded"));
   } catch (err) {
-    toast.error(errorMessage(err));
+    toast.error(errorMessage(err), { copy: true });
   } finally {
     testing.value = false;
   }
@@ -151,7 +151,7 @@ async function onSave() {
     toast.success(isEdit.value ? t("connections.saved") : t("connections.created"));
     emit("update:open", false);
   } catch (err) {
-    toast.error(errorMessage(err));
+    toast.error(errorMessage(err), { copy: true });
   } finally {
     saving.value = false;
   }
